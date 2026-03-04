@@ -13,6 +13,11 @@ public class LoginRequest
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
+    /// Google reCAPTCHA v2 token (required when captcha is enabled)
+    /// </summary>
+    public string? CaptchaToken { get; set; }
+
+    /// <summary>
     /// Client IP address for session tracking
     /// </summary>
     public string? IpAddress { get; set; }

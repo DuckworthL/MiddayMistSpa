@@ -1,5 +1,6 @@
-@* Security Settings Component - Two-Factor Authentication *@
+@* Security Settings Component - Two-Factor Authentication & CAPTCHA *@
 @inject ITwoFactorApiService TwoFactorApi
+@inject ICaptchaApiService CaptchaApi
 @inject IAuthStateService AuthService
 
 <div class="card">
@@ -72,6 +73,96 @@
                                 <small class="text-muted">Enter the 6-digit code</small>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@* ===== CAPTCHA SETTINGS CARD ===== *@
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-robot me-2"></i>CAPTCHA Protection</h5>
+    </div>
+    <div class="card-body">
+        @if (_captchaLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading CAPTCHA settings...</p>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-lg-8">
+                    @if (!string.IsNullOrEmpty(_captchaMessage))
+                    {
+                        <div class="alert @(_captchaSuccess ? "alert-success" : "alert-danger") d-flex align-items-center py-2 mb-3">
+                            <i class="bi @(_captchaSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i>
+                            <span>@_captchaMessage</span>
+                        </div>
+                    }
+
+                    @* Status Card *@
+                    <div class="d-flex align-items-center p-3 rounded-3 mb-4" style="background: @(_captchaEnabled ? "#E8F5E9" : "#FFF3E0");">
+                        <div class="me-3">
+                            <i class="bi @(_captchaEnabled ? "bi-shield-fill-check" : "bi-shield-fill-exclamation") fs-2"
+                               style="color: @(_captchaEnabled ? "#2E7D32" : "#E65100");"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1" style="color: @(_captchaEnabled ? "#2E7D32" : "#E65100");">
+                                @(_captchaEnabled ? "CAPTCHA is Enabled" : "CAPTCHA is Disabled")
+                            </h6>
+                            <p class="mb-0 small text-muted">
+                                @(_captchaEnabled
+                                    ? "Users must complete a CAPTCHA challenge when logging in"
+                                    : "Enable CAPTCHA to protect the login page from automated attacks")
+                            </p>
+                        </div>
+                    </div>
+
+                    @* Settings Form *@
+                    <div class="mb-3">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="captchaEnabled" @bind="_captchaEnabled" />
+                            <label class="form-check-label" for="captchaEnabled">Enable reCAPTCHA on login page</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Site Key</label>
+                        <input type="text" class="form-control" @bind="_captchaSiteKey" placeholder="reCAPTCHA v2 Site Key" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Secret Key</label>
+                        <div class="input-group">
+                            <input type="@(_showSecretKey ? "text" : "password")" class="form-control" @bind="_captchaSecretKey" placeholder="reCAPTCHA v2 Secret Key" />
+                            <button class="btn btn-outline-secondary" type="button" @onclick="() => _showSecretKey = !_showSecretKey">
+                                <i class="bi @(_showSecretKey ? "bi-eye-slash" : "bi-eye")"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="SaveCaptchaSettings" disabled="@_captchaSaving">
+                            @if (_captchaSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-lg me-1"></i> Save CAPTCHA Settings
+                        </button>
+                    </div>
+
+                    <div class="mt-3 p-3 rounded-3" style="background: #F8F9FA;">
+                        <p class="small text-muted mb-1"><i class="bi bi-info-circle me-1"></i> <strong>Note:</strong></p>
+                        <ul class="small text-muted mb-0 ps-3">
+                            <li>Uses Google reCAPTCHA v2 ("I'm not a robot" checkbox)</li>
+                            <li>Get your keys from <a href="https://www.google.com/recaptcha/admin" target="_blank">Google reCAPTCHA Admin</a></li>
+                            <li>To increase challenge difficulty, set Security Preference to "Most Secure" in the reCAPTCHA Admin console</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -276,9 +367,20 @@
     private string? _disableError;
     private bool _isDisabling;
 
+    // Captcha settings
+    private bool _captchaLoading = true;
+    private bool _captchaEnabled;
+    private string _captchaSiteKey = string.Empty;
+    private string _captchaSecretKey = string.Empty;
+    private bool _showSecretKey;
+    private bool _captchaSaving;
+    private string? _captchaMessage;
+    private bool _captchaSuccess;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadStatus();
+        await LoadCaptchaSettings();
     }
 
     private async Task LoadStatus()
@@ -406,6 +508,69 @@
         finally
         {
             _isDisabling = false;
+        }
+    }
+
+    // ===== CAPTCHA METHODS =====
+
+    private async Task LoadCaptchaSettings()
+    {
+        _captchaLoading = true;
+        try
+        {
+            var settings = await CaptchaApi.GetSettingsAsync();
+            if (settings != null)
+            {
+                _captchaEnabled = settings.Enabled;
+                _captchaSiteKey = settings.SiteKey;
+                _captchaSecretKey = string.Empty; // secret key is never sent to frontend for display
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading captcha settings: {ex.Message}");
+        }
+        finally
+        {
+            _captchaLoading = false;
+        }
+    }
+
+    private async Task SaveCaptchaSettings()
+    {
+        _captchaSaving = true;
+        _captchaMessage = null;
+
+        try
+        {
+            var request = new UpdateCaptchaSettingsRequest
+            {
+                Enabled = _captchaEnabled,
+                SiteKey = _captchaSiteKey,
+                SecretKey = _captchaSecretKey
+            };
+
+            var success = await CaptchaApi.UpdateSettingsAsync(request);
+            if (success)
+            {
+                _captchaMessage = "CAPTCHA settings saved successfully!";
+                _captchaSuccess = true;
+            }
+            else
+            {
+                _captchaMessage = "Failed to save CAPTCHA settings";
+                _captchaSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _captchaMessage = "Error saving CAPTCHA settings";
+            _captchaSuccess = false;
+            Console.WriteLine($"Captcha save error: {ex.Message}");
+        }
+        finally
+        {
+            _captchaSaving = false;
         }
     }
 }

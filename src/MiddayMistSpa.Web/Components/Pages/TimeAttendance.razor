@@ -17,9 +17,12 @@
                 <p class="text-muted mb-0">Track employee hours and attendance</p>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary" @onclick="ShowManualEntryModal">
-                    <i class="bi bi-pencil-square me-1"></i> Manual Entry
-                </button>
+                @if (_isAdminUser)
+                {
+                    <button class="btn btn-outline-primary" @onclick="ShowManualEntryModal">
+                        <i class="bi bi-pencil-square me-1"></i> Manual Entry
+                    </button>
+                }
                 <button class="btn btn-primary" @onclick="ShowClockModal">
                     <i class="bi bi-clock me-1"></i> Clock In/Out
                 </button>
@@ -65,15 +68,18 @@
                     <div class="col">
                         <h5 class="mb-0">@_weekStart.ToString("MMM dd") - @_weekEnd.ToString("MMM dd, yyyy")</h5>
                     </div>
-                    <div class="col-md-2">
-                        <select class="form-select" @onchange="OnEmployeeFilterChange">
-                            <option value="">All Employees</option>
-                            @foreach (var emp in _employeeLookup)
-                            {
-                                <option value="@emp.Id">@emp.Name</option>
-                            }
-                        </select>
-                    </div>
+                    @if (_isAdminUser)
+                    {
+                        <div class="col-md-2">
+                            <select class="form-select" @onchange="OnEmployeeFilterChange">
+                                <option value="">All Employees</option>
+                                @foreach (var emp in _employeeLookup)
+                                {
+                                    <option value="@emp.Id">@emp.Name</option>
+                                }
+                            </select>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -254,12 +260,15 @@
                                     <th class="text-center">Break</th>
                                     <th class="text-center">Total Hours</th>
                                     <th class="text-center">Status</th>
-                                    <th class="text-end">Actions</th>
+                                    @if (_isAdminUser)
+                                    {
+                                        <th class="text-end">Actions</th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e =>
-                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
                                 {
                                     <tr>
                                         <td>@entry.Date.ToString("ddd, MMM dd")</td>
@@ -289,21 +298,24 @@
                                                 <span class="badge bg-warning">Pending</span>
                                             }
                                         </td>
-                                        <td class="text-end">
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" @onclick="() => EditTimeEntry(entry)"
-                                                        title="Edit">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                @if (!entry.IsApproved)
-                                                {
-                                                    <button class="btn btn-outline-success" @onclick="() => ApproveEntry(entry)"
-                                                            title="Approve">
-                                                        <i class="bi bi-check-lg"></i>
+                                        @if (_isAdminUser)
+                                        {
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" @onclick="() => EditTimeEntry(entry)"
+                                                            title="Edit">
+                                                        <i class="bi bi-pencil"></i>
                                                     </button>
-                                                }
-                                            </div>
-                                        </td>
+                                                    @if (!entry.IsApproved)
+                                                    {
+                                                        <button class="btn btn-outline-success" @onclick="() => ApproveEntry(entry)"
+                                                                title="Approve">
+                                                            <i class="bi bi-check-lg"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>
@@ -478,7 +490,7 @@
     private bool _showClockModal;
     private ClockFormModel _clockForm = new();
     private LiveStatusViewModel? _selectedEmployeeStatus;
-    private bool _isAdminUser;
+    private bool _isAdminUser = false;
     private string _currentEmployeeName = string.Empty;
 
     // Manual entry modal
@@ -528,6 +540,14 @@
             {
                 var emp = _employeeLookup.FirstOrDefault(e => e.Id == currentEmployeeId.Value);
                 _currentEmployeeName = emp?.Name ?? AuthService.CurrentUser?.FullName ?? "You";
+            }
+            else
+            {
+                // Fallback: use user's display name when no Employee record is linked
+                _currentEmployeeName = AuthService.CurrentUser?.FullName
+                    ?? $"{AuthService.CurrentUser?.FirstName} {AuthService.CurrentUser?.LastName}".Trim();
+                if (string.IsNullOrWhiteSpace(_currentEmployeeName))
+                    _currentEmployeeName = AuthService.CurrentUser?.Username ?? "You";
             }
         }
     }
@@ -627,6 +647,18 @@
             _timesheets = BuildTimesheetsFromAttendance(attendance);
             _timeEntries = BuildTimeEntriesFromAttendance(attendance);
 
+            // Non-admin users should only see their own data
+            if (!_isAdminUser)
+            {
+                var myEmployeeId = AuthService.CurrentUser?.EmployeeId;
+                if (myEmployeeId.HasValue && myEmployeeId.Value > 0)
+                {
+                    _liveStatus = _liveStatus.Where(s => s.EmployeeId == myEmployeeId.Value).ToList();
+                    _timesheets = _timesheets.Where(t => t.EmployeeId == myEmployeeId.Value).ToList();
+                    _timeEntries = _timeEntries.Where(e => e.EmployeeId == myEmployeeId.Value).ToList();
+                }
+            }
+
             _clockedInCount = _liveStatus.Count(s => s.Status == "ClockedIn");
             _onBreakCount = _liveStatus.Count(s => s.Status == "OnBreak");
             _clockedOutCount = _liveStatus.Count(s => s.Status == "ClockedOut");
@@ -662,6 +694,7 @@
         .GroupBy(a => a.EmployeeId)
         .Select(g => new TimesheetViewModel
         {
+            EmployeeId = g.Key,
             EmployeeName = g.First().EmployeeName,
             Initials = GetInitials(g.First().EmployeeName),
             Position = g.First().Position ?? "Staff",
@@ -691,6 +724,7 @@
         .Where(a => a.ClockIn.HasValue) // Only include records with clock-in
         .Select(a => new TimeEntryViewModel
         {
+            EmployeeId = a.EmployeeId,
             EmployeeName = a.EmployeeName,
             Date = a.Date,
             ClockIn = a.ClockIn!.Value.TimeOfDay,
@@ -711,6 +745,19 @@
         {
             _clockForm.EmployeeId = currentEmployeeId.Value;
             _selectedEmployeeStatus = _liveStatus.FirstOrDefault(s => s.EmployeeId == currentEmployeeId.Value);
+
+            // If employee exists but isn't in live status yet, create a default "not clocked in" status
+            if (_selectedEmployeeStatus == null)
+            {
+                _selectedEmployeeStatus = new LiveStatusViewModel
+                {
+                    EmployeeId = currentEmployeeId.Value,
+                    EmployeeName = _currentEmployeeName,
+                    IsClockedIn = false,
+                    OnBreak = false,
+                    Status = "NotYetIn"
+                };
+            }
         }
         else
         {
@@ -966,6 +1013,7 @@ base64);
 
     private class TimesheetViewModel
     {
+        public int EmployeeId { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
         public string Initials { get; set; } = string.Empty;
         public string Position { get; set; } = string.Empty;
@@ -976,6 +1024,7 @@ base64);
 
     private class TimeEntryViewModel
     {
+        public int EmployeeId { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public TimeSpan ClockIn { get; set; }

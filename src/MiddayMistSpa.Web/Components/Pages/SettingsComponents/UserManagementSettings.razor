@@ -10,15 +10,18 @@
         <div class="row mb-3">
             <div class="col-md-4">
                 <input type="text" class="form-control" placeholder="Search users..." @bind="_searchTerm"
-                    @bind:event="oninput" />
+                       @bind:event="oninput" />
             </div>
             <div class="col-md-3">
                 <select class="form-select" @bind="_roleFilter">
                     <option value="">All Roles</option>
+                    <option value="SuperAdmin">Super Admin</option>
                     <option value="Admin">Admin</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Therapist">Therapist</option>
                     <option value="Receptionist">Receptionist</option>
+                    <option value="Therapist">Therapist</option>
+                    <option value="HR">HR</option>
+                    <option value="Inventory">Inventory</option>
+                    <option value="Accountant">Accountant</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -50,7 +53,7 @@
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <div class="avatar"
-                                        style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+                                         style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
                                         @user.FirstName.Substring(0, 1)@user.LastName.Substring(0, 1)
                                     </div>
                                     <div>
@@ -72,13 +75,13 @@
                                     <i class="bi bi-pencil text-primary"></i>
                                 </button>
                                 <button class="btn btn-link btn-sm p-1" @onclick="() => ResetPassword(user)"
-                                    title="Reset Password">
+                                        title="Reset Password">
                                     <i class="bi bi-key text-warning"></i>
                                 </button>
                                 <button class="btn btn-link btn-sm p-1" @onclick="() => ToggleStatus(user)"
-                                    title="@(user.Status == "Active" ? "Deactivate" : "Activate")">
+                                        title="@(user.Status == "Active" ? "Deactivate" : "Activate")">
                                     <i
-                                        class="bi @(user.Status == "Active" ? "bi-person-x text-danger" : "bi-person-check text-success")"></i>
+                                    class="bi @(user.Status == "Active" ? "bi-person-x text-danger" : "bi-person-check text-success")"></i>
                                 </button>
                             </td>
                         </tr>
@@ -112,7 +115,7 @@
                         <div class="col-md-6">
                             <label class="form-label">Username</label>
                             <input type="text" class="form-control" @bind="_formModel.Username"
-                                disabled="@(_editingUser != null)" />
+                                   disabled="@(_editingUser != null)" />
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Email</label>
@@ -132,10 +135,13 @@
                         <div class="col-md-6">
                             <label class="form-label">Role</label>
                             <select class="form-select" @bind="_formModel.Role">
+                                <option value="SuperAdmin">Super Admin</option>
                                 <option value="Admin">Admin</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Therapist">Therapist</option>
                                 <option value="Receptionist">Receptionist</option>
+                                <option value="Therapist">Therapist</option>
+                                <option value="HR">HR</option>
+                                <option value="Inventory">Inventory</option>
+                                <option value="Accountant">Accountant</option>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -167,20 +173,24 @@
 
 @code {
     private List<UserModel> _users = new()
-{
-new() { Id = 1, FirstName = "Admin", LastName = "User", Username = "admin", Email = "admin@middaymistspa.com", Role =
-"Admin", Status = "Active", LastLogin = DateTime.Now.AddHours(-2) },
-new() { Id = 2, FirstName = "Maria", LastName = "Santos", Username = "maria.santos", Email = "maria@middaymistspa.com",
-Role = "Manager", Status = "Active", LastLogin = DateTime.Now.AddHours(-5) },
-new() { Id = 3, FirstName = "Ana", LastName = "Reyes", Username = "ana.reyes", Email = "ana@middaymistspa.com", Role =
-"Therapist", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) },
-new() { Id = 4, FirstName = "Sofia", LastName = "Garcia", Username = "sofia.garcia", Email = "sofia@middaymistspa.com",
-Role = "Therapist", Status = "Active", LastLogin = DateTime.Now.AddDays(-2) },
-new() { Id = 5, FirstName = "Carlos", LastName = "Mendoza", Username = "carlos.mendoza", Email =
-"carlos@middaymistspa.com", Role = "Receptionist", Status = "Inactive", LastLogin = DateTime.Now.AddDays(-30) },
-new() { Id = 6, FirstName = "New", LastName = "Employee", Username = "new.employee", Email = "new@middaymistspa.com",
-Role = "Therapist", Status = "Pending", LastLogin = null }
-};
+    {
+        new() { Id = 1, FirstName = "System", LastName = "Administrator", Username = "superadmin", Email =
+"superadmin@middaymistspa.com",
+            Role = "SuperAdmin", Status = "Active", LastLogin = DateTime.Now.AddHours(-1) },
+        new() { Id = 2, FirstName = "Admin", LastName = "User", Username = "admin", Email = "admin@middaymistspa.com",
+            Role = "Admin", Status = "Active", LastLogin = DateTime.Now.AddHours(-2) },
+        new() { Id = 3, FirstName = "Maria", LastName = "Santos", Username = "maria.santos", Email = "maria@middaymistspa.com",
+            Role = "Receptionist", Status = "Active", LastLogin = DateTime.Now.AddHours(-5) },
+        new() { Id = 4, FirstName = "Ana", LastName = "Reyes", Username = "ana.reyes", Email = "ana@middaymistspa.com",
+            Role = "Therapist", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) },
+        new() { Id = 5, FirstName = "Rosa", LastName = "Cruz", Username = "rosa.cruz", Email = "rosa@middaymistspa.com",
+            Role = "HR", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) },
+        new() { Id = 6, FirstName = "Juan", LastName = "Dela Cruz", Username = "juan.delacruz", Email =
+"juan@middaymistspa.com",
+            Role = "Inventory", Status = "Active", LastLogin = DateTime.Now.AddDays(-2) },
+        new() { Id = 7, FirstName = "Sofia", LastName = "Garcia", Username = "sofia.garcia", Email = "sofia@middaymistspa.com",
+            Role = "Accountant", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) }
+    };
 
     private string _searchTerm = "";
     private string _roleFilter = "";
@@ -200,10 +210,13 @@ Role = "Therapist", Status = "Pending", LastLogin = null }
 
     private string GetRoleBadgeClass(string role) => role switch
     {
-        "Admin" => "bg-danger",
-        "Manager" => "bg-primary",
-        "Therapist" => "bg-success",
+        "SuperAdmin" => "bg-danger",
+        "Admin" => "bg-primary",
         "Receptionist" => "bg-info",
+        "Therapist" => "bg-success",
+        "HR" => "bg-warning text-dark",
+        "Inventory" => "bg-secondary",
+        "Accountant" => "bg-dark",
         _ => "bg-secondary"
     };
 

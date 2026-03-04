@@ -12,7 +12,7 @@ public interface IAuthStateService
     bool IsAuthenticated { get; }
     string? CurrentToken { get; }
     Models.UserInfo? CurrentUser { get; }
-    Task<LoginResult> LoginAsync(string username, string password);
+    Task<LoginResult> LoginAsync(string username, string password, string? captchaToken = null);
     Task<bool> ValidateTwoFactorAsync(string twoFactorToken, string code, string? recoveryCode = null);
     Task LogoutAsync();
     Task<bool> TryRestoreSessionAsync();
@@ -48,15 +48,16 @@ public class AuthStateService : IAuthStateService
         _localStorage = localStorage;
     }
 
-    public async Task<LoginResult> LoginAsync(string username, string password)
+    public async Task<LoginResult> LoginAsync(string username, string password, string? captchaToken = null)
     {
         var loginRequest = new Models.LoginRequest
         {
             Username = username,
-            Password = password
+            Password = password,
+            CaptchaToken = captchaToken
         };
 
-        var response = await _apiClient.PostAsync<Models.LoginRequest, Models.LoginResponse>("api/auth/login", loginRequest);
+        var (response, errorMessage) = await _apiClient.PostWithErrorAsync<Models.LoginRequest, Models.LoginResponse>("api/auth/login", loginRequest);
 
         // Check if 2FA is required
         if (response?.RequiresTwoFactor == true && !string.IsNullOrEmpty(response.TwoFactorToken))
@@ -89,7 +90,7 @@ public class AuthStateService : IAuthStateService
         return new LoginResult
         {
             Success = false,
-            ErrorMessage = response?.Message ?? "Invalid username or password"
+            ErrorMessage = response?.Message ?? errorMessage ?? "Invalid username or password"
         };
     }
 

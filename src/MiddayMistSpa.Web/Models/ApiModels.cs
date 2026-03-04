@@ -30,19 +30,71 @@ public class ApiResponse<T>
 // Dashboard Models
 // =============================================================================
 
+/// <summary>
+/// Matches the API's DashboardResponse nested structure
+/// </summary>
 public class DashboardSummary
 {
-    public decimal TodayRevenue { get; set; }
-    public int TodayAppointments { get; set; }
-    public int TodayCompletedAppointments { get; set; }
-    public int TodayNewCustomers { get; set; }
-    public int ActiveEmployees { get; set; }
-    public int LowStockItems { get; set; }
-    public decimal MonthRevenue { get; set; }
-    public int MonthAppointments { get; set; }
-    public List<AppointmentSummary> UpcomingAppointments { get; set; } = new();
-    public List<RevenueByDay> WeeklyRevenue { get; set; } = new();
+    public DateTime GeneratedAt { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public DashboardKpi Kpis { get; set; } = new();
+    public RevenueBreakdown Revenue { get; set; } = new();
+    public AppointmentsSummary Appointments { get; set; } = new();
+    public InventoryAlerts Inventory { get; set; } = new();
     public List<TopService> TopServices { get; set; } = new();
+}
+
+public class DashboardKpi
+{
+    public decimal TotalRevenue { get; set; }
+    public decimal RevenueChange { get; set; }
+    public int TotalAppointments { get; set; }
+    public int AppointmentChange { get; set; }
+    public int NewCustomers { get; set; }
+    public int NewCustomerChange { get; set; }
+    public decimal AverageTicket { get; set; }
+    public decimal AverageTicketChange { get; set; }
+    public decimal OccupancyRate { get; set; }
+    public decimal CustomerRetentionRate { get; set; }
+}
+
+public class RevenueBreakdown
+{
+    public decimal ServiceRevenue { get; set; }
+    public decimal ProductRevenue { get; set; }
+    public decimal PackageRevenue { get; set; }
+    public decimal TipsReceived { get; set; }
+    public decimal Discounts { get; set; }
+    public decimal RefundsProcessed { get; set; }
+    public decimal NetRevenue { get; set; }
+    public List<DailyRevenue> DailyTrend { get; set; } = new();
+}
+
+public class DailyRevenue
+{
+    public DateTime Date { get; set; }
+    public decimal Revenue { get; set; }
+    public int AppointmentCount { get; set; }
+}
+
+public class AppointmentsSummary
+{
+    public int Scheduled { get; set; }
+    public int Completed { get; set; }
+    public int Cancelled { get; set; }
+    public int NoShow { get; set; }
+    public int InProgress { get; set; }
+    public decimal CompletionRate { get; set; }
+    public decimal CancellationRate { get; set; }
+    public decimal NoShowRate { get; set; }
+}
+
+public class InventoryAlerts
+{
+    public int LowStockItems { get; set; }
+    public int OutOfStockItems { get; set; }
+    public int ExpiringItems { get; set; }
 }
 
 public class AppointmentSummary
@@ -55,13 +107,6 @@ public class AppointmentSummary
     public TimeSpan StartTime { get; set; }
     public TimeSpan EndTime { get; set; }
     public string Status { get; set; } = string.Empty;
-}
-
-public class RevenueByDay
-{
-    public DateTime Date { get; set; }
-    public decimal Revenue { get; set; }
-    public int TransactionCount { get; set; }
 }
 
 // TopService is defined in Reports Models section below
@@ -618,6 +663,7 @@ public class LoginRequest
 {
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+    public string? CaptchaToken { get; set; }
 }
 
 public class LoginResponse
@@ -1079,58 +1125,6 @@ public class DashboardReportResponse
     public List<TopPerformer> TopTherapists { get; set; } = new();
     public List<TopService> TopServices { get; set; } = new();
     public List<TopCustomer> TopCustomers { get; set; } = new();
-}
-
-public class DashboardKpi
-{
-    public decimal TotalRevenue { get; set; }
-    public decimal RevenueChange { get; set; }
-    public int TotalAppointments { get; set; }
-    public int AppointmentChange { get; set; }
-    public int NewCustomers { get; set; }
-    public int NewCustomerChange { get; set; }
-    public decimal AverageTicket { get; set; }
-    public decimal OccupancyRate { get; set; }
-    public decimal CustomerRetentionRate { get; set; }
-}
-
-public class RevenueBreakdown
-{
-    public decimal ServiceRevenue { get; set; }
-    public decimal ProductRevenue { get; set; }
-    public decimal PackageRevenue { get; set; }
-    public decimal TipsReceived { get; set; }
-    public decimal Discounts { get; set; }
-    public decimal RefundsProcessed { get; set; }
-    public decimal NetRevenue { get; set; }
-    public List<DailyRevenue> DailyTrend { get; set; } = new();
-}
-
-public class DailyRevenue
-{
-    public DateTime Date { get; set; }
-    public decimal Revenue { get; set; }
-    public int AppointmentCount { get; set; }
-}
-
-public class AppointmentsSummary
-{
-    public int Scheduled { get; set; }
-    public int Completed { get; set; }
-    public int Cancelled { get; set; }
-    public int NoShow { get; set; }
-    public int InProgress { get; set; }
-    public decimal CompletionRate { get; set; }
-    public decimal CancellationRate { get; set; }
-    public decimal NoShowRate { get; set; }
-}
-
-public class InventoryAlerts
-{
-    public int LowStockItems { get; set; }
-    public int OutOfStockItems { get; set; }
-    public int ExpiringItems { get; set; }
-    public List<LowStockItem> LowStockList { get; set; } = new();
 }
 
 public class LowStockItem
@@ -1978,4 +1972,21 @@ public class SupportedCurrenciesResponse
 {
     public string BaseCurrency { get; set; } = "PHP";
     public List<SupportedCurrencyInfo> Currencies { get; set; } = new();
+}
+
+// =============================================================================
+// Captcha Models
+// =============================================================================
+
+public class CaptchaSettingsResponse
+{
+    public bool Enabled { get; set; }
+    public string SiteKey { get; set; } = string.Empty;
+}
+
+public class UpdateCaptchaSettingsRequest
+{
+    public bool Enabled { get; set; }
+    public string SiteKey { get; set; } = string.Empty;
+    public string SecretKey { get; set; } = string.Empty;
 }

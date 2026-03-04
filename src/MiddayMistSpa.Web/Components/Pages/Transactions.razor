@@ -191,7 +191,7 @@
                                                                 </button>
                                                                 @if (txn.PaymentStatus == "Paid")
                                                                 {
-                                                                    <button class="btn btn-outline-danger"
+                                                                    <button class="btn btn-outline-warning text-dark"
                                                                             @onclick="() => ShowRefundConfirmation(txn)" title="Refund">
                                                                         <i class="bi bi-arrow-counterclockwise"></i>
                                                                     </button>
@@ -488,7 +488,7 @@
                                         <td class="text-end">@_selectedTransaction.TotalAmount.ToString("C")</td>
                                     </tr>
                                     @if (_selectedTransaction.ClientCurrency != "PHP" &&
-                                                        _selectedTransaction.TotalInClientCurrency.HasValue)
+                                                                                            _selectedTransaction.TotalInClientCurrency.HasValue)
                                     {
                                         <tr class="text-muted">
                                             <td colspan="3" class="text-end">In @_selectedTransaction.ClientCurrency:</td>

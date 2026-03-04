@@ -1,7 +1,9 @@
 @page "/login"
 @layout EmptyLayout
 @inject IAuthStateService AuthService
+@inject ICaptchaApiService CaptchaApi
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Login - MiddayMist Spa</PageTitle>
 
@@ -92,6 +94,19 @@
                                 </div>
                                 <a href="/forgot-password" class="text-primary small">Forgot password?</a>
                             </div>
+
+                            @if (_captchaEnabled && !string.IsNullOrEmpty(_captchaSiteKey))
+                            {
+                                <div class="mb-3 d-flex justify-content-center">
+                                    <div id="recaptcha-container"></div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_captchaError))
+                                {
+                                    <div class="alert alert-warning py-2 small mb-3">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>@_captchaError
+                                    </div>
+                                }
+                            }
 
                             <button type="submit" class="btn btn-primary w-100 py-3" disabled="@_isLoading">
                                 @if (_isLoading)
@@ -436,12 +451,50 @@
     private string? _recoveryCode;
     private bool _showRecoveryInput;
 
+    // Captcha state
+    private bool _captchaEnabled;
+    private string? _captchaSiteKey;
+    private string? _captchaError;
+    private bool _captchaRendered;
+
     protected override async Task OnInitializedAsync()
     {
         // Check if already authenticated
         if (AuthService.IsAuthenticated)
         {
             Navigation.NavigateTo("/");
+            return;
+        }
+
+        // Load captcha settings
+        try
+        {
+            var settings = await CaptchaApi.GetSettingsAsync();
+            if (settings != null)
+            {
+                _captchaEnabled = settings.Enabled;
+                _captchaSiteKey = settings.SiteKey;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load captcha settings: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_captchaEnabled && !string.IsNullOrEmpty(_captchaSiteKey) && !_captchaRendered && !_requiresTwoFactor)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("renderRecaptcha", _captchaSiteKey);
+                _captchaRendered = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Captcha render error: {ex.Message}");
+            }
         }
     }
 
@@ -449,10 +502,33 @@
     {
         _isLoading = true;
         _errorMessage = null;
+        _captchaError = null;
 
         try
         {
-            var result = await AuthService.LoginAsync(_loginModel.Username, _loginModel.Password);
+            // Get captcha token if captcha is enabled
+            string? captchaToken = null;
+            if (_captchaEnabled && !string.IsNullOrEmpty(_captchaSiteKey))
+            {
+                try
+                {
+                    captchaToken = await JS.InvokeAsync<string>("getRecaptchaResponse");
+                    if (string.IsNullOrEmpty(captchaToken))
+                    {
+                        _captchaError = "Please complete the CAPTCHA verification";
+                        _isLoading = false;
+                        return;
+                    }
+                }
+                catch
+                {
+                    _captchaError = "CAPTCHA verification failed. Please try again.";
+                    _isLoading = false;
+                    return;
+                }
+            }
+
+            var result = await AuthService.LoginAsync(_loginModel.Username, _loginModel.Password, captchaToken);
 
             if (result.Success)
             {
@@ -469,13 +545,25 @@
             }
             else
             {
-                _errorMessage = result.ErrorMessage ?? "Invalid username or password. Please try again.";
+                var msg = result.ErrorMessage ?? "Invalid username or password. Please try again.";
+                // Show CAPTCHA-specific errors in the captcha error area
+                if (msg.Contains("CAPTCHA", StringComparison.OrdinalIgnoreCase))
+                {
+                    _captchaError = msg;
+                }
+                else
+                {
+                    _errorMessage = msg;
+                }
+                // Reset captcha after failed login
+                await ResetCaptcha();
             }
         }
         catch (Exception ex)
         {
             _errorMessage = "An error occurred during login. Please try again.";
             Console.WriteLine($"Login error: {ex.Message}");
+            await ResetCaptcha();
         }
         finally
         {
@@ -571,6 +659,18 @@
         _loginModel.Username = username;
         _loginModel.Password = password;
         _errorMessage = null;
+    }
+
+    private async Task ResetCaptcha()
+    {
+        if (_captchaEnabled)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("resetRecaptcha");
+            }
+            catch { /* ignore */ }
+        }
     }
 
     public class LoginModel

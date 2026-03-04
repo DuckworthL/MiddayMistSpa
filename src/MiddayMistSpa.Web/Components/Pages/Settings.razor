@@ -53,10 +53,6 @@
                                     @onclick='() => _activeTab = "integrations"'>
                                 <i class="bi bi-hdd-network me-2"></i> API Services
                             </button>
-                            <button class="nav-link @(_activeTab == "backup" ? "active" : "")"
-                                    @onclick='() => _activeTab = "backup"'>
-                                <i class="bi bi-cloud-upload me-2"></i> Backup & Restore
-                            </button>
                         </nav>
                     </div>
                 </div>
@@ -89,9 +85,6 @@
                         break;
                     case "integrations":
                         <IntegrationSettings />
-                        break;
-                    case "backup":
-                        <BackupSettings />
                         break;
                 }
             </div>

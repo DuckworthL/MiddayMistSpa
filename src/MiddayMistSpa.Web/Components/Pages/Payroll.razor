@@ -422,6 +422,206 @@
             </FooterContent>
         </Modal>
 
+        @* Payroll Detail Modal *@
+        @if (_showPayrollDetailModal && _detailHistory != null)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055; background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title">
+                                <i class="bi bi-file-earmark-text me-2"></i>Payroll Summary
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" @onclick="ClosePayrollDetailModal"></button>
+                        </div>
+                        <div class="modal-body" id="payroll-detail-content">
+                            @* Header Info *@
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h4 class="text-primary mb-1">MiddayMist Spa & Wellness</h4>
+                                    <p class="text-muted mb-0">Payroll Report</p>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <div class="mb-1">
+                                        <strong>Pay Period:</strong>
+                                        @_detailHistory.PeriodStart.ToString("MMM dd") - @_detailHistory.PeriodEnd.ToString("MMM dd, yyyy")
+                                    </div>
+                                    <div class="mb-1">
+                                        <strong>Processed:</strong> @_detailHistory.ProcessedDate.ToString("MMM dd, yyyy")
+                                    </div>
+                                    <div>
+                                        <strong>Processed By:</strong> @_detailHistory.ProcessedBy
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr />
+
+                            @* Summary Cards *@
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Total Gross Pay</div>
+                                        <div class="h5 mb-0 text-primary">@_detailItems.Sum(x => x.GrossPay).ToString("C")</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Total Deductions</div>
+                                        <div class="h5 mb-0 text-danger">@_detailItems.Sum(x => x.Deductions).ToString("C")</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Employer Costs</div>
+                                        <div class="h5 mb-0 text-info">@_detailItems.Sum(x => x.TotalEmployerContributions).ToString("C")</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <div class="text-muted small">Total Net Pay</div>
+                                        <div class="h5 mb-0 text-success fw-bold">@_detailItems.Sum(x => x.NetPay).ToString("C")</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Employee Breakdown Table *@
+                            <h6 class="mb-3"><i class="bi bi-people me-1"></i> Employee Breakdown (@_detailItems.Count employees)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-4">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Position</th>
+                                            <th class="text-center">Hours</th>
+                                            <th class="text-end">Gross Pay</th>
+                                            <th class="text-end">Bonus/Comm</th>
+                                            <th class="text-end">SSS</th>
+                                            <th class="text-end">PhilHealth</th>
+                                            <th class="text-end">Pag-IBIG</th>
+                                            <th class="text-end">Tax</th>
+                                            <th class="text-end">Total Ded.</th>
+                                            <th class="text-end fw-bold">Net Pay</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in _detailItems)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-medium">@item.EmployeeName</div>
+                                                    <small class="text-muted">@item.EmployeeCode</small>
+                                                </td>
+                                                <td>@item.Position</td>
+                                                <td class="text-center">
+                                                    @item.RegularHours.ToString("N2")
+                                                    @if (item.OvertimeHours > 0)
+                                                    {
+                                                        <br /><small class="text-warning">+@item.OvertimeHours.ToString("N2") OT</small>
+                                                    }
+                                                </td>
+                                                <td class="text-end">@item.GrossPay.ToString("N2")</td>
+                                                <td class="text-end">
+                                                    @if (item.Bonus + item.Commission > 0)
+                                                    {
+                                                        <span class="text-success">@((item.Bonus + item.Commission).ToString("N2"))</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">-</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end">@item.SSSContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.PhilHealthContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.PagIBIGContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.WithholdingTax.ToString("N2")</td>
+                                                <td class="text-end text-danger">@item.Deductions.ToString("N2")</td>
+                                                <td class="text-end fw-bold">@item.NetPay.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold">
+                                        <tr>
+                                            <td colspan="3">Totals</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.GrossPay).ToString("N2")</td>
+                                            <td class="text-end text-success">@_detailItems.Sum(x => x.Bonus + x.Commission).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.SSSContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.PhilHealthContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.PagIBIGContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.WithholdingTax).ToString("N2")</td>
+                                            <td class="text-end text-danger">@_detailItems.Sum(x => x.Deductions).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.NetPay).ToString("N2")</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            @* Employer Contributions Breakdown *@
+                            <h6 class="mb-3"><i class="bi bi-building me-1"></i> Employer Contributions</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th class="text-end">SSS (ER)</th>
+                                            <th class="text-end">PhilHealth (ER)</th>
+                                            <th class="text-end">Pag-IBIG (ER)</th>
+                                            <th class="text-end">EC</th>
+                                            <th class="text-end fw-bold">Total ER Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in _detailItems)
+                                        {
+                                            <tr>
+                                                <td>@item.EmployeeName</td>
+                                                <td class="text-end">@item.SSSEmployerContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.PhilHealthEmployerContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.PagIBIGEmployerContribution.ToString("N2")</td>
+                                                <td class="text-end">@item.ECContribution.ToString("N2")</td>
+                                                <td class="text-end fw-bold">@item.TotalEmployerContributions.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot class="table-light fw-bold">
+                                        <tr>
+                                            <td>Totals</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.SSSEmployerContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.PhilHealthEmployerContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.PagIBIGEmployerContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.ECContribution).ToString("N2")</td>
+                                            <td class="text-end">@_detailItems.Sum(x => x.TotalEmployerContributions).ToString("N2")</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <div class="d-flex gap-2">
+                                <select class="form-select form-select-sm" style="width: auto;" @bind="_detailExportFormat">
+                                    <option value="PDF">PDF</option>
+                                    <option value="CSV">CSV</option>
+                                    <option value="Excel">Excel</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="ExportPayrollDetail" disabled="@_isExportingDetail">
+                                    @if (_isExportingDetail)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-download me-1"></i>
+                                    }
+                                    Export
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-secondary" @onclick="ClosePayrollDetailModal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @* Alert *@
         @if (!string.IsNullOrEmpty(_alertMessage))
         {
@@ -466,6 +666,13 @@
     // Alert
     private string _alertMessage = string.Empty;
     private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    // Payroll Detail Modal
+    private bool _showPayrollDetailModal;
+    private PayrollHistoryViewModel? _detailHistory;
+    private List<PayrollItemViewModel> _detailItems = new();
+    private string _detailExportFormat = "PDF";
+    private bool _isExportingDetail;
 
     protected override void OnInitialized()
     {
@@ -752,10 +959,88 @@
 
     private async Task ViewPayrollDetails(PayrollHistoryViewModel history)
     {
-        // Navigate to the period and load its records
-        _periodStart = history.PeriodStart;
-        _periodEnd = history.PeriodEnd;
-        await LoadPayrollData();
+        try
+        {
+            _detailHistory = history;
+            _detailItems.Clear();
+            _showPayrollDetailModal = true;
+            StateHasChanged();
+
+            // Fetch records for this period
+            var records = await PayrollService.GetPayrollRecordsAsync(history.PeriodId, 1, 100);
+            _detailItems = records.Items.Select(r => new PayrollItemViewModel
+            {
+                EmployeeId = r.EmployeeId,
+                EmployeeName = r.EmployeeName,
+                EmployeeCode = r.EmployeeCode,
+                Initials = GetInitials(r.EmployeeName),
+                Position = r.Position,
+                RegularHours = r.HoursWorked,
+                OvertimeHours = r.OvertimeHours,
+                HourlyRate = r.HoursWorked > 0 ? r.BasicSalary / r.HoursWorked : 0,
+                Bonus = r.Tips,
+                Commission = r.Commissions,
+                Deductions = r.TotalDeductions,
+                GrossPay = r.GrossPay,
+                NetPay = r.NetPay,
+                SSSContribution = r.SSSContribution,
+                PhilHealthContribution = r.PhilHealthContribution,
+                PagIBIGContribution = r.PagIBIGContribution,
+                WithholdingTax = r.WithholdingTax,
+                SSSEmployerContribution = r.SSSEmployerContribution,
+                PhilHealthEmployerContribution = r.PhilHealthEmployerContribution,
+                PagIBIGEmployerContribution = r.PagIBIGEmployerContribution,
+                ECContribution = r.ECContribution,
+                IsPaid = true
+            }).ToList();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payroll details: {ex.Message}");
+            ShowAlert("Failed to load payroll details.", Alert.AlertType.Error);
+            _showPayrollDetailModal = false;
+        }
+    }
+
+    private void ClosePayrollDetailModal()
+    {
+        _showPayrollDetailModal = false;
+        _detailHistory = null;
+        _detailItems.Clear();
+    }
+
+    private async Task ExportPayrollDetail()
+    {
+        if (_detailHistory == null) return;
+
+        _isExportingDetail = true;
+        StateHasChanged();
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("payroll",
+                _detailExportFormat, _detailHistory.PeriodStart, _detailHistory.PeriodEnd);
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert("Payroll report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExportingDetail = false;
+            StateHasChanged();
+        }
     }
 
     private string _exportFormat = "PDF";

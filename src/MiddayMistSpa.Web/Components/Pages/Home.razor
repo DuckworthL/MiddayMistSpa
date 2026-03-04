@@ -3,6 +3,7 @@
 @inject IAppointmentApiService AppointmentService
 @inject IAuthStateService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Dashboard - MiddayMist Spa</PageTitle>
 
@@ -125,10 +126,10 @@ else
                             </div>
                             <div class="card-body">
                                 <div class="d-grid gap-2">
-                                    <a href="/customers/new" class="btn btn-outline-primary text-start">
+                                    <a href="/customers" class="btn btn-outline-primary text-start">
                                         <i class="bi bi-person-plus me-2"></i> Add Customer
                                     </a>
-                                    <a href="/transactions/new" class="btn btn-outline-primary text-start">
+                                    <a href="/transactions" class="btn btn-outline-primary text-start">
                                         <i class="bi bi-receipt me-2"></i> New Transaction
                                     </a>
                                     <a href="/inventory" class="btn btn-outline-primary text-start">
@@ -166,37 +167,24 @@ else
                     </div>
                 </div>
 
-                @* Revenue Chart Area (Placeholder) *@
+                @* Revenue Chart Area *@
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
                             <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Weekly Revenue</h5>
+                                <h5 class="mb-0">Revenue Overview</h5>
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-secondary active">Week</button>
-                                    <button class="btn btn-outline-secondary">Month</button>
+                                    <button class="btn @(_revenueView == "week" ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="@(() => SetRevenueView("week"))">Week</button>
+                                    <button class="btn @(_revenueView == "month" ? "btn-primary" : "btn-outline-secondary")"
+                                            @onclick="@(() => SetRevenueView("month"))">Month</button>
                                 </div>
                             </div>
                             <div class="card-body">
-                                @if (_weeklyRevenue.Any())
+                                @if (_revenueData.Any())
                                 {
-                                    <div class="d-flex justify-content-around align-items-end" style="height: 200px;">
-                                        @{
-                                            var maxRevenue = _weeklyRevenue.Max(r => r.Revenue);
-                                            maxRevenue = maxRevenue > 0 ? maxRevenue : 1;
-                                        }
-                                        @foreach (var day in _weeklyRevenue)
-                                        {
-                                            var heightPercent = (int)((day.Revenue / maxRevenue) * 100);
-                                            var dayTitle = $"₱{day.Revenue:N0}";
-                                            <div class="text-center" style="flex: 1;">
-                                                <div class="bg-primary rounded-top mx-2"
-                                                     style="height: @(heightPercent)px; min-height: 5px;" title="@dayTitle">
-                                                </div>
-                                                <small class="text-muted d-block mt-2">@day.Date.ToString("ddd")</small>
-                                                <small class="fw-medium">₱@day.Revenue.ToString("N0")</small>
-                                            </div>
-                                        }
+                                    <div style="height: 280px; position: relative;">
+                                        <canvas id="revenueChart"></canvas>
                                     </div>
                                 }
                                 else
@@ -223,7 +211,8 @@ else
     private int _lowStockItems;
     private List<AppointmentSummary> _upcomingAppointments = new();
     private List<TopService> _topServices = new();
-    private List<RevenueByDay> _weeklyRevenue = new();
+    private List<DailyRevenue> _revenueData = new();
+    private string _revenueView = "week"; // "week" or "month"
 
     protected override void OnInitialized()
     {
@@ -240,14 +229,15 @@ else
             var summary = await DashboardService.GetDashboardSummaryAsync();
             if (summary != null)
             {
-                _todayRevenue = summary.TodayRevenue;
-                _todayAppointments = summary.TodayAppointments;
-                _completedAppointments = summary.TodayCompletedAppointments;
-                _newCustomers = summary.TodayNewCustomers;
-                _lowStockItems = summary.LowStockItems;
-                _upcomingAppointments = summary.UpcomingAppointments;
+                _todayRevenue = summary.Kpis.TotalRevenue;
+                _todayAppointments = summary.Kpis.TotalAppointments;
+                _completedAppointments = summary.Appointments.Completed;
+                _newCustomers = summary.Kpis.NewCustomers;
+                _lowStockItems = summary.Inventory.LowStockItems;
                 _topServices = summary.TopServices;
-                _weeklyRevenue = summary.WeeklyRevenue;
+
+                // Use DailyTrend from dashboard for initial chart data
+                _revenueData = summary.Revenue.DailyTrend ?? new();
             }
             else
             {
@@ -266,6 +256,26 @@ else
                 }).ToList();
                 _todayAppointments = todayAppts.TotalCount;
             }
+
+            // Load upcoming appointments (from today's)
+            if (!_upcomingAppointments.Any())
+            {
+                var todayAppts2 = await AppointmentService.GetAppointmentsAsync(date: DateTime.Today);
+                _upcomingAppointments = todayAppts2.Items.Select(a => new AppointmentSummary
+                {
+                    AppointmentId = a.AppointmentId,
+                    CustomerName = a.CustomerName,
+                    ServiceName = a.ServiceName,
+                    TherapistName = a.TherapistName ?? "",
+                    AppointmentDate = a.AppointmentDate,
+                    StartTime = a.StartTime,
+                    EndTime = a.EndTime,
+                    Status = a.Status
+                }).ToList();
+            }
+
+            // Load revenue data for the selected period
+            await LoadRevenueData();
         }
         catch (Exception ex)
         {
@@ -273,6 +283,87 @@ else
         }
 
         _isLoading = false;
+    }
+
+    private async Task LoadRevenueData()
+    {
+        try
+        {
+            var endDate = DateTime.Today;
+            var startDate = _revenueView == "week" ? endDate.AddDays(-6) : endDate.AddDays(-29);
+            _revenueData = await DashboardService.GetRevenueAsync(startDate, endDate);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading revenue: {ex.Message}");
+            _revenueData = new();
+        }
+    }
+
+    private async Task SetRevenueView(string view)
+    {
+        if (_revenueView == view) return;
+        _revenueView = view;
+        await LoadRevenueData();
+        StateHasChanged();
+        await RenderRevenueChart();
+    }
+
+    private async Task RenderRevenueChart()
+    {
+        if (!_revenueData.Any()) return;
+
+        try
+        {
+            var labels = _revenueData.Select(d =>
+                _revenueView == "week" ? d.Date.ToString("ddd") : d.Date.ToString("MMM dd")).ToArray();
+            var data = _revenueData.Select(d => (double)d.Revenue).ToArray();
+
+            var datasets = new[]
+            {
+                new
+                {
+                    label = "Revenue (₱)",
+                    data = data,
+                    borderColor = "rgba(99, 102, 241, 1)",
+                    backgroundColor = "rgba(99, 102, 241, 0.15)",
+                    fill = true,
+                    tension = 0.4,
+                    pointRadius = 4,
+                    pointBackgroundColor = "rgba(99, 102, 241, 1)",
+                    pointBorderColor = "#fff",
+                    pointBorderWidth = 2,
+                    borderWidth = 2
+                }
+            };
+
+            var options = new
+            {
+                scales = new
+                {
+                    y = new
+                    {
+                        beginAtZero = true,
+                        ticks = new { callback_format = "peso" }
+                    }
+                },
+                plugins = new
+                {
+                    legend = new { display = false },
+                    tooltip = new
+                    {
+                        callbacks = new { label_format = "peso" }
+                    }
+                },
+                interaction = new { intersect = false, mode = "index" }
+            };
+
+            await JS.InvokeVoidAsync("renderChart", "revenueChart", "line", labels, datasets, options);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rendering chart: {ex.Message}");
+        }
     }
 
     private bool _isAuthChecked = false;
@@ -295,6 +386,10 @@ else
             // Now load data after auth is ready
             await LoadDashboardData();
             StateHasChanged();
+
+            // Render chart after data loaded and DOM updated
+            await Task.Delay(100);
+            await RenderRevenueChart();
         }
     }
 }

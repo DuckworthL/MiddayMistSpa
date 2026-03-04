@@ -175,6 +175,9 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User {Username} logged in successfully", request.Username);
 
+        // Look up linked employee record
+        var employee = (await _unitOfWork.Employees.FindAsync(e => e.UserId == user.UserId)).FirstOrDefault();
+
         return new LoginResponse
         {
             Success = true,
@@ -193,7 +196,7 @@ public class AuthService : IAuthService
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 RoleName = user.Role?.RoleName ?? "Unknown",
-                EmployeeId = null
+                EmployeeId = employee?.EmployeeId
             },
             RequiresPasswordChange = passwordExpired || user.MustChangePassword
         };
@@ -238,6 +241,9 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User {Username} logged in successfully via 2FA", user.Username);
 
+        // Look up linked employee record
+        var employee = (await _unitOfWork.Employees.FindAsync(e => e.UserId == user.UserId)).FirstOrDefault();
+
         return new LoginResponse
         {
             Success = true,
@@ -256,7 +262,7 @@ public class AuthService : IAuthService
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 RoleName = user.Role?.RoleName ?? "Unknown",
-                EmployeeId = null
+                EmployeeId = employee?.EmployeeId
             },
             RequiresPasswordChange = passwordExpired || user.MustChangePassword
         };
@@ -382,7 +388,7 @@ public class AuthService : IAuthService
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 RoleName = role?.RoleName ?? "Unknown",
-                EmployeeId = null
+                EmployeeId = (await _unitOfWork.Employees.FindAsync(e => e.UserId == user.UserId)).FirstOrDefault()?.EmployeeId
             }
         };
     }

@@ -56,6 +56,7 @@ builder.Services.AddScoped<IClusteringService, ClusteringService>();
 builder.Services.AddScoped<ICurrencyService, CurrencyService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
+builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 builder.Services.AddMemoryCache();
 
 // =============================================================================
@@ -75,6 +76,14 @@ builder.Services.AddHttpClient<IFrankfurterService, FrankfurterService>(client =
     client.Timeout = TimeSpan.FromSeconds(10);
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.DefaultRequestHeaders.Add("User-Agent", "MiddayMistSpa/1.0");
+});
+
+// =============================================================================
+// CAPTCHA - Google reCAPTCHA v2 verification
+// =============================================================================
+builder.Services.AddHttpClient("Captcha", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
 });
 
 // =============================================================================

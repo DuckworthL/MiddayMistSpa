@@ -13,12 +13,14 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ITwoFactorService _twoFactorService;
+    private readonly ICaptchaService _captchaService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ITwoFactorService twoFactorService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ITwoFactorService twoFactorService, ICaptchaService captchaService, ILogger<AuthController> logger)
     {
         _authService = authService;
         _twoFactorService = twoFactorService;
+        _captchaService = captchaService;
         _logger = logger;
     }
 
@@ -34,6 +36,17 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
     {
+        // Verify reCAPTCHA if enabled
+        var captchaValid = await _captchaService.VerifyTokenAsync(request.CaptchaToken);
+        if (!captchaValid)
+        {
+            return BadRequest(new LoginResponse
+            {
+                Success = false,
+                Message = "CAPTCHA verification failed. Please complete the CAPTCHA and try again."
+            });
+        }
+
         // Capture client info
         request.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         request.UserAgent = Request.Headers["User-Agent"].ToString();

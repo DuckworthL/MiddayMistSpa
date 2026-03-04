@@ -61,6 +61,7 @@ if (!builder.Environment.IsDevelopment())
     builder.Services.AddScoped<IAccountingService, AccountingService>();
     builder.Services.AddScoped<IClusteringService, ClusteringService>();
     builder.Services.AddScoped<ICurrencyService, CurrencyService>();
+    builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 
     // HTTP Clients - External API integrations
     builder.Services.AddHttpClient<IIpGeoLocationService, IpWhoIsService>(client =>
@@ -77,6 +78,11 @@ if (!builder.Environment.IsDevelopment())
         client.Timeout = TimeSpan.FromSeconds(10);
         client.DefaultRequestHeaders.Add("Accept", "application/json");
         client.DefaultRequestHeaders.Add("User-Agent", "MiddayMistSpa/1.0");
+    });
+
+    builder.Services.AddHttpClient("Captcha", client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(10);
     });
 
     // Background Services
@@ -157,6 +163,7 @@ builder.Services.AddScoped<IProfileApiService, ProfileApiService>();
 builder.Services.AddScoped<IShiftApiService, ShiftApiService>();
 builder.Services.AddScoped<ICurrencyApiService, CurrencyApiService>();
 builder.Services.AddScoped<ITwoFactorApiService, TwoFactorApiService>();
+builder.Services.AddScoped<ICaptchaApiService, CaptchaApiService>();
 
 var app = builder.Build();
 

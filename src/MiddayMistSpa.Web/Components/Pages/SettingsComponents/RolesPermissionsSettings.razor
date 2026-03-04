@@ -13,8 +13,8 @@
                     @foreach (var role in _roles)
                     {
                         <button type="button"
-                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(_selectedRole?.Id == role.Id ? "active" : "")"
-                            @onclick="() => SelectRole(role)">
+                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(_selectedRole?.Id == role.Id ? "active" : "")"
+                                @onclick="() => SelectRole(role)">
                             <div>
                                 <i class="bi @role.Icon me-2"></i>
                                 @role.Name
@@ -58,9 +58,9 @@
                                             <div class="col-md-6">
                                                 <div class="form-check">
                                                     <input type="checkbox" class="form-check-input" id="@permKey"
-                                                        checked="@hasPermission"
-                                                        disabled="@(_selectedRole.IsSystem && _selectedRole.Name == "Admin")"
-                                                        @onchange="() => TogglePermission(permKey)" />
+                                                           checked="@hasPermission"
+                                                           disabled="@(_selectedRole.IsSystem && _selectedRole.Name == "SuperAdmin")"
+                                                           @onchange="() => TogglePermission(permKey)" />
                                                     <label class="form-check-label" for="@permKey">
                                                         @permission.Name
                                                     </label>
@@ -135,53 +135,117 @@
 
 @code {
     private List<RoleModel> _roles = new()
-{
-new() { Id = 1, Name = "Admin", Icon = "bi-person-gear", IsSystem = true, UserCount = 1,
-Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
-"appointments.delete",
-"customers.view", "customers.create", "customers.edit", "customers.delete",
-"services.view", "services.create", "services.edit", "services.delete",
-"employees.view", "employees.create", "employees.edit", "employees.delete",
-"inventory.view", "inventory.manage", "pos.access", "pos.refund", "pos.discount",
-"payroll.view", "payroll.manage", "reports.view", "reports.export", "settings.access", "settings.manage" } },
-new() { Id = 2, Name = "Manager", Icon = "bi-person-badge", IsSystem = true, UserCount = 1,
-Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
-"customers.view", "customers.create", "customers.edit", "services.view", "services.edit",
-"employees.view", "employees.edit", "inventory.view", "inventory.manage",
-"pos.access", "pos.discount", "payroll.view", "reports.view", "reports.export" } },
-new() { Id = 3, Name = "Therapist", Icon = "bi-person-heart", IsSystem = true, UserCount = 3,
-Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "customers.view", "services.view" } },
-new() { Id = 4, Name = "Receptionist", Icon = "bi-person-workspace", IsSystem = true, UserCount = 1,
-Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
-"customers.view", "customers.create", "customers.edit", "pos.access" } }
-};
+    {
+        new() { Id = 1, Name = "SuperAdmin", Icon = "bi-shield-lock", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "appointments.view", "appointments.create", "appointments.edit", "appointments.delete",
+                "customers.view", "customers.create", "customers.edit", "customers.delete",
+                "services.view", "services.create", "services.edit", "services.delete",
+                "employees.view", "employees.create", "employees.edit", "employees.delete",
+                "inventory.view", "inventory.manage",
+                "pos.access", "pos.refund", "pos.discount",
+                "accounting.view", "accounting.manage",
+                "payroll.view", "payroll.manage",
+                "shifts.view", "shifts.manage",
+                "timeattendance.view", "timeattendance.manage",
+                "reports.view", "reports.export",
+                "notifications.view", "notifications.manage",
+                "settings.access", "settings.manage" } },
+        new() { Id = 2, Name = "Admin", Icon = "bi-person-gear", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "appointments.view", "appointments.create", "appointments.edit", "appointments.delete",
+                "customers.view", "customers.create", "customers.edit", "customers.delete",
+                "services.view", "services.create", "services.edit", "services.delete",
+                "employees.view", "employees.create", "employees.edit", "employees.delete",
+                "inventory.view", "inventory.manage",
+                "pos.access", "pos.refund", "pos.discount",
+                "accounting.view", "accounting.manage",
+                "payroll.view", "payroll.manage",
+                "shifts.view", "shifts.manage",
+                "timeattendance.view", "timeattendance.manage",
+                "reports.view", "reports.export",
+                "notifications.view", "notifications.manage",
+                "settings.access", "settings.manage" } },
+        new() { Id = 3, Name = "Receptionist", Icon = "bi-person-workspace", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "appointments.view", "appointments.create", "appointments.edit",
+                "customers.view", "customers.create", "customers.edit",
+                "services.view",
+                "pos.access",
+                "timeattendance.view",
+                "notifications.view" } },
+        new() { Id = 4, Name = "Therapist", Icon = "bi-person-heart", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "appointments.view",
+                "customers.view",
+                "services.view",
+                "timeattendance.view",
+                "notifications.view" } },
+        new() { Id = 5, Name = "HR", Icon = "bi-people", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "employees.view", "employees.create", "employees.edit", "employees.delete",
+                "shifts.view", "shifts.manage",
+                "payroll.view", "payroll.manage",
+                "timeattendance.view", "timeattendance.manage",
+                "reports.view", "reports.export",
+                "notifications.view" } },
+        new() { Id = 6, Name = "Inventory", Icon = "bi-box-seam", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "inventory.view", "inventory.manage",
+                "reports.view", "reports.export",
+                "timeattendance.view",
+                "notifications.view" } },
+        new() { Id = 7, Name = "Accountant", Icon = "bi-calculator", IsSystem = true, UserCount = 1,
+            Permissions = new HashSet<string> {
+                "dashboard.view",
+                "accounting.view", "accounting.manage",
+                "payroll.view", "payroll.manage",
+                "pos.access",
+                "reports.view", "reports.export",
+                "timeattendance.view",
+                "notifications.view" } }
+    };
 
     private List<PermissionModule> _permissionModules = new()
-{
-new() { Key = "dashboard", Name = "Dashboard", Permissions = new() { new("view", "View Dashboard") } },
-new() { Key = "appointments", Name = "Appointments", Permissions = new() {
-new("view", "View Appointments"), new("create", "Create Appointments"),
-new("edit", "Edit Appointments"), new("delete", "Delete Appointments") } },
-new() { Key = "customers", Name = "Customers", Permissions = new() {
-new("view", "View Customers"), new("create", "Add Customers"),
-new("edit", "Edit Customers"), new("delete", "Delete Customers") } },
-new() { Key = "services", Name = "Services", Permissions = new() {
-new("view", "View Services"), new("create", "Add Services"),
-new("edit", "Edit Services"), new("delete", "Delete Services") } },
-new() { Key = "employees", Name = "Employees", Permissions = new() {
-new("view", "View Employees"), new("create", "Add Employees"),
-new("edit", "Edit Employees"), new("delete", "Delete Employees") } },
-new() { Key = "inventory", Name = "Inventory", Permissions = new() {
-new("view", "View Inventory"), new("manage", "Manage Stock") } },
-new() { Key = "pos", Name = "Point of Sale", Permissions = new() {
-new("access", "Access POS"), new("refund", "Process Refunds"), new("discount", "Apply Discounts") } },
-new() { Key = "payroll", Name = "Payroll", Permissions = new() {
-new("view", "View Payroll"), new("manage", "Manage Payroll") } },
-new() { Key = "reports", Name = "Reports", Permissions = new() {
-new("view", "View Reports"), new("export", "Export Reports") } },
-new() { Key = "settings", Name = "Settings", Permissions = new() {
-new("access", "Access Settings"), new("manage", "Manage Settings") } }
-};
+    {
+        new() { Key = "dashboard", Name = "Dashboard", Permissions = new() { new("view", "View Dashboard") } },
+        new() { Key = "appointments", Name = "Appointments", Permissions = new() {
+            new("view", "View Appointments"), new("create", "Create Appointments"),
+            new("edit", "Edit Appointments"), new("delete", "Delete Appointments") } },
+        new() { Key = "customers", Name = "Customers", Permissions = new() {
+            new("view", "View Customers"), new("create", "Add Customers"),
+            new("edit", "Edit Customers"), new("delete", "Delete Customers") } },
+        new() { Key = "services", Name = "Services", Permissions = new() {
+            new("view", "View Services"), new("create", "Add Services"),
+            new("edit", "Edit Services"), new("delete", "Delete Services") } },
+        new() { Key = "employees", Name = "Employees", Permissions = new() {
+            new("view", "View Employees"), new("create", "Add Employees"),
+            new("edit", "Edit Employees"), new("delete", "Delete Employees") } },
+        new() { Key = "inventory", Name = "Inventory", Permissions = new() {
+            new("view", "View Inventory"), new("manage", "Manage Stock") } },
+        new() { Key = "pos", Name = "Point of Sale", Permissions = new() {
+            new("access", "Access POS"), new("refund", "Process Refunds"), new("discount", "Apply Discounts") } },
+        new() { Key = "accounting", Name = "Accounting", Permissions = new() {
+            new("view", "View Accounting"), new("manage", "Manage Accounting") } },
+        new() { Key = "payroll", Name = "Payroll", Permissions = new() {
+            new("view", "View Payroll"), new("manage", "Manage Payroll") } },
+        new() { Key = "shifts", Name = "Shift Management", Permissions = new() {
+            new("view", "View Shifts"), new("manage", "Manage Shifts") } },
+        new() { Key = "timeattendance", Name = "Time & Attendance", Permissions = new() {
+            new("view", "View Attendance"), new("manage", "Manage Attendance") } },
+        new() { Key = "reports", Name = "Reports", Permissions = new() {
+            new("view", "View Reports"), new("export", "Export Reports") } },
+        new() { Key = "notifications", Name = "Notifications", Permissions = new() {
+            new("view", "View Notifications"), new("manage", "Manage Notifications") } },
+        new() { Key = "settings", Name = "Settings", Permissions = new() {
+            new("access", "Access Settings"), new("manage", "Manage Settings") } }
+    };
 
     private RoleModel? _selectedRole = null;
     private bool _showModal = false;

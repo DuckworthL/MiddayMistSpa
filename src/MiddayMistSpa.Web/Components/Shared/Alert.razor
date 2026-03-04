@@ -1,7 +1,7 @@
-@* Alert/Notification Component *@
+@* Alert/Notification Component with auto-dismiss *@
 @if (!string.IsNullOrEmpty(Message))
 {
-    <div class="@AlertFullClass" role="alert">
+    <div class="@AlertFullClass" role="alert" style="opacity: 1 !important;">
         @if (!string.IsNullOrEmpty(Icon))
         {
             <i class="bi @Icon me-2"></i>
@@ -18,7 +18,12 @@
     [Parameter] public string Message { get; set; } = string.Empty;
     [Parameter] public AlertType Type { get; set; } = AlertType.Info;
     [Parameter] public bool Dismissible { get; set; } = true;
+    [Parameter] public bool AutoDismiss { get; set; } = true;
+    [Parameter] public int AutoDismissMs { get; set; } = 3000;
     [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private string? _lastMessage;
+    private CancellationTokenSource? _autoDismissCts;
 
     private string AlertClass => Type switch
     {
@@ -28,7 +33,7 @@
         _ => "alert-info"
     };
 
-    private string AlertFullClass => $"alert {AlertClass} {(Dismissible ? "alert-dismissible fade show" : "")}";
+    private string AlertFullClass => $"alert {AlertClass} {(Dismissible ? "alert-dismissible fade show" : "")} alert-opaque";
 
     private string Icon => Type switch
     {
@@ -38,9 +43,38 @@
         _ => "bi-info-circle-fill"
     };
 
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(Message) && Message != _lastMessage && AutoDismiss)
+        {
+            _lastMessage = Message;
+            _ = StartAutoDismissAsync();
+        }
+    }
+
+    private async Task StartAutoDismissAsync()
+    {
+        _autoDismissCts?.Cancel();
+        _autoDismissCts = new CancellationTokenSource();
+        var token = _autoDismissCts.Token;
+
+        try
+        {
+            await Task.Delay(AutoDismissMs, token);
+            if (!token.IsCancellationRequested)
+            {
+                await Dismiss();
+                StateHasChanged();
+            }
+        }
+        catch (TaskCanceledException) { }
+    }
+
     private async Task Dismiss()
     {
+        _autoDismissCts?.Cancel();
         Message = string.Empty;
+        _lastMessage = null;
         await OnDismiss.InvokeAsync();
     }
 

@@ -9,7 +9,7 @@ public interface IDashboardService
 {
     Task<DashboardSummary?> GetDashboardSummaryAsync();
     Task<List<AppointmentSummary>> GetTodayAppointmentsAsync();
-    Task<List<RevenueByDay>> GetWeeklyRevenueAsync();
+    Task<List<DailyRevenue>> GetRevenueAsync(DateTime startDate, DateTime endDate);
 }
 
 public class DashboardService : IDashboardService
@@ -32,10 +32,10 @@ public class DashboardService : IDashboardService
         return result ?? new List<AppointmentSummary>();
     }
 
-    public async Task<List<RevenueByDay>> GetWeeklyRevenueAsync()
+    public async Task<List<DailyRevenue>> GetRevenueAsync(DateTime startDate, DateTime endDate)
     {
-        var result = await _apiClient.GetAsync<List<RevenueByDay>>($"api/reports/revenue/daily?startDate={DateTime.Today.AddDays(-7):yyyy-MM-dd}&endDate={DateTime.Today:yyyy-MM-dd}");
-        return result ?? new List<RevenueByDay>();
+        var result = await _apiClient.GetAsync<List<DailyRevenue>>($"api/reports/revenue/daily?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
+        return result ?? new List<DailyRevenue>();
     }
 }
 
@@ -1623,5 +1623,35 @@ public class TwoFactorApiService : ITwoFactorApiService
     public async Task<TwoFactorStatusResponse?> GetStatusAsync()
     {
         return await _apiClient.GetAsync<TwoFactorStatusResponse>("api/auth/2fa/status");
+    }
+}
+
+/// <summary>
+/// Captcha API service for managing reCAPTCHA v2 settings
+/// </summary>
+public interface ICaptchaApiService
+{
+    Task<CaptchaSettingsResponse?> GetSettingsAsync();
+    Task<bool> UpdateSettingsAsync(UpdateCaptchaSettingsRequest request);
+}
+
+public class CaptchaApiService : ICaptchaApiService
+{
+    private readonly IApiClient _apiClient;
+
+    public CaptchaApiService(IApiClient apiClient)
+    {
+        _apiClient = apiClient;
+    }
+
+    public async Task<CaptchaSettingsResponse?> GetSettingsAsync()
+    {
+        return await _apiClient.GetAsync<CaptchaSettingsResponse>("api/captcha/settings");
+    }
+
+    public async Task<bool> UpdateSettingsAsync(UpdateCaptchaSettingsRequest request)
+    {
+        var result = await _apiClient.PutAsync<UpdateCaptchaSettingsRequest, object>("api/captcha/settings", request);
+        return result != null;
     }
 }

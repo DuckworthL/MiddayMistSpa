@@ -53,6 +53,7 @@ public class DatabaseSeeder : IDatabaseSeeder
             await SeedProductCategoriesAndProductsAsync();
             await SeedSampleCustomersAsync();
             await SeedSampleEmployeesAsync();
+            await LinkUsersToEmployeesAsync();
             await SeedEmployeeShiftsAsync();
             await SeedAttendanceRecordsAsync();
             await SeedRoomsAsync();
@@ -60,6 +61,9 @@ public class DatabaseSeeder : IDatabaseSeeder
             // Accounting
             await SeedChartOfAccountsAsync();
             await EnsureContraRevenueAccountsAsync();
+
+            // Ensure new settings exist (for existing databases)
+            await EnsureCaptchaSettingsAsync();
 
             _logger.LogInformation("Database seeding completed successfully");
         }
@@ -356,7 +360,12 @@ public class DatabaseSeeder : IDatabaseSeeder
             // System Settings
             new() { SettingKey = "System.MaintenanceMode", SettingValue = "false", SettingType = "Boolean", Category = "System", Description = "Enable maintenance mode", IsEditable = true, UpdatedAt = DateTime.UtcNow },
             new() { SettingKey = "System.SessionTimeout", SettingValue = "30", SettingType = "Number", Category = "System", Description = "Session timeout in minutes", IsEditable = true, UpdatedAt = DateTime.UtcNow },
-            new() { SettingKey = "System.MaxConcurrentSessions", SettingValue = "2", SettingType = "Number", Category = "System", Description = "Maximum concurrent sessions per user", IsEditable = true, UpdatedAt = DateTime.UtcNow }
+            new() { SettingKey = "System.MaxConcurrentSessions", SettingValue = "2", SettingType = "Number", Category = "System", Description = "Maximum concurrent sessions per user", IsEditable = true, UpdatedAt = DateTime.UtcNow },
+            
+            // Captcha Settings (off by default, Google reCAPTCHA v2)
+            new() { SettingKey = "Captcha.Enabled", SettingValue = "false", SettingType = "Boolean", Category = "Captcha", Description = "Enable reCAPTCHA on login page", IsEditable = true, UpdatedAt = DateTime.UtcNow },
+            new() { SettingKey = "Captcha.SiteKey", SettingValue = "6LfHZn8sAAAAAKBb6fKq8naNpNe94LfBVIlvpP-g", SettingType = "String", Category = "Captcha", Description = "Google reCAPTCHA v2 site key", IsEditable = true, UpdatedAt = DateTime.UtcNow },
+            new() { SettingKey = "Captcha.SecretKey", SettingValue = "6LfHZn8sAAAAAL75V5kS1ugi4zENyDRuMXFGUC4j", SettingType = "String", Category = "Captcha", Description = "Google reCAPTCHA v2 secret key", IsEditable = true, UpdatedAt = DateTime.UtcNow }
         };
 
         await _context.SystemSettings.AddRangeAsync(settings);
@@ -1141,6 +1150,91 @@ public class DatabaseSeeder : IDatabaseSeeder
         _logger.LogInformation("Seeded {Count} sample employees", employees.Count);
     }
 
+    /// <summary>
+    /// Links User accounts to Employee records so they can clock in/out themselves.
+    /// Creates Employee records for Users that don't have one yet.
+    /// </summary>
+    private async Task LinkUsersToEmployeesAsync()
+    {
+        // Roles whose users need an Employee record to clock in/out
+        var staffRoles = new[] { "Receptionist", "Therapist", "Inventory", "Accountant", "HR" };
+
+        var usersWithRoles = await _context.Users
+            .Include(u => u.Role)
+            .Where(u => u.Role != null && staffRoles.Contains(u.Role.RoleName))
+            .ToListAsync();
+
+        // Get existing employee-user links
+        var linkedUserIds = await _context.Employees
+            .Where(e => e.UserId != null)
+            .Select(e => e.UserId!.Value)
+            .ToListAsync();
+
+        // Get max employee code number for new records
+        var maxCode = await _context.Employees
+            .Where(e => e.EmployeeCode.StartsWith("EMP-"))
+            .Select(e => e.EmployeeCode)
+            .ToListAsync();
+        var nextNum = maxCode
+            .Select(c => int.TryParse(c.Replace("EMP-", ""), out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max() + 1;
+
+        var created = 0;
+        foreach (var user in usersWithRoles)
+        {
+            if (linkedUserIds.Contains(user.UserId))
+                continue;
+
+            // Determine position and department based on role
+            var (position, department, isTherapist) = user.Role!.RoleName switch
+            {
+                "Therapist" => ("Therapist", "Operations", true),
+                "Receptionist" => ("Receptionist", "Front Desk", false),
+                "Inventory" => ("Inventory Staff", "Inventory", false),
+                "Accountant" => ("Accountant", "Finance", false),
+                "HR" => ("HR Staff", "Human Resources", false),
+                _ => ("Staff", "General", false)
+            };
+
+            var emp = new Employee
+            {
+                UserId = user.UserId,
+                EmployeeCode = $"EMP-{nextNum:D3}",
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                DateOfBirth = new DateTime(1990, 1, 1),
+                Gender = "Other",
+                PhoneNumber = user.Email ?? "",
+                Email = user.Email,
+                Position = position,
+                Department = department,
+                EmploymentType = "Regular",
+                HireDate = DateTime.UtcNow.AddYears(-1),
+                DailyRate = 700,
+                MonthlyBasicSalary = 18200,
+                IsTherapist = isTherapist,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _context.Employees.AddAsync(emp);
+            nextNum++;
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Linked {Count} user accounts to new employee records", created);
+        }
+        else
+        {
+            _logger.LogInformation("All staff users already linked to employees, skipping...");
+        }
+    }
+
     #endregion
 
     #region Employee Shifts & Attendance
@@ -1448,6 +1542,26 @@ public class DatabaseSeeder : IDatabaseSeeder
             await _context.SaveChangesAsync();
             _logger.LogInformation("Added {Count} contra-revenue accounts", added);
         }
+    }
+
+    /// <summary>
+    /// Ensures captcha settings exist in the database (for databases seeded before captcha feature was added)
+    /// </summary>
+    private async Task EnsureCaptchaSettingsAsync()
+    {
+        var hasCaptchaEnabled = await _context.SystemSettings.AnyAsync(s => s.SettingKey == "Captcha.Enabled");
+        if (hasCaptchaEnabled) return;
+
+        var captchaSettings = new List<SystemSetting>
+        {
+            new() { SettingKey = "Captcha.Enabled", SettingValue = "false", SettingType = "Boolean", Category = "Captcha", Description = "Enable reCAPTCHA on login page", IsEditable = true, UpdatedAt = DateTime.UtcNow },
+            new() { SettingKey = "Captcha.SiteKey", SettingValue = "6LfHZn8sAAAAAKBb6fKq8naNpNe94LfBVIlvpP-g", SettingType = "String", Category = "Captcha", Description = "Google reCAPTCHA v2 site key", IsEditable = true, UpdatedAt = DateTime.UtcNow },
+            new() { SettingKey = "Captcha.SecretKey", SettingValue = "6LfHZn8sAAAAAL75V5kS1ugi4zENyDRuMXFGUC4j", SettingType = "String", Category = "Captcha", Description = "Google reCAPTCHA v2 secret key", IsEditable = true, UpdatedAt = DateTime.UtcNow }
+        };
+
+        await _context.SystemSettings.AddRangeAsync(captchaSettings);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Seeded captcha settings (disabled by default, using Google test keys)");
     }
 
     #endregion

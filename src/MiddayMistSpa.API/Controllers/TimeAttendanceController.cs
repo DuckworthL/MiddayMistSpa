@@ -623,7 +623,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("attendance")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
     public async Task<ActionResult<List<AttendanceRecordDto>>> GetAttendanceRecords(
         [FromQuery] int? employeeId = null,
         [FromQuery] DateTime? date = null)
@@ -641,7 +641,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("live-status")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist")]
+    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
     public async Task<ActionResult<List<LiveAttendanceStatusDto>>> GetLiveStatus()
     {
         try
