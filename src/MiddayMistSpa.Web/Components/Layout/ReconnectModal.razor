@@ -1,0 +1,19 @@
+﻿@* Blazor reconnect modal - appears when SignalR connection is lost *@
+
+<div id="components-reconnect-modal" class="components-reconnect-hide">
+    <div class="components-reconnect-container">
+        <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+        <p class="components-reconnect-first-attempt-visible">
+            Reconnecting to server...
+        </p>
+        <p class="components-reconnect-repeated-attempt-visible">
+            Connection lost. Retrying...
+        </p>
+        <p class="components-reconnect-failed-visible">
+            Failed to reconnect.<br />Please reload the page.
+        </p>
+        <button onclick="location.reload()" class="btn btn-primary components-reconnect-failed-visible">
+            Reload
+        </button>
+    </div>
+</div>

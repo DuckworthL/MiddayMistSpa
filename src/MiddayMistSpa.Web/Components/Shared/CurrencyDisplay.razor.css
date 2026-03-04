@@ -1,0 +1,15 @@
+.currency-display {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.currency-converted {
+    font-size: 0.8em;
+    opacity: 0.85;
+}
+
+.currency-converted small {
+    font-size: 0.85em;
+    margin-left: 2px;
+}

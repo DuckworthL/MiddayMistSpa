@@ -1,0 +1,1068 @@
+@page "/pos"
+@inject IServiceApiService ServiceService
+@inject IInventoryApiService InventoryService
+@inject ICustomerApiService CustomerService
+@inject ITransactionApiService TransactionService
+@inject IAppointmentApiService AppointmentService
+@inject ICurrencyApiService CurrencyService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>POS - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="pos-container">
+        @* Left Panel - Appointments & Products *@
+        <div class="pos-products">
+            <div class="pos-header">
+                <h4 class="mb-0">Point of Sale</h4>
+                <div class="btn-group" role="group">
+                    <button class="btn @(_activeTab == "appointments" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => SwitchTab("appointments")'>
+                        <i class="bi bi-calendar-check me-1"></i> Appointments
+                    </button>
+                    <button class="btn @(_activeTab == "products" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => SwitchTab("products")'>
+                        <i class="bi bi-box me-1"></i> Products
+                    </button>
+                </div>
+            </div>
+
+            @if (_activeTab == "appointments")
+            {
+                @* Appointment Panel *@
+                <div class="pos-search mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" placeholder="Search appointments by customer name..."
+                               @bind="_appointmentSearch" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                @if (_appointmentsLoading)
+                {
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="text-muted mt-2">Loading appointments...</p>
+                    </div>
+                }
+                else if (!GetFilteredAppointments().Any())
+                {
+                    <div class="empty-cart text-center py-4">
+                        <i class="bi bi-calendar-x" style="font-size: 2.5rem; opacity: 0.3;"></i>
+                        <p class="text-muted mt-2">No active appointments found</p>
+                        <small class="text-muted">Appointments with status Confirmed, Checked In, or In Progress will appear
+                            here</small>
+                        </div>
+                    }
+            else
+                    {
+                        <div class="appointment-list">
+                            @foreach (var appt in GetFilteredAppointments())
+                            {
+                                var isSelected = _selectedAppointment?.AppointmentId == appt.AppointmentId;
+                                <div class="appointment-card @(isSelected ? "selected" : "")" @onclick="() => SelectAppointment(appt)">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-bold">@appt.CustomerName</div>
+                                            <div class="text-muted small">@appt.AppointmentNumber</div>
+                                        </div>
+                                        <span class="badge @GetStatusBadgeClass(appt.Status)">@appt.Status</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        @if (appt.ServiceItems.Any())
+                                        {
+                                            @foreach (var si in appt.ServiceItems)
+                                            {
+                                                <div class="small"><i class="bi bi-gem me-1 text-primary"></i>@si.ServiceName —
+                                                    ₱@si.UnitPrice.ToString("N0") (@si.DurationMinutes min)</div>
+                                                }
+                                            }
+                        else
+                                            {
+                                                <div class="small"><i class="bi bi-gem me-1 text-primary"></i>@appt.ServiceName —
+                                                    ₱@appt.ServicePrice.ToString("N0") (@appt.DurationMinutes min)</div>
+                                                }
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
+                                                <span><i class="bi bi-person me-1"></i>@(appt.TherapistName ?? "Unassigned")</span>
+                                                <span><i class="bi bi-clock me-1"></i>@appt.StartTime.ToString(@"hh\:mm") -
+                                                    @appt.EndTime.ToString(@"hh\:mm")</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center mt-1">
+                                                    <strong class="text-primary">₱@appt.TotalPrice.ToString("N0")</strong>
+                                                    @if (isSelected)
+                                                    {
+                                                        <span class="badge bg-success"><i class="bi bi-check me-1"></i>Selected</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-primary" @onclick:stopPropagation="true"
+                                                                @onclick="() => SelectAppointment(appt)">
+                                                            <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+            else
+                            {
+                                @* Products Panel *@
+                                <div class="pos-search mb-3">
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search products..." @bind="_searchTerm"
+                                               @bind:event="oninput" />
+                                    </div>
+                                </div>
+
+                                <div class="pos-categories mb-3">
+                                    <button class="btn btn-sm @(_selectedCategory == null ? "btn-secondary" : "btn-outline-secondary")"
+                                            @onclick="() => _selectedCategory = null">
+                                        All
+                                    </button>
+                                    @foreach (var cat in GetProductCategories())
+                                    {
+                                        <button class="btn btn-sm @(_selectedCategory == cat ? "btn-secondary" : "btn-outline-secondary")"
+                                                @onclick="() => _selectedCategory = cat">
+                                            @cat
+                                        </button>
+                                    }
+                                </div>
+
+                                <div class="pos-items-grid">
+                                    @foreach (var product in GetFilteredProducts())
+                                    {
+                                        <div class="pos-item @(product.QuantityInStock <= 0 ? "out-of-stock" : "")"
+                                             @onclick="() => AddProductToCart(product)">
+                                            <div class="pos-item-name">@product.Name</div>
+                                            <div class="pos-item-price">₱@((product.SellingPrice ?? product.CostPrice).ToString("N0"))</div>
+                                            @if (_selectedCurrency != "PHP")
+                                            {
+                                                <div class="pos-item-converted">@ConvertDisplay(product.SellingPrice ?? product.CostPrice)</div>
+                                            }
+                                            <div class="pos-item-stock">
+                                                @if (product.QuantityInStock <= 0)
+                                                {
+                                                    <span class="text-danger">Out of stock</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@product.QuantityInStock in stock</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @* Right Panel - Cart & Checkout *@
+                        <div class="pos-cart">
+                            <div class="cart-header">
+                                <h4 class="mb-0">Current Sale</h4>
+                                @if (_cartItems.Any() || _selectedAppointment != null)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="ClearCart">
+                                        <i class="bi bi-trash me-1"></i>Clear
+                                    </button>
+                                }
+                            </div>
+
+                            @* Customer Selection *@
+                            <div class="customer-section mb-3">
+                                @if (_selectedCustomer == null)
+                                {
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                        <input type="text" class="form-control" placeholder="Search customer..." value="@_customerSearch"
+                                               @oninput="OnCustomerSearchInput" @onfocus="() => _showCustomerDropdown = true" />
+                                    </div>
+                                    @if (_showCustomerDropdown && _filteredCustomers.Any())
+                                    {
+                                        <div class="customer-dropdown">
+                                            @foreach (var customer in _filteredCustomers.Take(5))
+                                            {
+                                                <div class="customer-option" @onclick="() => SelectCustomer(customer)">
+                                                    <strong>@customer.FullName</strong>
+                                                    <span class="text-muted">@customer.PhoneNumber</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="selected-customer">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="customer-avatar">
+                                                <i class="bi bi-person-fill"></i>
+                                            </div>
+                                            <div>
+                                                <strong>@_selectedCustomer.FullName</strong>
+                                                <div class="small text-muted">@_selectedCustomer.PhoneNumber</div>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-link text-danger btn-sm" @onclick="ClearCustomer">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+
+                            @* Cart Items *@
+                            <div class="cart-items">
+                                @if (!_cartItems.Any())
+                                {
+                                    <div class="empty-cart">
+                                        <p class="mb-1">No items yet</p>
+                                        <small class="text-muted">Select an appointment or add products</small>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @* Service items from appointment *@
+                                    @foreach (var item in _cartItems.Where(c => c.Type == "Service"))
+                                    {
+                                        <div class="cart-item cart-item-service">
+                                            <div class="cart-item-row-top">
+                                                <span class="cart-item-name" title="@item.Name">
+                                                    <i class="bi bi-gem text-primary" style="font-size:0.7rem"></i> @item.Name
+                                                </span>
+                                                <div class="cart-item-qty">
+                                                    <button class="btn btn-sm btn-outline-secondary"
+                                                            @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
+                                                    <span>@item.Quantity</span>
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
+                                                        class="bi bi-plus"></i></button>
+                                                    </div>
+                                                </div>
+                                                <div class="cart-item-row-bottom">
+                                                    <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
+                                                    @if (_selectedCurrency != "PHP")
+                                                    {
+                                                        <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                        @* Product items *@
+                                        @foreach (var item in _cartItems.Where(c => c.Type == "Product"))
+                                        {
+                                            <div class="cart-item">
+                                                <div class="cart-item-row-top">
+                                                    <span class="cart-item-name" title="@item.Name">
+                                                        <i class="bi bi-box text-secondary" style="font-size:0.7rem"></i> @item.Name
+                                                    </span>
+                                                    <div class="cart-item-qty">
+                                                        <button class="btn btn-sm btn-outline-secondary"
+                                                                @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
+                                                        <span>@item.Quantity</span>
+                                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
+                                                            class="bi bi-plus"></i></button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="cart-item-row-bottom">
+                                                        <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
+                                                        @if (_selectedCurrency != "PHP")
+                                                        {
+                                                            <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+
+                                    @* Discount Section *@
+                                    @if (_cartItems.Any())
+                                    {
+                                        <div class="discount-section">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="bi bi-percent"></i></span>
+                                                <input type="number" class="form-control" placeholder="Discount %" @bind="_discountPercent" min="0"
+                                                       max="100" />
+                                                <button class="btn btn-outline-secondary" type="button" @onclick="ApplyDiscount">Apply</button>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    @* Cart Summary *@
+                                    <div class="cart-summary">
+                                        <div class="summary-row">
+                                            <span>Subtotal</span>
+                                            <span>₱ @Subtotal.ToString("N2")</span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span>Discount (@_discountPercent%)</span>
+                                            <span class="text-danger">-₱ @DiscountAmount.ToString("N2")</span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span>VAT (12%)</span>
+                                            <span>₱ @TaxAmount.ToString("N2")</span>
+                                        </div>
+                                        <div class="summary-row total">
+                                            <span>Total</span>
+                                            <span>
+                                                ₱ @GrandTotal.ToString("N2")
+                                                @if (_selectedCurrency != "PHP" && _exchangeRate > 0)
+                                                {
+                                                    <small class="d-block text-muted fw-normal"
+                                                           style="font-size: 0.7em;">@ConvertDisplay(GrandTotal)</small>
+                                                }
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    @* Currency Selector *@
+                                    <div class="currency-section">
+                                        <div class="currency-selector-inline">
+                                            <i class="bi bi-currency-exchange me-2 text-muted"></i>
+                                            <label class="form-label mb-0 me-2 small text-muted">Display Currency</label>
+                                            <select class="form-select form-select-sm currency-select-inline" value="@_selectedCurrency"
+                                                    @onchange="OnCurrencyChanged">
+                                                <option value="PHP">PHP ₱</option>
+                                                @foreach (var c in _supportedCurrencies.Where(c => c.Code != "PHP"))
+                                                {
+                                                    <option value="@c.Code">@c.Code @c.Symbol</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    @* Payment Methods *@
+                                    <div class="payment-section">
+                                        <label class="form-label">Payment Method</label>
+                                        <div class="payment-methods">
+                                            <button class="payment-method @(_paymentMethod == "Cash" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "Cash"'>
+                                                <i class="bi bi-cash-coin"></i>
+                                                <span>Cash</span>
+                                            </button>
+                                            <button class="payment-method @(_paymentMethod == "Card" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "Card"'>
+                                                <i class="bi bi-credit-card"></i>
+                                                <span>Card</span>
+                                            </button>
+                                            <button class="payment-method @(_paymentMethod == "GCash" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "GCash"'>
+                                                <i class="bi bi-phone"></i>
+                                                <span>GCash</span>
+                                            </button>
+                                            <button class="payment-method @(_paymentMethod == "Bank Transfer" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "Bank Transfer"'>
+                                                <i class="bi bi-bank"></i>
+                                                <span>Bank Transfer</span>
+                                            </button>
+                                            <button class="payment-method @(_paymentMethod == "Maya" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "Maya"'>
+                                                <i class="bi bi-phone"></i>
+                                                <span>Maya</span>
+                                            </button>
+                                            <button class="payment-method @(_paymentMethod == "Split" ? "active" : "")"
+                                                    @onclick='() => _paymentMethod = "Split"'>
+                                                <i class="bi bi-pie-chart"></i>
+                                                <span>Split</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    @* Cash Tendered (for cash payments) *@
+                                    @if (_paymentMethod == "Cash")
+                                    {
+                                        <div class="cash-section">
+                                            <label class="form-label">Cash Tendered</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">₱</span>
+                                                <input type="number" class="form-control form-control-lg" @bind="_cashTendered" />
+                                            </div>
+                                            @if (_cashTendered > 0 && _cashTendered >= GrandTotal)
+                                            {
+                                                <div class="change-display">
+                                                    <span>Change:</span>
+                                                    <strong>₱@((_cashTendered - GrandTotal).ToString("N0"))</strong>
+                                                </div>
+                                            }
+                                            <div class="quick-cash">
+                                                @foreach (var amount in new[] { 100, 500, 1000, 2000, 5000 })
+                                                {
+                                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => _cashTendered = amount">
+                                                        ₱@amount
+                                                    </button>
+                                                }
+                                                <button class="btn btn-outline-primary btn-sm" @onclick="() => _cashTendered = GrandTotal">
+                                                    Exact
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    @* Error Message *@
+                                    @if (!string.IsNullOrEmpty(_errorMessage))
+                                    {
+                                        <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
+                                            <i class="bi bi-exclamation-triangle me-1"></i> @_errorMessage
+                                            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+                                        </div>
+                                    }
+
+                                    @* Checkout Button *@
+                                    <button class="btn btn-success btn-lg w-100 checkout-btn" disabled="@(!CanCheckout)"
+                                            @onclick="ProcessCheckout">
+                                        @if (_isProcessing)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Processing...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-check-circle me-2"></i>
+                                            <span>Complete Sale - ₱@GrandTotal.ToString("N0")
+                                                @if (_selectedCurrency != "PHP")
+                                                {
+                                                    <small class="ms-1">(@ConvertDisplay(GrandTotal))</small>
+                                                }
+                                            </span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+
+                            @* Success Modal *@
+                            @if (_showSuccessModal)
+                            {
+                                <div class="modal-backdrop fade show"></div>
+                                <div class="modal fade show d-block" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-body text-center py-5">
+                                                <div class="success-icon mb-4">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </div>
+                                                <h3 class="text-success mb-2">Payment Successful!</h3>
+                                                <p class="text-muted mb-4">Transaction completed successfully</p>
+                                                <div class="receipt-summary">
+                                                    <div class="d-flex justify-content-between mb-2">
+                                                        <span>Total Paid:</span>
+                                                        <strong>₱@(_lastPaymentMethod == "Cash" ? _lastCashTendered.ToString("N0") :
+                                                                                            _lastGrandTotal.ToString("N0"))</strong>
+                                                        </div>
+                                                        @if (_lastTransaction?.ClientCurrency != null && _lastTransaction.ClientCurrency != "PHP" &&
+                                                                                _lastTransaction.TotalInClientCurrency.HasValue)
+                                                        {
+                                                            <div class="d-flex justify-content-between mb-2">
+                                                                <span>In @_lastTransaction.ClientCurrency:</span>
+                                                                <strong>@CurrencyDisplay.GetCurrencySymbol(_lastTransaction.ClientCurrency)@_lastTransaction.TotalInClientCurrency?.ToString("N2")</strong>
+                                                            </div>
+                                                        }
+                                                        @if (_lastPaymentMethod == "Cash" && _lastCashTendered > _lastGrandTotal)
+                                                        {
+                                                            <div class="d-flex justify-content-between mb-2">
+                                                                <span>Change:</span>
+                                                                <strong class="text-success">₱@((_lastCashTendered -
+                                                                                                    _lastGrandTotal).ToString("N0"))</strong>
+                                                                </div>
+                                                            }
+                                                            <div class="d-flex justify-content-between">
+                                                                <span>Receipt #:</span>
+                                                                <strong>@_lastTransaction?.TransactionNumber</strong>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex gap-2 justify-content-center mt-4">
+                                                            <button class="btn btn-outline-primary" @onclick="PrintReceipt">
+                                                                <i class="bi bi-printer me-1"></i> Print Receipt
+                                                            </button>
+                                                            <button class="btn btn-primary" @onclick="StartNewSale">
+                                                                <i class="bi bi-plus me-1"></i> New Sale
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </AuthorizedPage>
+
+@code {
+    // Tab & search state
+    private string _activeTab = "appointments";
+    private string _searchTerm = "";
+    private string _appointmentSearch = "";
+    private string? _selectedCategory;
+
+    // Customer
+    private string _customerSearch = "";
+    private bool _showCustomerDropdown;
+    private CustomerResponse? _selectedCustomer;
+    private List<CustomerResponse> _filteredCustomers = new();
+    private List<CustomerResponse> _customers = new();
+
+    // Appointments
+    private List<AppointmentResponse> _appointments = new();
+    private AppointmentResponse? _selectedAppointment;
+    private bool _appointmentsLoading;
+
+    // Cart
+    private List<CartItem> _cartItems = new();
+
+    // Products & Services
+    private List<ServiceResponse> _services = new();
+    private List<ProductResponse> _products = new();
+
+    // Payment
+    private decimal _discountPercent;
+    private string _paymentMethod = "Cash";
+    private decimal _cashTendered;
+    private bool _isProcessing;
+    private bool _showSuccessModal;
+    private string? _errorMessage;
+    private TransactionResponse? _lastTransaction;
+
+    // Store values at checkout time for the success modal
+    private decimal _lastCashTendered;
+    private decimal _lastGrandTotal;
+    private string _lastPaymentMethod = "Cash";
+
+    // Currency state
+    private string _selectedCurrency = "PHP";
+    private decimal _exchangeRate = 1.0m;
+    private List<SupportedCurrencyInfo> _supportedCurrencies = new();
+#pragma warning disable CS0414
+    private bool _currencyLoading;
+#pragma warning restore CS0414
+
+    private const decimal TaxRate = 0.12m;
+    private decimal Subtotal => _cartItems.Sum(x => x.Total);
+    private decimal DiscountAmount => Subtotal * (_discountPercent / 100);
+    private decimal TaxableAmount => Subtotal - DiscountAmount;
+    private decimal TaxAmount => TaxableAmount * TaxRate;
+    private decimal GrandTotal => TaxableAmount + TaxAmount;
+    private bool CanCheckout => _cartItems.Any() &&
+    (_paymentMethod != "Cash" || _cashTendered >= GrandTotal);
+
+    private async Task LoadData()
+    {
+        try
+        {
+            _appointmentsLoading = true;
+
+            var productsTask = InventoryService.GetProductsAsync(1, 100);
+            var customersTask = CustomerService.GetCustomersAsync(1, 200);
+            var currencyTask = LoadCurrencyInfo();
+            var servicesTask = ServiceService.GetServicesAsync(1, 100);
+
+            await Task.WhenAll(productsTask, customersTask, currencyTask, servicesTask);
+
+            _products = (await productsTask)?.Items.Where(p => p.IsActive).ToList() ?? new();
+            _customers = (await customersTask)?.Items.ToList() ?? new();
+            _services = (await servicesTask)?.Items.Where(s => s.IsActive).ToList() ?? new();
+
+            // Load active appointments (today by default)
+            await LoadAppointments();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading POS data: {ex.Message}");
+        }
+        finally
+        {
+            _appointmentsLoading = false;
+        }
+    }
+
+    private async Task LoadAppointments()
+    {
+        try
+        {
+            _appointmentsLoading = true;
+
+            // Load appointments for today that are in active statuses (exclude Completed to prevent duplicate transactions)
+            var result = await AppointmentService.GetAppointmentsAsync(1, 100, DateTime.Today);
+            if (result?.Items != null)
+            {
+                _appointments = result.Items
+                .Where(a => a.Status is "Confirmed" or "Checked In" or "In Progress")
+                .OrderBy(a => a.StartTime)
+                .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading appointments: {ex.Message}");
+        }
+        finally
+        {
+            _appointmentsLoading = false;
+        }
+    }
+
+    private void SwitchTab(string tab)
+    {
+        _activeTab = tab;
+        _searchTerm = "";
+        _selectedCategory = null;
+    }
+
+    // ========================================================================
+    // Appointment handling
+    // ========================================================================
+
+    private IEnumerable<AppointmentResponse> GetFilteredAppointments()
+    {
+        var query = _appointments.AsEnumerable();
+
+        // If a customer is selected, filter appointments for that customer
+        if (_selectedCustomer != null)
+        {
+            query = query.Where(a => a.CustomerId == _selectedCustomer.CustomerId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_appointmentSearch))
+        {
+            query = query.Where(a =>
+            a.CustomerName.Contains(_appointmentSearch, StringComparison.OrdinalIgnoreCase) ||
+            a.AppointmentNumber.Contains(_appointmentSearch, StringComparison.OrdinalIgnoreCase) ||
+            a.ServiceName.Contains(_appointmentSearch, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return query;
+    }
+
+    private void SelectAppointment(AppointmentResponse appointment)
+    {
+        if (_selectedAppointment?.AppointmentId == appointment.AppointmentId)
+        {
+            // Deselect
+            DeselectAppointment();
+            return;
+        }
+
+        _selectedAppointment = appointment;
+
+        // Auto-set customer from appointment
+        var matchingCustomer = _customers.FirstOrDefault(c => c.CustomerId == appointment.CustomerId);
+        if (matchingCustomer != null)
+        {
+            _selectedCustomer = matchingCustomer;
+        }
+
+        // Remove existing service items from cart (from any other appointment)
+        _cartItems.RemoveAll(c => c.Type == "Service");
+
+        // Add the appointment's services to cart
+        if (appointment.ServiceItems.Any())
+        {
+            foreach (var si in appointment.ServiceItems)
+            {
+                _cartItems.Add(new CartItem
+                {
+                    ItemId = si.ServiceId,
+                    Name = si.ServiceName,
+                    Type = "Service",
+                    UnitPrice = si.UnitPrice,
+                    Quantity = si.Quantity
+                });
+            }
+        }
+        else
+        {
+            // Legacy single-service appointment
+            _cartItems.Add(new CartItem
+            {
+                ItemId = appointment.ServiceId,
+                Name = appointment.ServiceName,
+                Type = "Service",
+                UnitPrice = appointment.ServicePrice,
+                Quantity = 1
+            });
+        }
+    }
+
+    private void DeselectAppointment()
+    {
+        _selectedAppointment = null;
+        _cartItems.RemoveAll(c => c.Type == "Service");
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Confirmed" => "bg-info",
+        "Checked In" => "bg-warning text-dark",
+        "In Progress" => "bg-primary",
+        "Completed" => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    // ========================================================================
+    // Product handling
+    // ========================================================================
+
+    private IEnumerable<string> GetProductCategories()
+    {
+        return _products.Select(p => p.CategoryName).Distinct().Where(c => !string.IsNullOrEmpty(c))!;
+    }
+
+    private IEnumerable<ProductResponse> GetFilteredProducts()
+    {
+        var query = _products.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+            query = query.Where(p => p.ProductName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(_selectedCategory))
+            query = query.Where(p => p.CategoryName == _selectedCategory);
+        return query;
+    }
+
+    private void AddProductToCart(ProductResponse product)
+    {
+        if (product.QuantityInStock <= 0) return;
+
+        var existing = _cartItems.FirstOrDefault(x => x.ItemId == product.ProductId && x.Type == "Product");
+        if (existing != null)
+        {
+            if (existing.Quantity < product.QuantityInStock)
+                existing.Quantity++;
+        }
+        else
+        {
+            _cartItems.Add(new CartItem
+            {
+                ItemId = product.ProductId,
+                Name = product.ProductName,
+                Type = "Product",
+                UnitPrice = product.SellingPrice ?? product.CostPrice,
+                Quantity = 1
+            });
+        }
+    }
+
+    // ========================================================================
+    // Cart management
+    // ========================================================================
+
+    private void UpdateQuantity(CartItem item, int change)
+    {
+        item.Quantity += change;
+        if (item.Quantity <= 0)
+            RemoveFromCart(item);
+    }
+
+    private void RemoveFromCart(CartItem item)
+    {
+        _cartItems.Remove(item);
+
+        // If removing the last service item and there's a selected appointment, deselect it
+        if (item.Type == "Service" && !_cartItems.Any(c => c.Type == "Service"))
+        {
+            _selectedAppointment = null;
+        }
+    }
+
+    private void ClearCart()
+    {
+        _cartItems.Clear();
+        _selectedAppointment = null;
+        _discountPercent = 0;
+        _cashTendered = 0;
+    }
+
+    // ========================================================================
+    // Customer handling
+    // ========================================================================
+
+    private void OnCustomerSearchInput(ChangeEventArgs e)
+    {
+        _customerSearch = e.Value?.ToString() ?? "";
+        _showCustomerDropdown = true;
+
+        if (string.IsNullOrWhiteSpace(_customerSearch))
+        {
+            _filteredCustomers = new List<CustomerResponse>();
+        }
+        else
+        {
+            _filteredCustomers = _customers
+            .Where(c => c.FullName.Contains(_customerSearch, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrEmpty(c.PhoneNumber) && c.PhoneNumber.Contains(_customerSearch, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrEmpty(c.Email) && c.Email.Contains(_customerSearch, StringComparison.OrdinalIgnoreCase)))
+            .Take(10)
+            .ToList();
+        }
+    }
+
+    private void SelectCustomer(CustomerResponse customer)
+    {
+        _selectedCustomer = customer;
+        _showCustomerDropdown = false;
+        _customerSearch = "";
+        _filteredCustomers = new List<CustomerResponse>();
+    }
+
+    private void ClearCustomer()
+    {
+        _selectedCustomer = null;
+        if (_selectedAppointment != null)
+        {
+            DeselectAppointment();
+        }
+    }
+
+    // ========================================================================
+    // Currency
+    // ========================================================================
+
+    private async Task LoadCurrencyInfo()
+    {
+        try
+        {
+            var supported = await CurrencyService.GetSupportedCurrenciesAsync();
+            if (supported?.Currencies != null)
+                _supportedCurrencies = supported.Currencies;
+
+            var detected = await CurrencyService.DetectClientAsync();
+            if (detected != null && detected.IsSupported && detected.SuggestedCurrency != "PHP")
+            {
+                _selectedCurrency = detected.SuggestedCurrency;
+                _exchangeRate = detected.ExchangeRate ?? 1.0m;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Currency detection failed: {ex.Message}");
+        }
+    }
+
+    private async Task OnCurrencyChanged(ChangeEventArgs e)
+    {
+        _selectedCurrency = e.Value?.ToString() ?? "PHP";
+        if (_selectedCurrency == "PHP")
+        {
+            _exchangeRate = 1.0m;
+            return;
+        }
+
+        _currencyLoading = true;
+        try
+        {
+            var rate = await CurrencyService.GetRateAsync(_selectedCurrency);
+            _exchangeRate = rate?.ExchangeRate ?? 1.0m;
+        }
+        catch
+        {
+            _exchangeRate = 1.0m;
+        }
+        finally
+        {
+            _currencyLoading = false;
+        }
+    }
+
+    private string ConvertDisplay(decimal phpAmount)
+    {
+        if (_selectedCurrency == "PHP" || _exchangeRate <= 0) return "";
+        var converted = phpAmount * _exchangeRate;
+        return $"\u2248 {CurrencyDisplay.GetCurrencySymbol(_selectedCurrency)}{converted:N2} {_selectedCurrency}";
+    }
+
+    // ========================================================================
+    // Discount
+    // ========================================================================
+
+    private void ApplyDiscount()
+    {
+        if (_discountPercent < 0) _discountPercent = 0;
+        if (_discountPercent > 100) _discountPercent = 100;
+    }
+
+    // ========================================================================
+    // Checkout
+    // ========================================================================
+
+    private async Task ProcessCheckout()
+    {
+        if (!CanCheckout) return;
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            var serviceItems = _cartItems
+            .Where(c => c.Type == "Service")
+            .Select(c => new CreateTransactionServiceItemRequest
+            {
+                ServiceId = c.ItemId,
+                Quantity = c.Quantity,
+                UnitPrice = null
+            }).ToList();
+
+            var productItems = _cartItems
+            .Where(c => c.Type == "Product")
+            .Select(c => new CreateTransactionProductItemRequest
+            {
+                ProductId = c.ItemId,
+                Quantity = c.Quantity,
+                UnitPrice = null
+            }).ToList();
+
+            var customerId = _selectedCustomer?.CustomerId ?? 1;
+
+            var transaction = new CreateTransactionRequest
+            {
+                CustomerId = customerId,
+                AppointmentId = _selectedAppointment?.AppointmentId,
+                PaymentMethod = _paymentMethod,
+                DiscountAmount = DiscountAmount,
+                ServiceItems = serviceItems,
+                ProductItems = productItems,
+                AmountTendered = _paymentMethod == "Cash" && _cashTendered > 0 ? _cashTendered : null,
+                ClientCurrency = _selectedCurrency != "PHP" ? _selectedCurrency : null
+            };
+
+            _lastCashTendered = _cashTendered;
+            _lastGrandTotal = GrandTotal;
+            _lastPaymentMethod = _paymentMethod;
+
+            _lastTransaction = await TransactionService.CreateTransactionAsync(transaction);
+
+            if (_lastTransaction != null)
+            {
+                _showSuccessModal = true;
+            }
+            else
+            {
+                _errorMessage = "Transaction failed. Please check the details and try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Checkout error: {ex.Message}");
+            _errorMessage = $"Failed to process transaction: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    // ========================================================================
+    // Receipt
+    // ========================================================================
+
+    private async Task PrintReceipt()
+    {
+        if (_lastTransaction == null) return;
+
+        var customerName = _lastTransaction.CustomerName ?? "Walk-in";
+        var appointmentInfo = _selectedAppointment != null
+        ? $"<div class='item'><span>Appointment:</span><span>{_selectedAppointment.AppointmentNumber}</span></div><div class='item'><span>Therapist:</span><span>{_selectedAppointment.TherapistName ?? "N/A"}</span></div>"
+        : "";
+
+        var receipt = $@"
+<html>
+<head>
+<title>Receipt #{_lastTransaction.TransactionNumber}</title>
+<style>
+body {{ font-family: 'Courier New', monospace; width: 300px; margin: 0 auto; padding: 20px; }}
+.header {{ text-align: center; margin-bottom: 20px; }}
+.header h2 {{ margin: 0; font-size: 18px; }}
+.header p {{ margin: 5px 0; font-size: 12px; }}
+.divider {{ border-top: 1px dashed #000; margin: 10px 0; }}
+.item {{ display: flex; justify-content: space-between; font-size: 12px; margin: 5px 0; }}
+.total {{ font-weight: bold; font-size: 14px; }}
+.section-label {{ font-size: 11px; font-weight: bold; margin-top: 8px; text-transform: uppercase; color: #666; }}
+.footer {{ text-align: center; margin-top: 20px; font-size: 11px; }}
+</style>
+</head>
+<body>
+<div class='header'>
+<h2>MiddayMist Spa</h2>
+<p>123 Wellness Street, Manila</p>
+<p>Tel: (02) 8888-MIST</p>
+</div>
+<div class='divider'></div>
+<div class='item'><span>Receipt #:</span><span>{_lastTransaction.TransactionNumber}</span></div>
+<div class='item'><span>Date:</span><span>{_lastTransaction.TransactionDate:MMM dd, yyyy hh:mm tt}</span></div>
+<div class='item'><span>Customer:</span><span>{customerName}</span></div>
+<div class='item'><span>Cashier:</span><span>{_lastTransaction.CashierName}</span></div>
+{appointmentInfo}
+<div class='divider'></div>";
+
+        if (_lastTransaction.ServiceItems.Any())
+        {
+            receipt += "<div class='section-label'>Services</div>";
+            foreach (var item in _lastTransaction.ServiceItems)
+            {
+                receipt += $"<div class='item'><span>{item.ServiceName} x{item.Quantity}</span><span>₱{item.TotalPrice:N2}</span></div>";
+            }
+        }
+
+        if (_lastTransaction.ProductItems.Any())
+        {
+            receipt += "<div class='section-label'>Products</div>";
+            foreach (var item in _lastTransaction.ProductItems)
+            {
+                receipt += $"<div class='item'><span>{item.ProductName} x{item.Quantity}</span><span>₱{item.TotalPrice:N2}</span></div>";
+            }
+        }
+
+        receipt += $@"
+<div class='divider'></div>
+<div class='item'><span>Subtotal:</span><span>₱{_lastTransaction.Subtotal:N2}</span></div>";
+
+        if (_lastTransaction.DiscountAmount > 0)
+        {
+            receipt += $"<div class='item'><span>Discount:</span><span>-₱{_lastTransaction.DiscountAmount:N2}</span></div>";
+        }
+
+        receipt += $@"
+<div class='item'><span>Tax (12%):</span><span>₱{_lastTransaction.TaxAmount:N2}</span></div>
+<div class='divider'></div>
+<div class='item total'><span>TOTAL:</span><span>₱{_lastTransaction.TotalAmount:N2}</span></div>";
+
+        if (_lastTransaction.ClientCurrency != "PHP" && _lastTransaction.TotalInClientCurrency.HasValue)
+        {
+            receipt += $"<div class='item'><span>In {_lastTransaction.ClientCurrency}:</span><span>{CurrencyDisplay.GetCurrencySymbol(_lastTransaction.ClientCurrency)}{_lastTransaction.TotalInClientCurrency:N2}</span></div>";
+        }
+
+        receipt += $@"
+<div class='item'><span>Payment:</span><span>{_lastTransaction.PaymentMethod}</span></div>
+<div class='divider'></div>
+<div class='footer'>
+<p>Thank you for visiting MiddayMist Spa!</p>
+<p>We hope to see you again soon.</p>
+</div>
+</body>
+</html>";
+
+        await JSRuntime.InvokeVoidAsync("printReceipt", receipt);
+    }
+
+    private void StartNewSale()
+    {
+        _showSuccessModal = false;
+        ClearCart();
+        _selectedCustomer = null;
+        _lastTransaction = null;
+        _ = LoadAppointments();
+    }
+
+    // ========================================================================
+    // Models
+    // ========================================================================
+
+    private class CartItem
+    {
+        public int ItemId { get; set; }
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+        public decimal Total => UnitPrice * Quantity;
+    }
+}

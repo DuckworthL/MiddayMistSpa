@@ -1,0 +1,516 @@
+@page "/employees"
+@inject IEmployeeApiService EmployeeService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Employees - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadEmployees">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Employees</h1>
+                <p class="text-muted mb-0">Manage your spa staff and therapists</p>
+            </div>
+            <div>
+                <button class="btn btn-primary" @onclick="ShowAddModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add Employee
+                </button>
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <SearchInput @bind-Value="_searchQuery" Placeholder="Search employees..." OnSearch="OnSearch" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small text-muted">Status</label>
+                        <select class="form-select" @onchange="OnStatusFilterChange">
+                            <option value="">All Status</option>
+                            <option value="true">Active</option>
+                            <option value="false">Archived</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small text-muted">Department</label>
+                        <select class="form-select" @onchange="OnDepartmentFilterChange">
+                            <option value="">All Departments</option>
+                            <option value="Spa">Spa</option>
+                            <option value="Reception">Reception</option>
+                            <option value="Management">Management</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading employees..." />
+        }
+        else
+        {
+            @* Employees Table *@
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Position</th>
+                                    <th>Department</th>
+                                    <th>Contact</th>
+                                    <th>Hire Date</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_employees.Items.Any())
+                                {
+                                    @foreach (var employee in _employees.Items)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
+                                                         style="width: 40px; height: 40px;">
+                                                        @(string.IsNullOrEmpty(employee.FirstName) ? "?" :
+                                                        employee.FirstName[0..1])@(string.IsNullOrEmpty(employee.LastName) ? "" :
+                                                                                                    employee.LastName[0..1])
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">@employee.FullName</div>
+                                                        <small class="text-muted">@employee.EmployeeCode</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@employee.Position</td>
+                                            <td>@(employee.Department ?? "-")</td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(employee.Email))
+                                                {
+                                                    <div><i class="bi bi-envelope me-1 text-muted"></i> @employee.Email</div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(employee.PhoneNumber))
+                                                {
+                                                    <div><i class="bi bi-phone me-1 text-muted"></i> @employee.PhoneNumber</div>
+                                                }
+                                            </td>
+                                            <td>@employee.HireDate.ToString("MMM dd, yyyy")</td>
+                                            <td>
+                                                <StatusBadge Status="@(employee.IsActive ? "Active" : "Inactive")" />
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary"
+                                                            @onclick="() => ViewEmployee(employee.EmployeeId)" title="View">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-secondary"
+                                                            @onclick="() => EditEmployee(employee)" title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    @if (employee.IsActive)
+                                                    {
+                                                        <button class="btn btn-outline-warning"
+                                                                @onclick="() => ConfirmArchive(employee)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-outline-success"
+                                                                @onclick="() => RestoreEmployee(employee)" title="Restore">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center py-5">
+                                            <i class="bi bi-people display-4 text-muted"></i>
+                                            <p class="text-muted mt-2">No employees found</p>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if (_employees.TotalPages > 1)
+                {
+                    <div class="card-footer bg-white border-0">
+                        <Pagination CurrentPage="_currentPage" TotalCount="_employees.TotalCount" PageSize="_pageSize"
+                                    OnPageChanged="OnPageChanged" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Add/Edit Employee Modal *@
+    <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Employee" : "Add New Employee")"
+           Size="Modal.ModalSize.Large">
+        <ChildContent>
+            <EditForm Model="_formModel" OnValidSubmit="SaveEmployee">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">First Name *</label>
+                        <InputText class="form-control" @bind-Value="_formModel.FirstName" />
+                        <ValidationMessage For="() => _formModel.FirstName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Last Name *</label>
+                        <InputText class="form-control" @bind-Value="_formModel.LastName" />
+                        <ValidationMessage For="() => _formModel.LastName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Email" type="email" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone Number</label>
+                        <InputText class="form-control" @bind-Value="_formModel.PhoneNumber" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Position *</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.Position">
+                            <option value="">Select Position</option>
+                            <option value="Therapist">Therapist</option>
+                            <option value="Senior Therapist">Senior Therapist</option>
+                            <option value="Receptionist">Receptionist</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Esthetician">Esthetician</option>
+                            <option value="Nail Technician">Nail Technician</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Department</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.Department">
+                            <option value="">Select Department</option>
+                            <option value="Spa">Spa</option>
+                            <option value="Reception">Reception</option>
+                            <option value="Management">Management</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Hire Date *</label>
+                        <InputDate class="form-control" @bind-Value="_formModel.HireDate" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Employment Type</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.EmploymentType">
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contract</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Base Salary</label>
+                        <InputNumber class="form-control" @bind-Value="_formModel.BaseSalary" />
+                    </div>
+                </div>
+            </EditForm>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveEmployee" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                @(_isEditing ? "Update" : "Create") Employee
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Archive Confirmation *@
+    <ConfirmDialog @bind-IsVisible="_showDeleteConfirm" Title="Archive Employee"
+                   Message="@($"Are you sure you want to archive {_employeeToDelete?.FullName}? They can be restored later from the Archived filter.")"
+                   IsDanger="true" OnConfirm="ArchiveEmployee" />
+
+    @* View Employee Detail Modal *@
+    <Modal @bind-IsVisible="_showViewModal" Title="Employee Details" Size="Modal.ModalSize.Large">
+        <ChildContent>
+            @if (_viewEmployee != null)
+            {
+                <div class="row g-4">
+                    <div class="col-12 text-center">
+                        <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-2"
+                             style="width: 72px; height: 72px; font-size: 1.5rem;">
+                            @(string.IsNullOrEmpty(_viewEmployee.FirstName) ? "?" :
+                            _viewEmployee.FirstName[0..1])@(string.IsNullOrEmpty(_viewEmployee.LastName) ? "" :
+                                                    _viewEmployee.LastName[0..1])
+                        </div>
+                        <h5 class="mb-0">@_viewEmployee.FullName</h5>
+                        <small class="text-muted">@_viewEmployee.EmployeeCode</small>
+                        <div class="mt-1">
+                            <StatusBadge Status="@(_viewEmployee.IsActive ? "Active" : "Inactive")" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted border-bottom pb-2"><i class="bi bi-person me-1"></i> Personal Info</h6>
+                        <div class="mb-2"><strong>Email:</strong> @(_viewEmployee.Email ?? "N/A")</div>
+                        <div class="mb-2"><strong>Phone:</strong> @(_viewEmployee.PhoneNumber ?? "N/A")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted border-bottom pb-2"><i class="bi bi-briefcase me-1"></i> Work Info</h6>
+                        <div class="mb-2"><strong>Position:</strong> @_viewEmployee.Position</div>
+                        <div class="mb-2"><strong>Department:</strong> @(_viewEmployee.Department ?? "N/A")</div>
+                        <div class="mb-2"><strong>Employment Type:</strong> @_viewEmployee.EmploymentType</div>
+                        <div class="mb-2"><strong>Hire Date:</strong> @_viewEmployee.HireDate.ToString("MMM dd, yyyy")</div>
+                        <div class="mb-2"><strong>Base Salary:</strong> ₱@_viewEmployee.BaseSalary.ToString("N2")</div>
+                        @if (_viewEmployee.IsTherapist)
+                        {
+                            <div class="mb-2"><strong>Specialization:</strong> @(_viewEmployee.Specialization ?? "N/A")</div>
+                        }
+                    </div>
+                </div>
+            }
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showViewModal = false">Close</button>
+            <button type="button" class="btn btn-primary"
+                    @onclick="() => { _showViewModal = false; EditEmployee(_viewEmployee!); }">
+                <i class="bi bi-pencil me-1"></i> Edit
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private PagedResponse<EmployeeResponse> _employees = new();
+    private bool _isLoading = true;
+    private int _currentPage = 1;
+    private int _pageSize = 20;
+    private string _searchQuery = string.Empty;
+    private bool? _activeOnlyFilter;
+    private string? _departmentFilter;
+
+    // Modal state
+    private bool _showModal;
+    private bool _isEditing;
+    private bool _isSaving;
+    private CreateEmployeeRequest _formModel = new();
+    private int? _editingEmployeeId;
+
+    // Delete confirmation
+    private bool _showDeleteConfirm;
+    private EmployeeResponse? _employeeToDelete;
+
+    // View detail
+    private bool _showViewModal;
+    private EmployeeResponse? _viewEmployee;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadEmployees()
+    {
+        _isLoading = true;
+        try
+        {
+            _employees = await EmployeeService.GetEmployeesAsync(_currentPage, _pageSize, _searchQuery, _activeOnlyFilter,
+            _departmentFilter);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading employees: {ex.Message}");
+            ShowAlert("Failed to load employees. Please check your connection and try again.", Alert.AlertType.Error);
+            _employees = new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnSearch(string query)
+    {
+        _searchQuery = query;
+        _currentPage = 1;
+        await LoadEmployees();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        _currentPage = newPage;
+        await LoadEmployees();
+    }
+
+    private async Task OnStatusFilterChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        _activeOnlyFilter = string.IsNullOrEmpty(value) ? null : bool.Parse(value);
+        _currentPage = 1;
+        await LoadEmployees();
+    }
+
+    private async Task OnDepartmentFilterChange(ChangeEventArgs e)
+    {
+        _departmentFilter = e.Value?.ToString();
+        _currentPage = 1;
+        await LoadEmployees();
+    }
+
+    private void ShowAddModal()
+    {
+        _isEditing = false;
+        _editingEmployeeId = null;
+        _formModel = new CreateEmployeeRequest { HireDate = DateTime.Today };
+        _showModal = true;
+    }
+
+    private void EditEmployee(EmployeeResponse employee)
+    {
+        _isEditing = true;
+        _editingEmployeeId = employee.EmployeeId;
+        _formModel = new CreateEmployeeRequest
+        {
+            FirstName = employee.FirstName,
+            LastName = employee.LastName,
+            Email = employee.Email,
+            PhoneNumber = employee.PhoneNumber,
+            Position = employee.Position,
+            Department = employee.Department,
+            HireDate = employee.HireDate,
+            EmploymentType = employee.EmploymentType,
+            BaseSalary = employee.BaseSalary
+        };
+        _showModal = true;
+    }
+
+    private void ViewEmployee(int id)
+    {
+        _viewEmployee = _employees.Items.FirstOrDefault(e => e.EmployeeId == id);
+        if (_viewEmployee != null)
+        {
+            _showViewModal = true;
+        }
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task SaveEmployee()
+    {
+        _isSaving = true;
+
+        try
+        {
+            EmployeeResponse? result;
+            string? errorMessage = null;
+            if (_isEditing && _editingEmployeeId.HasValue)
+            {
+                var updateRequest = new UpdateEmployeeRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    PhoneNumber = _formModel.PhoneNumber,
+                    Position = _formModel.Position,
+                    Department = _formModel.Department,
+                    EmploymentType = _formModel.EmploymentType,
+                    BaseSalary = _formModel.BaseSalary
+                };
+                (result, errorMessage) = await EmployeeService.UpdateEmployeeWithErrorAsync(_editingEmployeeId.Value, updateRequest);
+            }
+            else
+            {
+                (result, errorMessage) = await EmployeeService.CreateEmployeeWithErrorAsync(_formModel);
+            }
+
+            if (result != null)
+            {
+                ShowAlert($"Employee {(_isEditing ? "updated" : "created")} successfully!", Alert.AlertType.Success);
+                _showModal = false;
+                await LoadEmployees();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to save employee. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveEmployee error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the employee.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private void ConfirmArchive(EmployeeResponse employee)
+    {
+        _employeeToDelete = employee;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ArchiveEmployee()
+    {
+        if (_employeeToDelete == null) return;
+
+        var success = await EmployeeService.ArchiveEmployeeAsync(_employeeToDelete.EmployeeId);
+        if (success)
+        {
+            ShowAlert("Employee archived successfully!", Alert.AlertType.Success);
+            await LoadEmployees();
+        }
+        else
+        {
+            ShowAlert("Failed to archive employee. They may have active appointments or pending payroll.", Alert.AlertType.Error);
+        }
+
+        _employeeToDelete = null;
+    }
+
+    private async Task RestoreEmployee(EmployeeResponse employee)
+    {
+        var success = await EmployeeService.ReactivateEmployeeAsync(employee.EmployeeId);
+        if (success)
+        {
+            ShowAlert("Employee restored successfully!", Alert.AlertType.Success);
+            await LoadEmployees();
+        }
+        else
+        {
+            ShowAlert("Failed to restore employee. Please try again.", Alert.AlertType.Error);
+        }
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+}

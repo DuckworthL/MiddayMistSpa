@@ -1,0 +1,560 @@
+@page "/accounting"
+@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject IAccountingApiService AccountingService
+@inject IReportsApiService ReportsService
+@inject ITransactionApiService TransactionService
+@inject NavigationManager Navigation
+
+<PageTitle>Accounting - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1" style="color: #2C2C2C;">Accounting & Finance</h1>
+                <p class="mb-0" style="color: #6B7280;">Financial overview and management</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select" style="width: 150px;" @bind="_selectedPeriod" @bind:after="OnPeriodChanged">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="year">This Year</option>
+                </select>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading financial data..." />
+        }
+        else
+        {
+            @* Financial Summary Cards *@
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card h-100" style="border-left: 4px solid #10B981;">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <p class="text-muted mb-1 small">Total Revenue</p>
+                                    <h3 class="mb-0" style="color: #10B981;">₱@_totalRevenue.ToString("N2")</h3>
+                                    <small class="text-success"><i class="bi bi-arrow-up"></i> 12.5% vs last period</small>
+                                </div>
+                                <div class="rounded-circle p-2" style="background: #D1FAE5;">
+                                    <i class="bi bi-graph-up-arrow fs-4" style="color: #10B981;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100" style="border-left: 4px solid #EF4444;">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <p class="text-muted mb-1 small">Total Expenses</p>
+                                    <h3 class="mb-0" style="color: #EF4444;">₱@_totalExpenses.ToString("N2")</h3>
+                                    <small class="text-danger"><i class="bi bi-arrow-up"></i> 5.2% vs last period</small>
+                                </div>
+                                <div class="rounded-circle p-2" style="background: #FEE2E2;">
+                                    <i class="bi bi-graph-down-arrow fs-4" style="color: #EF4444;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100" style="border-left: 4px solid #6A9C89;">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <p class="text-muted mb-1 small">Net Profit</p>
+                                    <h3 class="mb-0" style="color: #6A9C89;">₱@((_totalRevenue -
+                                                                                                                _totalExpenses).ToString("N2"))
+                                    </h3>
+                                    <small class="text-success">@((_totalRevenue > 0 ? (_totalRevenue - _totalExpenses) /
+                                                                                                                _totalRevenue * 100 : 0).ToString("F1"))%
+                                        margin</small>
+                                    </div>
+                                    <div class="rounded-circle p-2" style="background: #E8F2EE;">
+                                        <i class="bi bi-cash-stack fs-4" style="color: #6A9C89;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card h-100" style="border-left: 4px solid #8B5CF6;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <p class="text-muted mb-1 small">Outstanding</p>
+                                        <h3 class="mb-0" style="color: #8B5CF6;">₱@_outstandingAmount.ToString("N2")</h3>
+                                        <small class="text-muted">@_outstandingCount unpaid invoices</small>
+                                    </div>
+                                    <div class="rounded-circle p-2" style="background: #EDE9FE;">
+                                        <i class="bi bi-receipt fs-4" style="color: #8B5CF6;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    @* Quick Links *@
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body py-3">
+                                <div class="d-flex gap-3 flex-wrap">
+                                    <a href="/accounting/income" class="btn btn-outline-success">
+                                        <i class="bi bi-plus-circle me-1"></i> Record Income
+                                    </a>
+                                    <a href="/accounting/expenses" class="btn btn-outline-danger">
+                                        <i class="bi bi-dash-circle me-1"></i> Record Expense
+                                    </a>
+                                    <a href="/accounting/invoices" class="btn btn-outline-primary">
+                                        <i class="bi bi-file-text me-1"></i> Invoices
+                                    </a>
+                                    <a href="/accounting/journal" class="btn btn-outline-secondary">
+                                        <i class="bi bi-journal-text me-1"></i> Journal Entries
+                                    </a>
+                                    <a href="/reports" class="btn btn-outline-info">
+                                        <i class="bi bi-file-bar-graph me-1"></i> Financial Reports
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Revenue Breakdown *@
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Revenue by Category</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (!_revenueByCategory.Any())
+                                {
+                                    <div class="text-center py-4 text-muted">
+                                        <i class="bi bi-bar-chart" style="font-size: 2rem; opacity: 0.3;"></i>
+                                        <p class="mt-2 mb-0">No revenue recorded yet</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var category in _revenueByCategory)
+                                    {
+                                        var categoryWidth = _totalRevenue > 0 ? (category.Amount / _totalRevenue * 100) : 0;
+                                        var categoryStyle = $"width: {categoryWidth:F0}%; background: {category.Color};";
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>@category.Name</span>
+                                                <span class="fw-medium">₱@category.Amount.ToString("N2")</span>
+                                            </div>
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar" style="@categoryStyle">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Expense Breakdown *@
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Expenses by Category</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (!_expensesByCategory.Any())
+                                {
+                                    <div class="text-center py-4 text-muted">
+                                        <i class="bi bi-bar-chart" style="font-size: 2rem; opacity: 0.3;"></i>
+                                        <p class="mt-2 mb-0">No expenses recorded yet</p>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var expense in _expensesByCategory)
+                                    {
+                                        var expenseWidth = _totalExpenses > 0 ? expense.Amount / _totalExpenses * 100 : 0;
+                                        var expenseOpacity = _totalExpenses > 0 ? 0.4m + expense.Amount / _totalExpenses * 0.6m : 0.4m;
+                                        var expenseStyle = $"width: {expenseWidth:F0}%; opacity: {expenseOpacity:F2};";
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>@expense.Name</span>
+                                                <span class="fw-medium">₱@expense.Amount.ToString("N2")</span>
+                                            </div>
+                                            <div class="progress" style="height: 8px;">
+                                                <div class="progress-bar bg-danger" style="@expenseStyle">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Recent Transactions *@
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Recent Financial Transactions</h5>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="ToggleViewAllTransactions">
+                                    @(_showAllTransactions ? "Show Less" : "View All")
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Description</th>
+                                                <th>Category</th>
+                                                <th>Type</th>
+                                                <th class="text-end">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var txn in (_showAllTransactions ? _allTransactions : _recentTransactions))
+                                            {
+                                                <tr>
+                                                    <td>@txn.Date.ToString("MMM dd, yyyy")</td>
+                                                    <td>@txn.Description</td>
+                                                    <td><span class="badge bg-light text-dark">@txn.Category</span></td>
+                                                    <td>
+                                                        <span
+                                                        class="badge @(txn.Type == "Income" ? "bg-success" : "bg-danger")">@txn.Type</span>
+                                                    </td>
+                                                    <td
+                                                        class="text-end fw-medium @(txn.Type == "Income" ? "text-success" : "text-danger")">
+                                                        @(txn.Type == "Income" ? "+" : "-")₱@txn.Amount.ToString("N2")
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Cash Flow Summary *@
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Monthly Cash Flow</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (_monthlyData.Any())
+                                {
+                                    var maxRevenue = _monthlyData.Max(m => m.Revenue);
+                                    var maxExpense = _monthlyData.Max(m => m.Expenses);
+                                    var maxValue = Math.Max(maxRevenue, maxExpense);
+                                    maxValue = maxValue > 0 ? maxValue : 1;
+
+                                    <div class="row text-center">
+                                        @foreach (var month in _monthlyData)
+                                        {
+                                            var revenueHeight = (int)(month.Revenue / maxValue * 100);
+                                            var expenseHeight = (int)(month.Expenses / maxValue * 100);
+                                            revenueHeight = Math.Max(revenueHeight, month.Revenue > 0 ? 4 : 0);
+                                            expenseHeight = Math.Max(expenseHeight, month.Expenses > 0 ? 4 : 0);
+
+                                            <div class="col">
+                                                <div style="height: 120px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;">
+                                                    <div class="d-flex gap-1 align-items-end">
+                                                        <div style="width: 14px; background: linear-gradient(to top, #6A9C89, #8AB4A5); border-radius: 3px 3px 0 0; height: @(revenueHeight)px;"
+                                                             title="Revenue: ₱@month.Revenue.ToString("N0")"></div>
+                                                        <div style="width: 14px; background: linear-gradient(to top, #EF4444, #F87171); border-radius: 3px 3px 0 0; height: @(expenseHeight)px;"
+                                                             title="Expenses: ₱@month.Expenses.ToString("N0")"></div>
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@month.Month</small>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-center py-4 text-muted">
+                                        <i class="bi bi-bar-chart" style="font-size: 2rem; opacity: 0.3;"></i>
+                                        <p class="mt-2 mb-0">No monthly data available</p>
+                                    </div>
+                                }
+                                <div class="d-flex justify-content-center gap-4 mt-3">
+                                    <div><span class="badge" style="background: #6A9C89;">■</span> Revenue</div>
+                                    <div><span class="badge bg-danger">■</span> Expenses</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Account Balances *@
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5 class="mb-0">Account Balances</h5>
+                            </div>
+                            <div class="card-body">
+                                @foreach (var account in _accounts)
+                                {
+                                    var iconClass = $"bi {account.Icon}";
+                                    var iconStyle = $"color: {account.Color};";
+                                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="@iconClass" style="@iconStyle"></i>
+                                            <span>@account.Name</span>
+                                        </div>
+                                        <span class="fw-medium">₱@account.Balance.ToString("N2")</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </AuthorizedPage>
+
+@code {
+    private bool _isLoading = true;
+    private string _selectedPeriod = "month";
+    private decimal _totalRevenue = 0;
+    private decimal _totalExpenses = 0;
+    private decimal _outstandingAmount = 0;
+    private int _outstandingCount = 0;
+
+    private List<CategoryAmount> _revenueByCategory = new();
+    private List<CategoryAmount> _expensesByCategory = new();
+    private List<TransactionItem> _recentTransactions = new();
+    private List<TransactionItem> _allTransactions = new();
+    private bool _showAllTransactions = false;
+    private List<MonthlyData> _monthlyData = new();
+    private List<AccountBalance> _accounts = new();
+
+    private async Task LoadData()
+    {
+        await LoadFinancialData();
+    }
+
+    private async Task OnPeriodChanged()
+    {
+        await LoadFinancialData();
+    }
+
+    private void ToggleViewAllTransactions()
+    {
+        _showAllTransactions = !_showAllTransactions;
+    }
+
+    private async Task LoadFinancialData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var (startDate, endDate) = GetDateRange(_selectedPeriod);
+
+            // Load accounting summary
+            var summary = await AccountingService.GetAccountingSummaryAsync(startDate, endDate);
+            if (summary != null)
+            {
+                _totalRevenue = summary.TotalRevenue;
+                _totalExpenses = summary.TotalExpenses;
+                _outstandingAmount = summary.AccountsReceivable;
+
+                // Map revenue streams
+                _revenueByCategory = summary.RevenueStreams.Select((r, i) => new CategoryAmount
+                {
+                    Name = r.Stream,
+                    Amount = r.Amount,
+                    Color = GetRevenueColor(i)
+                }).ToList();
+
+                // Map expense categories
+                _expensesByCategory = summary.ExpensesByCategory.Select(e => new CategoryAmount
+                {
+                    Name = e.Category,
+                    Amount = e.Amount,
+                    Color = "#EF4444"
+                }).ToList();
+
+                // Map monthly trend
+                _monthlyData = summary.MonthlyTrend.Select(m => new MonthlyData
+                {
+                    Month = m.Month,
+                    Revenue = m.Revenue,
+                    Expenses = m.Expenses
+                }).ToList();
+            }
+
+            // Load dashboard for additional KPIs
+            var dashboard = await ReportsService.GetDashboardAsync(startDate, endDate);
+
+            // Only use dashboard KPIs if accounting summary had no revenue data
+            // (accounting journal entries are the source of truth for revenue)
+            if (dashboard?.Kpis != null && _totalRevenue == 0)
+            {
+                _totalRevenue = dashboard.Kpis.TotalRevenue;
+            }
+
+            // Load invoices to get outstanding count
+            var invoices = await AccountingService.GetInvoicesAsync(status: "Pending", page: 1, pageSize: 100);
+            if (invoices != null)
+            {
+                _outstandingCount = invoices.TotalCount;
+                _outstandingAmount = invoices.Items.Sum(i => i.Total - i.AmountPaid);
+            }
+
+            // Set default accounts (these would come from an API in a real scenario)
+            _accounts = new List<AccountBalance>
+            {
+                new() { Name = "Cash on Hand", Balance = summary?.CashOnHand ?? 0, Icon = "bi-cash", Color = "#10B981" },
+                new() { Name = "Accounts Receivable", Balance = summary?.AccountsReceivable ?? 0, Icon = "bi-receipt", Color = "#3B82F6" },
+                new() { Name = "Accounts Payable", Balance = summary?.AccountsPayable ?? 0, Icon = "bi-credit-card", Color = "#F59E0B" }
+            };
+
+            // Load recent transactions (income, expenses, and POS transactions)
+            _allTransactions.Clear();
+            var expenses = await AccountingService.GetExpensesAsync(startDate, endDate, page: 1, pageSize: 50);
+            if (expenses?.Items != null)
+            {
+                foreach (var exp in expenses.Items)
+                {
+                    _allTransactions.Add(new TransactionItem
+                    {
+                        Date = exp.Date,
+                        Description = exp.Description ?? "Expense",
+                        Category = exp.Category ?? "Other",
+                        Type = "Expense",
+                        Amount = exp.Amount
+                    });
+                }
+            }
+
+            var incomeRecords = await AccountingService.GetIncomeRecordsAsync(startDate, endDate, page: 1, pageSize: 50);
+            if (incomeRecords?.Items != null)
+            {
+                foreach (var inc in incomeRecords.Items)
+                {
+                    _allTransactions.Add(new TransactionItem
+                    {
+                        Date = inc.Date,
+                        Description = inc.Description ?? "Income",
+                        Category = inc.Category ?? "Services",
+                        Type = "Income",
+                        Amount = inc.Amount
+                    });
+                }
+            }
+
+            // Also load POS/sale transactions (these are the main revenue source)
+            var posTransactions = await TransactionService.GetTransactionsAsync(page: 1, pageSize: 50, startDate: startDate, endDate: endDate);
+            if (posTransactions?.Items != null)
+            {
+                foreach (var txn in posTransactions.Items)
+                {
+                    // Avoid duplicating entries already captured as Income journal entries
+                    var alreadyExists = _allTransactions.Any(t =>
+                        t.Type == "Income" &&
+                        Math.Abs(t.Amount - txn.TotalAmount) < 0.01m &&
+                        t.Date.Date == txn.TransactionDate.Date);
+                    if (!alreadyExists)
+                    {
+                        var serviceNames = txn.ServiceItems.Any()
+                            ? string.Join(", ", txn.ServiceItems.Select(s => s.ServiceName))
+                            : null;
+                        var productNames = txn.ProductItems.Any()
+                            ? string.Join(", ", txn.ProductItems.Select(p => p.ProductName))
+                            : null;
+                        var description = serviceNames ?? productNames ?? $"Transaction {txn.TransactionNumber}";
+
+                        _allTransactions.Add(new TransactionItem
+                        {
+                            Date = txn.TransactionDate,
+                            Description = $"{description} — {txn.CustomerName ?? "Walk-in"}",
+                            Category = txn.ServiceItems.Any() ? "Services" : "Products",
+                            Type = txn.PaymentStatus == "Refunded" ? "Expense" : "Income",
+                            Amount = txn.TotalAmount
+                        });
+                    }
+                }
+            }
+
+            // Sort by date descending
+            _allTransactions = _allTransactions.OrderByDescending(t => t.Date).ToList();
+            _recentTransactions = _allTransactions.Take(5).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading financial data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private (DateTime startDate, DateTime endDate) GetDateRange(string period)
+    {
+        var today = DateTime.Today;
+        return period switch
+        {
+            "today" => (today, today),
+            "week" => (today.AddDays(-(int)today.DayOfWeek), today),
+            "month" => (new DateTime(today.Year, today.Month, 1), today),
+            "quarter" => (new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1), today),
+            "year" => (new DateTime(today.Year, 1, 1), today),
+            _ => (new DateTime(today.Year, today.Month, 1), today)
+        };
+    }
+
+    private string GetRevenueColor(int index)
+    {
+        var colors = new[] { "#6A9C89", "#8AB4A5", "#67597A", "#E8B4B8", "#D4A5A5", "#5B8C85" };
+        return colors[index % colors.Length];
+    }
+
+    private class CategoryAmount
+    {
+        public string Name { get; set; } = "";
+        public decimal Amount { get; set; }
+        public string Color { get; set; } = "#6A9C89";
+    }
+
+    private class TransactionItem
+    {
+        public DateTime Date { get; set; }
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Type { get; set; } = "";
+        public decimal Amount { get; set; }
+    }
+
+    private class MonthlyData
+    {
+        public string Month { get; set; } = "";
+        public decimal Revenue { get; set; }
+        public decimal Expenses { get; set; }
+    }
+
+    private class AccountBalance
+    {
+        public string Name { get; set; } = "";
+        public decimal Balance { get; set; }
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+    }
+}

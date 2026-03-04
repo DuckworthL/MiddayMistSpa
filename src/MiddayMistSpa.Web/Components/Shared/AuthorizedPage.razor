@@ -1,0 +1,121 @@
+@* Authorization wrapper component for role-based page access *@
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject IApiClient ApiClient
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (_isChecking)
+{
+    <LoadingSpinner Message="Loading..." />
+}
+else if (_isAuthorized)
+{
+    <CascadingValue Value="true" Name="IsAuthReady">
+        @ChildContent
+    </CascadingValue>
+}
+else if (!_isAuthenticated)
+{
+    <div class="text-center py-5">
+        <i class="bi bi-box-arrow-in-right display-1 text-muted"></i>
+        <h3 class="mt-3">Session Expired</h3>
+        <p class="text-muted">Please log in to continue.</p>
+        <a href="/login" class="btn btn-primary mt-2">
+            <i class="bi bi-box-arrow-in-right me-1"></i> Go to Login
+        </a>
+    </div>
+}
+else
+{
+    <div class="text-center py-5">
+        <i class="bi bi-shield-x display-1 text-danger"></i>
+        <h3 class="mt-3">Access Denied</h3>
+        <p class="text-muted">You don't have permission to access this page.</p>
+        <a href="/" class="btn btn-primary mt-2">
+            <i class="bi bi-house me-1"></i> Go to Dashboard
+        </a>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? RequiredRole { get; set; }
+    [Parameter] public EventCallback OnAuthReady { get; set; }
+
+    private bool _isChecking = true;
+    private bool _isAuthorized;
+    private bool _isAuthenticated;
+    private bool _hasChecked;
+
+    protected override void OnInitialized()
+    {
+        ApiClient.OnUnauthorized += HandleUnauthorized;
+    }
+
+    private void HandleUnauthorized()
+    {
+        Console.WriteLine("AuthorizedPage: Received unauthorized event, redirecting to login");
+        _isAuthenticated = false;
+        _isAuthorized = false;
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+            Navigation.NavigateTo("/login", forceLoad: true);
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_hasChecked)
+        {
+            _hasChecked = true;
+            await CheckAuthorization();
+            StateHasChanged();
+
+            // Notify parent that auth is ready and child can load data
+            if (_isAuthorized && OnAuthReady.HasDelegate)
+            {
+                await OnAuthReady.InvokeAsync();
+            }
+        }
+    }
+
+    private async Task CheckAuthorization()
+    {
+        _isChecking = true;
+
+        try
+        {
+            // Try to restore session - this needs JS interop so only works after render
+            await AuthService.TryRestoreSessionAsync();
+
+            _isAuthenticated = AuthService.IsAuthenticated;
+
+            if (_isAuthenticated)
+            {
+                var userRole = AuthService.CurrentUser?.RoleName;
+                var currentPath = new Uri(Navigation.Uri).AbsolutePath;
+                _isAuthorized = RolePermissionService.CanAccessPage(userRole, currentPath);
+            }
+            else
+            {
+                _isAuthorized = false;
+            }
+        }
+        catch
+        {
+            _isAuthenticated = false;
+            _isAuthorized = false;
+        }
+        finally
+        {
+            _isChecking = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        ApiClient.OnUnauthorized -= HandleUnauthorized;
+    }
+}

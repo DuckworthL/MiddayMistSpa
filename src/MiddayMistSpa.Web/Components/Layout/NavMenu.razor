@@ -1,0 +1,84 @@
+﻿@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissions
+@implements IDisposable
+
+@code {
+    [Parameter]
+    public EventCallback OnNavItemClicked { get; set; }
+
+    private List<NavMenuItem> _menuItems = new();
+    private string? _currentRole;
+
+    protected override void OnInitialized()
+    {
+        UpdateMenuItems();
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        UpdateMenuItems();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateMenuItems()
+    {
+        _currentRole = AuthService.CurrentUser?.Role;
+        _menuItems = RolePermissions.GetNavMenuForRole(_currentRole);
+    }
+
+    private async Task HandleNavClick()
+    {
+        await OnNavItemClicked.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+    }
+}
+
+@* Brand Logo Section *@
+<div class="sidebar-brand">
+    <div class="brand-logo-container">
+        <img src="images/logo.png?v=2" alt="MiddayMist Spa" class="brand-logo" />
+    </div>
+    <div class="brand-text">
+        <span class="brand-name">MiddayMist</span>
+        <span class="brand-tagline">Spa & Wellness</span>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable">
+    <nav class="nav flex-column">
+        @{
+            string? currentSection = null;
+        }
+
+        @foreach (var item in _menuItems)
+        {
+            @* Check if we need a section divider *@
+            @if (item.Section != currentSection && !string.IsNullOrEmpty(item.Section))
+            {
+                currentSection = item.Section;
+                <div class="nav-section">
+                    <span class="nav-section-title">@item.Section</span>
+                </div>
+            }
+            else if (item.Section == null && currentSection != null)
+            {
+                currentSection = null;
+            }
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="@item.Href.TrimStart('/')"
+                    Match="@(item.Href == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" @onclick="HandleNavClick">
+                    <i class="bi @item.Icon"></i>
+                    <span>@item.Label</span>
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>

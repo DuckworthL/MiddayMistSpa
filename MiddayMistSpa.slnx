@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MiddayMistSpa.API/MiddayMistSpa.API.csproj" />
+    <Project Path="src/MiddayMistSpa.Core/MiddayMistSpa.Core.csproj" />
+    <Project Path="src/MiddayMistSpa.Infrastructure/MiddayMistSpa.Infrastructure.csproj" />
+    <Project Path="src/MiddayMistSpa.Web/MiddayMistSpa.Web.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,591 @@
+@page "/customers"
+@inject ICustomerApiService CustomerService
+@inject IReportsApiService ReportsService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Customers - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadCustomers">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Customers</h1>
+                <p class="text-muted mb-0">Manage your spa clients and their preferences</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/customers/segmentation" class="btn btn-outline-primary">
+                    <i class="bi bi-diagram-3 me-1"></i> Segmentation
+                </a>
+                <button class="btn btn-primary" @onclick="ShowAddModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add Customer
+                </button>
+            </div>
+        </div>
+
+        @* Stats Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 fw-bold text-primary">@_customers.TotalCount</div>
+                        <small class="text-muted">Total Customers</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 fw-bold text-success">@_customers.Items.Count(c => c.MembershipType ==
+                                                        "Gold" || c.MembershipType == "Platinum")</div>
+                            <small class="text-muted">Premium Members</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body text-center">
+                            <div class="display-6 fw-bold text-info">@_customers.Items.Count(c => c.LastVisitDate >=
+                                                            DateTime.Today.AddDays(-30))</div>
+                                <small class="text-muted">Active (30 days)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center">
+                                <div class="display-6 fw-bold text-warning">@_customers.Items.Where(c => c.LastVisitDate <
+                                                                DateTime.Today.AddDays(-90)).Count()</div>
+                                    <small class="text-muted">At-Risk</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Filters *@
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-12 col-md-4">
+                                    <SearchInput @bind-Value="_searchQuery" Placeholder="Search by name, phone, or email..."
+                                                 OnSearch="OnSearch" />
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label small text-muted">Membership</label>
+                                    <select class="form-select" @onchange="OnMembershipFilterChange">
+                                        <option value="">All Memberships</option>
+                                        <option value="Regular">Regular</option>
+                                        <option value="Bronze">Bronze</option>
+                                        <option value="Silver">Silver</option>
+                                        <option value="Gold">Gold</option>
+                                        <option value="Platinum">Platinum</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-2 ms-auto d-flex gap-2">
+                                    <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
+                                        <option value="PDF">PDF</option>
+                                        <option value="Excel">Excel</option>
+                                        <option value="CSV">CSV</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" @onclick="ExportCustomers" disabled="@_isExporting">
+                                        @if (_isExporting)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-download me-1"></i>
+                                        }
+                                        Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (_isLoading)
+                    {
+                        <LoadingSpinner Message="Loading customers..." />
+                    }
+                    else
+                    {
+                        @* Customers Table *@
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Customer</th>
+                                                <th>Contact</th>
+                                                <th>Membership</th>
+                                                <th>Visits</th>
+                                                <th>Total Spent</th>
+                                                <th>Last Visit</th>
+                                                <th class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (_customers.Items.Any())
+                                            {
+                                                @foreach (var customer in _customers.Items)
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            <div class="d-flex align-items-center">
+                                                                <div class="rounded-circle d-flex align-items-center justify-content-center me-2 @GetMembershipBgClass(customer.MembershipType)"
+                                                                     style="width: 40px; height: 40px;">
+                                                                    @(GetInitials(customer.FirstName, customer.LastName))
+                                                                </div>
+                                                                <div>
+                                                                    <div class="fw-medium">
+                                                                        @customer.FullName
+                                                                        @if (!string.IsNullOrEmpty(customer.Allergies))
+                                                                        {
+                                                                            <i class="bi bi-exclamation-triangle-fill text-danger ms-1"
+                                                                               title="Has allergies: @customer.Allergies"></i>
+                                                                        }
+                                                                    </div>
+                                                                    <small class="text-muted">@customer.CustomerCode</small>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div><i class="bi bi-phone me-1 text-muted"></i> @customer.PhoneNumber</div>
+                                                            @if (!string.IsNullOrEmpty(customer.Email))
+                                                            {
+                                                                <div><i class="bi bi-envelope me-1 text-muted"></i> @customer.Email</div>
+                                                            }
+                                                        </td>
+                                                        <td>
+                                                            <StatusBadge Status="@customer.MembershipType" />
+                                                            <div class="small text-muted">@customer.LoyaltyPoints pts</div>
+                                                        </td>
+                                                        <td>
+                                                            <span class="fw-medium">@customer.TotalVisits</span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="fw-medium">₱@customer.TotalSpent.ToString("N0")</span>
+                                                        </td>
+                                                        <td>
+                                                            @if (customer.LastVisitDate.HasValue)
+                                                            {
+                                                                <span class="@GetLastVisitClass(customer.LastVisitDate.Value)">
+                                                                    @customer.LastVisitDate.Value.ToString("MMM dd, yyyy")
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-muted">Never</span>
+                                                            }
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="btn-group btn-group-sm">
+                                                                <a href="/customers/@customer.CustomerId" class="btn btn-outline-primary"
+                                                                       title="View Profile">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                                <a href="/appointments/new?customerId=@customer.CustomerId"
+                                                                       class="btn btn-outline-success" title="Book Appointment">
+                                                                    <i class="bi bi-calendar-plus"></i>
+                                                                </a>
+                                                                <button class="btn btn-outline-secondary"
+                                                                        @onclick="() => EditCustomer(customer)" title="Edit">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <tr>
+                                                    <td colspan="7" class="text-center py-5">
+                                                        <i class="bi bi-people display-4 text-muted"></i>
+                                                        <p class="text-muted mt-2">No customers found</p>
+                                                        <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
+                                                            <i class="bi bi-plus me-1"></i> Add First Customer
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            @if (_customers.TotalPages > 1)
+                            {
+                                <div class="card-footer bg-white border-0">
+                                    <Pagination CurrentPage="_currentPage" TotalCount="_customers.TotalCount" PageSize="_pageSize"
+                                                OnPageChanged="OnPageChanged" />
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @* Add/Edit Customer Modal *@
+                <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Customer" : "Add New Customer")"
+                       Size="Modal.ModalSize.Large">
+                    <ChildContent>
+                        <EditForm EditContext="_editContext" OnValidSubmit="SaveCustomer">
+                            <DataAnnotationsValidator />
+
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <h6 class="text-muted mb-3">Personal Information</h6>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">First Name *</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.FirstName" />
+                                    <ValidationMessage For="() => _formModel.FirstName" class="text-danger small" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Last Name *</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.LastName" />
+                                    <ValidationMessage For="() => _formModel.LastName" class="text-danger small" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone Number *</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.PhoneNumber"
+                                               placeholder="+63 9XX XXX XXXX" />
+                                    <ValidationMessage For="() => _formModel.PhoneNumber" class="text-danger small" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.Email" type="email" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Date of Birth</label>
+                                    <InputDate class="form-control" @bind-Value="_formModel.DateOfBirth" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Gender</label>
+                                    <InputSelect class="form-select" @bind-Value="_formModel.Gender">
+                                        <option value="">Select Gender</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Other">Other</option>
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-12 mt-4">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="bi bi-exclamation-triangle text-danger me-1"></i>
+                                        Medical & Preferences (Important)
+                                    </h6>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label text-danger">Allergies</label>
+                                    <InputTextArea class="form-control" @bind-Value="_formModel.Allergies" rows="2"
+                                                   placeholder="List any allergies (e.g., nuts, essential oils, latex)..." />
+                                    <small class="text-muted">This will be displayed prominently to staff</small>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Special Requests / Notes</label>
+                                    <InputTextArea class="form-control" @bind-Value="_formModel.SpecialRequests" rows="2"
+                                                   placeholder="Any special preferences or requirements..." />
+                                </div>
+
+                                <div class="col-12 mt-4">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="bi bi-person-lines-fill me-1"></i>
+                                        Emergency Contact
+                                    </h6>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Contact Name</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.EmergencyContactName"
+                                               placeholder="Full name" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Contact Phone</label>
+                                    <InputText class="form-control" @bind-Value="_formModel.EmergencyContactPhone"
+                                               placeholder="+63 9XX XXX XXXX" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Relationship</label>
+                                    <InputSelect class="form-select" @bind-Value="_formModel.EmergencyContactRelationship">
+                                        <option value="">Select</option>
+                                        <option value="Spouse">Spouse</option>
+                                        <option value="Parent">Parent</option>
+                                        <option value="Sibling">Sibling</option>
+                                        <option value="Child">Child</option>
+                                        <option value="Friend">Friend</option>
+                                        <option value="Other">Other</option>
+                                    </InputSelect>
+                                </div>
+
+                                <div class="col-12 mt-4">
+                                    <h6 class="text-muted mb-3">
+                                        <i class="bi bi-chat-dots me-1"></i>
+                                        Communication Preferences
+                                    </h6>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Preferred Channel</label>
+                                    <InputSelect class="form-select" @bind-Value="_formModel.PreferredCommunicationChannel">
+                                        <option value="Email">Email</option>
+                                        <option value="None">None</option>
+                                    </InputSelect>
+                                </div>
+                            </div>
+                        </EditForm>
+                    </ChildContent>
+                    <FooterContent>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                        <button type="button" class="btn btn-primary" @onclick="SubmitCustomerForm" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(_isEditing ? "Update" : "Create") Customer
+                        </button>
+                    </FooterContent>
+                </Modal>
+
+                @* Alert *@
+                @if (!string.IsNullOrEmpty(_alertMessage))
+                {
+                    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+                        <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+                    </div>
+                }
+            </AuthorizedPage>
+
+@code {
+    private PagedResponse<CustomerResponse> _customers = new();
+    private bool _isLoading = true;
+    private int _currentPage = 1;
+    private int _pageSize = 20;
+    private string _searchQuery = string.Empty;
+    private string? _membershipFilter;
+
+    // Modal state
+    private bool _showModal;
+    private bool _isEditing;
+    private bool _isSaving;
+    private CreateCustomerRequest _formModel = new();
+    private EditContext _editContext = new(new CreateCustomerRequest());
+    private int? _editingCustomerId;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    private string GetInitials(string? firstName, string? lastName)
+    {
+        var first = !string.IsNullOrEmpty(firstName) ? firstName[0].ToString().ToUpper() : "?";
+        var last = !string.IsNullOrEmpty(lastName) ? lastName[0].ToString().ToUpper() : "";
+        return first + last;
+    }
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadCustomers()
+    {
+        _isLoading = true;
+        _customers = await CustomerService.GetCustomersAsync(_currentPage, _pageSize, _searchQuery, _membershipFilter);
+        _isLoading = false;
+    }
+
+    private async Task OnSearch(string query)
+    {
+        _searchQuery = query;
+        _currentPage = 1;
+        await LoadCustomers();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        _currentPage = newPage;
+        await LoadCustomers();
+    }
+
+    private async Task OnMembershipFilterChange(ChangeEventArgs e)
+    {
+        _membershipFilter = e.Value?.ToString();
+        _currentPage = 1;
+        await LoadCustomers();
+    }
+
+    private void ShowAddModal()
+    {
+        _isEditing = false;
+        _editingCustomerId = null;
+        _formModel = new CreateCustomerRequest();
+        _editContext = new EditContext(_formModel);
+        _showModal = true;
+    }
+
+    private async Task SubmitCustomerForm()
+    {
+        if (_editContext.Validate())
+        {
+            await SaveCustomer();
+        }
+    }
+
+    private void EditCustomer(CustomerResponse customer)
+    {
+        _isEditing = true;
+        _editingCustomerId = customer.CustomerId;
+        _formModel = new CreateCustomerRequest
+        {
+            FirstName = customer.FirstName,
+            LastName = customer.LastName,
+            Email = customer.Email,
+            PhoneNumber = customer.PhoneNumber,
+            DateOfBirth = customer.DateOfBirth,
+            Gender = customer.Gender,
+            Allergies = customer.Allergies,
+            SpecialRequests = customer.SpecialRequests,
+            EmergencyContactName = customer.EmergencyContactName,
+            EmergencyContactPhone = customer.EmergencyContactPhone,
+            EmergencyContactRelationship = customer.EmergencyContactRelationship,
+            PreferredCommunicationChannel = customer.PreferredCommunicationChannel ?? "Email",
+            SmsConsent = customer.SmsConsent
+        };
+        _editContext = new EditContext(_formModel);
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task SaveCustomer()
+    {
+        _isSaving = true;
+
+        try
+        {
+            CustomerResponse? result;
+            if (_isEditing && _editingCustomerId.HasValue)
+            {
+                var updateRequest = new UpdateCustomerRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    PhoneNumber = _formModel.PhoneNumber,
+                    DateOfBirth = _formModel.DateOfBirth,
+                    Gender = _formModel.Gender,
+                    Allergies = _formModel.Allergies,
+                    SpecialRequests = _formModel.SpecialRequests,
+                    EmergencyContactName = _formModel.EmergencyContactName,
+                    EmergencyContactPhone = _formModel.EmergencyContactPhone,
+                    EmergencyContactRelationship = _formModel.EmergencyContactRelationship,
+                    PreferredCommunicationChannel = _formModel.PreferredCommunicationChannel,
+                    SmsConsent = _formModel.SmsConsent
+                };
+                result = await CustomerService.UpdateCustomerAsync(_editingCustomerId.Value, updateRequest);
+            }
+            else
+            {
+                var (createResult, errorMessage) = await CustomerService.CreateCustomerWithErrorAsync(_formModel);
+                result = createResult;
+                if (result == null)
+                {
+                    ShowAlert(errorMessage ?? "Failed to create customer. Please try again.", Alert.AlertType.Error);
+                    _isSaving = false;
+                    return;
+                }
+            }
+
+            if (result != null)
+            {
+                ShowAlert($"Customer {(_isEditing ? "updated" : "created")} successfully!", Alert.AlertType.Success);
+                _showModal = false;
+                await LoadCustomers();
+            }
+            else
+            {
+                ShowAlert("Failed to update customer. The email or phone number may already be in use.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveCustomer error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the customer.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+
+    private string _exportFormat = "PDF";
+    private bool _isExporting;
+
+    private async Task ExportCustomers()
+    {
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var endDate = DateTime.Today;
+            var startDate = endDate.AddMonths(-3);
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("customer",
+            _exportFormat, startDate, endDate);
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert("Customer report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetMembershipBadgeClass(string membership) => membership switch
+    {
+        "Gold" => "bg-warning text-dark",
+        "Platinum" => "bg-info text-white",
+        "Silver" => "bg-secondary text-white",
+        _ => "bg-light text-dark"
+    };
+
+    private string GetMembershipBgClass(string membership) => membership switch
+    {
+        "Gold" => "bg-warning",
+        "Platinum" => "bg-info",
+        "Silver" => "bg-secondary",
+        _ => "bg-light"
+    };
+
+    private string GetLastVisitClass(DateTime lastVisit)
+    {
+        var daysSince = (DateTime.Today - lastVisit.Date).Days;
+        return daysSince switch
+        {
+            <= 30 => "text-success",
+            <= 60 => "text-warning",
+            _ => "text-danger"
+        };
+    }
+}

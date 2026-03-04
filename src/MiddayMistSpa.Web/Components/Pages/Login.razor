@@ -1,0 +1,586 @@
+@page "/login"
+@layout EmptyLayout
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login - MiddayMist Spa</PageTitle>
+
+<div class="login-page">
+    <div class="login-container">
+        @* Left Side - Brand Panel *@
+        <div class="brand-panel">
+            <div class="brand-content">
+                <div class="brand-logo">
+                    <img src="images/logo.png" alt="MiddayMist Spa Logo" />
+                </div>
+                <h1 class="brand-title">MiddayMist Spa</h1>
+                <p class="brand-tagline">Wellness Management System</p>
+                <div class="brand-features">
+                    <div class="feature-item">
+                        <i class="bi bi-calendar-check"></i>
+                        <span>Appointment Scheduling</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="bi bi-people"></i>
+                        <span>Customer Management</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="bi bi-graph-up"></i>
+                        <span>Business Analytics</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="bi bi-cash-coin"></i>
+                        <span>Point of Sale</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="bi bi-person-badge"></i>
+                        <span>HR & Payroll</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Right Side - Login Form *@
+        <div class="login-panel">
+            <div class="login-form-container">
+                <div class="login-header">
+                    <h2>Welcome Back</h2>
+                    <p>Sign in to continue to your dashboard</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger d-flex align-items-center" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <div>@_errorMessage</div>
+                    </div>
+                }
+
+                @if (!_requiresTwoFactor)
+                {
+                    @* ===== STEP 1: Username & Password ===== *@
+                    <EditForm Model="_loginModel" OnValidSubmit="HandleLogin" FormName="login">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="_loginModel.Username" class="form-control" id="username"
+                                       placeholder="Username" />
+                            <label for="username"><i class="bi bi-person me-2"></i>Username</label>
+                            <ValidationMessage For="@(() => _loginModel.Username)" />
+                        </div>
+
+                        <div class="password-input-wrapper mb-3">
+                            <div class="form-floating">
+                                <InputText @bind-Value="_loginModel.Password" type="@(_showPassword ? "text" : "password")"
+                                           class="form-control" id="password" placeholder="Password" />
+                                <label for="password"><i class="bi bi-lock me-2"></i>Password</label>
+                            </div>
+                            <button type="button" class="password-toggle-btn" @onclick="TogglePasswordVisibility"
+                                    tabindex="-1">
+                                <i class="bi @(_showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                            </button>
+                            <ValidationMessage For="@(() => _loginModel.Password)" />
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rememberMe"
+                                       @bind="_loginModel.RememberMe">
+                                    <label class="form-check-label" for="rememberMe">
+                                        Remember me
+                                    </label>
+                                </div>
+                                <a href="/forgot-password" class="text-primary small">Forgot password?</a>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-3" disabled="@_isLoading">
+                                @if (_isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    <span>Signing in...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                                    <span>Sign In</span>
+                                }
+                            </button>
+                        </EditForm>
+                }
+                else
+                {
+                    @* ===== STEP 2: Two-Factor Code ===== *@
+                    <div class="two-factor-step">
+                        <div class="text-center mb-4">
+                            <div class="mx-auto mb-3 d-flex align-items-center justify-content-center"
+                                 style="width: 64px; height: 64px; background: #E8F2EE; border-radius: 50%;">
+                                <i class="bi bi-shield-lock fs-3" style="color: #3D5A4F;"></i>
+                            </div>
+                            <h5 class="fw-semibold mb-1">Two-Factor Authentication</h5>
+                            <p class="text-muted small mb-0">Enter the 6-digit code from your authenticator app</p>
+                        </div>
+
+                        @if (!_showRecoveryInput)
+                        {
+                            <div class="mx-auto mb-4" style="max-width: 220px;">
+                                <input type="text" class="form-control form-control-lg text-center"
+                                       maxlength="6" placeholder="000000"
+                                       @bind="_twoFactorCode" @bind:event="oninput"
+                                       @onkeydown="HandleTwoFactorKeyDown"
+                                       style="letter-spacing: 8px; font-size: 1.5rem; font-weight: 600;" />
+                            </div>
+                            <button class="btn btn-primary w-100 py-3 mb-3" @onclick="HandleTwoFactorSubmit"
+                                    disabled="@(_twoFactorCode?.Length != 6 || _isLoading)">
+                                @if (_isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <span>Verifying...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span>Verify</span>
+                                }
+                            </button>
+                            <div class="text-center">
+                                <button class="btn btn-link btn-sm text-muted" @onclick="() => _showRecoveryInput = true">
+                                    Use a recovery code instead
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-4">
+                                <label class="form-label small text-muted">Recovery Code</label>
+                                <input type="text" class="form-control text-center"
+                                       placeholder="XXXX-XXXX" @bind="_recoveryCode" @bind:event="oninput"
+                                       style="letter-spacing: 3px; font-weight: 600;" />
+                            </div>
+                            <button class="btn btn-primary w-100 py-3 mb-3" @onclick="HandleRecoverySubmit"
+                                    disabled="@(string.IsNullOrWhiteSpace(_recoveryCode) || _isLoading)">
+                                @if (_isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <span>Verifying...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span>Verify Recovery Code</span>
+                                }
+                            </button>
+                            <div class="text-center">
+                                <button class="btn btn-link btn-sm text-muted" @onclick="() => _showRecoveryInput = false">
+                                    Use authenticator code instead
+                                </button>
+                            </div>
+                        }
+
+                        <div class="text-center mt-2">
+                            <button class="btn btn-link btn-sm text-muted" @onclick="BackToLogin">
+                                <i class="bi bi-arrow-left me-1"></i> Back to login
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                    <div class="demo-credentials mt-4">
+                        <p class="text-center text-muted small mb-2">Demo Credentials</p>
+                        <div class="d-flex gap-2 flex-wrap justify-content-center">
+                            <button class="btn btn-outline-primary btn-sm"
+                                    @onclick='() => FillDemoCredentials("superadmin", "SuperAdmin@2026!")'>
+                                <i class="bi bi-shield-fill-check me-1"></i> Super Admin
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("admin", "Admin@2026!")'>
+                                <i class="bi bi-shield-check me-1"></i> Admin
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("receptionist", "Receptionist@2026!")'>
+                                <i class="bi bi-person-workspace me-1"></i> Receptionist
+                            </button>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap justify-content-center mt-2">
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("therapist", "Therapist@2026!")'>
+                                <i class="bi bi-heart-pulse me-1"></i> Therapist
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("inventory", "Inventory@2026!")'>
+                                <i class="bi bi-box-seam me-1"></i> Inventory
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("accountant", "Accountant@2026!")'>
+                                <i class="bi bi-calculator me-1"></i> Accountant
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    @onclick='() => FillDemoCredentials("hr", "HR@2026!")'>
+                                <i class="bi bi-people me-1"></i> HR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .login-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #F8FAF8 0%, #E8EFE8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .login-container {
+            display: flex;
+            max-width: 1000px;
+            width: 100%;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .brand-panel {
+            flex: 1;
+            background: linear-gradient(135deg, #3D5A4F 0%, #2A3F36 100%);
+            padding: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .brand-content {
+            text-align: center;
+        }
+
+        .brand-logo {
+            width: 100px;
+            height: 100px;
+            background: #4A6B5D;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        .brand-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .brand-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #D1B07D;
+        }
+
+        .brand-tagline {
+            font-size: 1.1rem;
+            color: #ffffff;
+            margin-bottom: 2.5rem;
+            font-weight: 500;
+        }
+
+        .brand-features {
+            text-align: left;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #4A6B5D;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-item:hover {
+            background: #5A7B6D;
+            transform: translateX(5px);
+        }
+
+        .feature-item i {
+            font-size: 1.25rem;
+            color: #D1B07D;
+        }
+
+        .feature-item span {
+            color: #ffffff;
+            font-weight: 500;
+        }
+
+        .login-panel {
+            flex: 1;
+            padding: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+        }
+
+        .login-form-container {
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h2 {
+            color: #2C2C2C;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header p {
+            color: #6B7280;
+            font-size: 0.9375rem;
+        }
+
+        .form-floating>.form-control {
+            padding-left: 1rem;
+            height: 3.5rem;
+        }
+
+        .form-floating>label {
+            padding-left: 1rem;
+        }
+
+        .password-input-wrapper {
+            position: relative;
+        }
+
+        .password-input-wrapper .form-floating {
+            flex: 1;
+        }
+
+        .password-input-wrapper .form-control {
+            padding-right: 3rem;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6B7280;
+            cursor: pointer;
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            z-index: 5;
+        }
+
+        .password-toggle-btn:hover {
+            color: #3D5A4F;
+        }
+
+        .password-toggle-btn i {
+            font-size: 1.1rem;
+        }
+
+        .demo-credentials {
+            padding-top: 1rem;
+            border-top: 1px solid #E5E7EB;
+        }
+
+        .demo-credentials .btn {
+            font-size: 0.75rem;
+            padding: 0.35rem 0.65rem;
+        }
+
+        @@media (max-width: 768px) {
+            .brand-panel {
+                display: none;
+            }
+
+            .login-container {
+                border-radius: 1rem;
+            }
+
+            .login-panel {
+                padding: 2rem;
+            }
+        }
+    </style>
+
+@code {
+    private LoginModel _loginModel = new();
+    private bool _isLoading;
+    private bool _showPassword;
+    private string? _errorMessage;
+
+    // 2FA state
+    private bool _requiresTwoFactor;
+    private string? _twoFactorToken;
+    private string? _twoFactorCode;
+    private string? _recoveryCode;
+    private bool _showRecoveryInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if already authenticated
+        if (AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(_loginModel.Username, _loginModel.Password);
+
+            if (result.Success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else if (result.RequiresTwoFactor)
+            {
+                _requiresTwoFactor = true;
+                _twoFactorToken = result.TwoFactorToken;
+                _twoFactorCode = null;
+                _recoveryCode = null;
+                _showRecoveryInput = false;
+                _errorMessage = null;
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Invalid username or password. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An error occurred during login. Please try again.";
+            Console.WriteLine($"Login error: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleTwoFactorSubmit()
+    {
+        if (string.IsNullOrEmpty(_twoFactorCode) || _twoFactorCode.Length != 6 || string.IsNullOrEmpty(_twoFactorToken)) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var success = await AuthService.ValidateTwoFactorAsync(_twoFactorToken, _twoFactorCode);
+            if (success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = "Invalid verification code. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Verification failed. Please try again.";
+            Console.WriteLine($"2FA error: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleRecoverySubmit()
+    {
+        if (string.IsNullOrWhiteSpace(_recoveryCode) || string.IsNullOrEmpty(_twoFactorToken)) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var success = await AuthService.ValidateTwoFactorAsync(_twoFactorToken, "", _recoveryCode.Trim());
+            if (success)
+            {
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = "Invalid recovery code. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Verification failed. Please try again.";
+            Console.WriteLine($"Recovery code error: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleTwoFactorKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && _twoFactorCode?.Length == 6)
+        {
+            await HandleTwoFactorSubmit();
+        }
+    }
+
+    private void BackToLogin()
+    {
+        _requiresTwoFactor = false;
+        _twoFactorToken = null;
+        _twoFactorCode = null;
+        _recoveryCode = null;
+        _errorMessage = null;
+        _showRecoveryInput = false;
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private void FillDemoCredentials(string username, string password)
+    {
+        _loginModel.Username = username;
+        _loginModel.Password = password;
+        _errorMessage = null;
+    }
+
+    public class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Username is required")]
+        public string Username { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required")]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}

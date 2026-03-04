@@ -1,0 +1,365 @@
+@page "/notifications"
+@inject IAuthStateService AuthService
+@inject INotificationApiService NotificationService
+@inject NavigationManager Navigation
+@using MiddayMistSpa.Web.Models
+
+<PageTitle>Notifications - MiddayMist Spa</PageTitle>
+
+<div class="notifications-page">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="page-header d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h1 class="page-title">
+                            <i class="bi bi-bell me-2"></i>Notifications
+                        </h1>
+                        <p class="text-muted mb-0">Stay updated with important alerts and messages</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-outline-secondary me-2" @onclick="MarkAllAsRead"
+                            disabled="@(!HasUnread)">
+                            <i class="bi bi-check-all me-1"></i> Mark All Read
+                        </button>
+                        <button class="btn btn-outline-danger" @onclick="ClearAll" disabled="@(!_notifications.Any())">
+                            <i class="bi bi-trash me-1"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <button class="nav-link @(_filter == "all" ? "active" : "")" @onclick='() => SetFilter("all")'>
+                            All <span class="badge bg-secondary ms-1">@_notifications.Count</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_filter == "unread" ? "active" : "")"
+                            @onclick='() => SetFilter("unread")'>
+                            Unread <span class="badge bg-primary ms-1">@_notifications.Count(n => !n.IsRead)</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_filter == "appointments" ? "active" : "")"
+                            @onclick='() => SetFilter("appointments")'>
+                            <i class="bi bi-calendar me-1"></i> Appointments
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_filter == "inventory" ? "active" : "")"
+                            @onclick='() => SetFilter("inventory")'>
+                            <i class="bi bi-box me-1"></i> Inventory
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_filter == "system" ? "active" : "")"
+                            @onclick='() => SetFilter("system")'>
+                            <i class="bi bi-gear me-1"></i> System
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Notifications List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body p-0">
+                        @if (_isLoading)
+                        {
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Loading notifications...</p>
+                            </div>
+                        }
+                        else if (FilteredNotifications.Any())
+                        {
+                            <div class="notification-list">
+                                @foreach (var notification in FilteredNotifications)
+                                {
+                                    <div class="notification-item @(!notification.IsRead ? "unread" : "") d-flex align-items-start p-3 border-bottom"
+                                        @onclick="() => MarkAsRead(notification)">
+                                        <div class="notification-icon me-3 @GetIconClass(notification.Category)">
+                                            <i class="bi @GetIcon(notification.Category)"></i>
+                                        </div>
+                                        <div class="notification-content flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <h6 class="notification-title mb-1">@notification.Title</h6>
+                                                <small class="notification-time text-muted">@notification.TimeAgo</small>
+                                            </div>
+                                            <p class="notification-message mb-1 text-muted">@notification.Message</p>
+                                            @if (!string.IsNullOrEmpty(notification.ActionUrl))
+                                            {
+                                                <a href="@notification.ActionUrl" class="btn btn-sm btn-link p-0">
+                                                    View Details <i class="bi bi-arrow-right"></i>
+                                                </a>
+                                            }
+                                        </div>
+                                        <div class="notification-actions ms-2">
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick:stopPropagation="true"
+                                                @onclick="() => DeleteNotification(notification)">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="empty-state text-center py-5">
+                                <i class="bi bi-bell-slash display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">No notifications</h5>
+                                <p class="text-muted small">You're all caught up! Check back later for updates.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notifications-page {
+        min-height: 100vh;
+        background: var(--bg-light, #F8FAF8);
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #2C2C2C;
+    }
+
+    .nav-pills .nav-link {
+        color: #6B7280;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+        margin-right: 0.5rem;
+    }
+
+    .nav-pills .nav-link.active {
+        background: #3D5A4F;
+        color: white;
+    }
+
+    .card {
+        border: 1px solid #E5E7EB;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .notification-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .notification-item:hover {
+        background: #F9FAFB;
+    }
+
+    .notification-item.unread {
+        background: #F0FDF4;
+        border-left: 4px solid #3D5A4F;
+    }
+
+    .notification-item.unread:hover {
+        background: #DCFCE7;
+    }
+
+    .notification-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .notification-icon.icon-appointment {
+        background: #DBEAFE;
+        color: #2563EB;
+    }
+
+    .notification-icon.icon-inventory {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    .notification-icon.icon-system {
+        background: #E5E7EB;
+        color: #6B7280;
+    }
+
+    .notification-icon.icon-success {
+        background: #D1FAE5;
+        color: #059669;
+    }
+
+    .notification-icon.icon-warning {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+
+    .notification-title {
+        font-weight: 600;
+        color: #2C2C2C;
+    }
+
+    .notification-message {
+        font-size: 0.875rem;
+    }
+
+    .notification-time {
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    .empty-state i {
+        opacity: 0.3;
+    }
+</style>
+
+@code {
+    private string _filter = "all";
+    private List<NotificationResponse> _notifications = new();
+    private bool _isLoading = true;
+
+    private bool HasUnread => _notifications.Any(n => !n.IsRead);
+
+    private IEnumerable<NotificationResponse> FilteredNotifications => _filter switch
+    {
+        "unread" => _notifications.Where(n => !n.IsRead),
+        "appointments" => _notifications.Where(n => n.Category == "Appointment"),
+        "inventory" => _notifications.Where(n => n.Category == "Inventory"),
+        "system" => _notifications.Where(n => n.Category == "System"),
+        _ => _notifications
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        _isLoading = true;
+        try
+        {
+            _notifications = await NotificationService.GetMyNotificationsAsync(false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading notifications: {ex.Message}");
+            _notifications = new List<NotificationResponse>();
+        }
+        _isLoading = false;
+    }
+
+    private void SetFilter(string filter)
+    {
+        _filter = filter;
+    }
+
+    private async Task MarkAsRead(NotificationResponse notification)
+    {
+        if (!notification.IsRead)
+        {
+            try
+            {
+                await NotificationService.MarkAsReadAsync(notification.NotificationId);
+                // Reload to get updated read status
+                await LoadNotifications();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error marking notification as read: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        try
+        {
+            await NotificationService.MarkAllAsReadAsync();
+            await LoadNotifications(); // Reload to get updated status
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error marking all as read: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteNotification(NotificationResponse notification)
+    {
+        try
+        {
+            var deleted = await NotificationService.DeleteNotificationAsync(notification.NotificationId);
+            if (deleted)
+            {
+                _notifications.Remove(notification);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting notification: {ex.Message}");
+        }
+    }
+
+    private async Task ClearAll()
+    {
+        // Delete all notifications one by one
+        var toDelete = _notifications.ToList();
+        foreach (var notification in toDelete)
+        {
+            try
+            {
+                await NotificationService.DeleteNotificationAsync(notification.NotificationId);
+            }
+            catch { }
+        }
+        _notifications.Clear();
+    }
+
+    private string GetIcon(string category) => category switch
+    {
+        "Appointment" => "bi-calendar-check",
+        "Inventory" => "bi-box-seam",
+        "System" => "bi-gear",
+        "Customer" => "bi-person",
+        "Payroll" => "bi-wallet2",
+        "Transaction" => "bi-receipt",
+        "Success" => "bi-check-circle",
+        "Warning" => "bi-exclamation-triangle",
+        _ => "bi-bell"
+    };
+
+    private string GetIconClass(string category) => category switch
+    {
+        "Appointment" => "icon-appointment",
+        "Inventory" => "icon-inventory",
+        "System" => "icon-system",
+        "Customer" => "icon-success",
+        "Transaction" => "icon-success",
+        "Payroll" => "icon-warning",
+        _ => "icon-system"
+    };
+}

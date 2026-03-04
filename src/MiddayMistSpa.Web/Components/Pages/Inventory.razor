@@ -1,0 +1,914 @@
+@page "/inventory"
+@inject IInventoryApiService InventoryService
+@inject IReportsApiService ReportsService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Inventory - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Inventory Management</h1>
+                <p class="text-muted mb-0">Track products, stock levels, and supplies</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" @onclick="ShowCategoryModalDialog">
+                    <i class="bi bi-folder-plus me-1"></i> Category
+                </button>
+                <button class="btn btn-outline-primary" @onclick="ShowStockAdjustmentModal">
+                    <i class="bi bi-boxes me-1"></i> Stock Adjustment
+                </button>
+                <button class="btn btn-primary" @onclick="ShowNewProductModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Product
+                </button>
+            </div>
+        </div>
+
+        @* Stats Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <StatCard Title="Total Products" Value="@_totalProductCount.ToString()" Icon="bi-box-seam"
+                          Color="StatCard.CardColor.Primary" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Low Stock" Value="@_lowStockCount.ToString()" Icon="bi-exclamation-triangle"
+                          Color="StatCard.CardColor.Warning" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Out of Stock" Value="@_outOfStockCount.ToString()" Icon="bi-x-circle"
+                          Color="StatCard.CardColor.Danger" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Total Value" Value="@_totalValueDisplay" Icon="bi-currency-dollar"
+                          Color="StatCard.CardColor.Success" />
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <SearchInput @bind-Value="_searchTerm" OnSearch="LoadProducts"
+                                     Placeholder="Search products..." />
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @onchange="OnCategoryFilterChange">
+                            <option value="">All Categories</option>
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category.CategoryId">@category.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @bind="_stockFilter" @bind:after="OnStockFilterChanged">
+                            <option value="">All Stock Levels</option>
+                            <option value="low">Low Stock</option>
+                            <option value="out">Out of Stock</option>
+                            <option value="ok">In Stock</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @onchange="OnStatusFilterChange">
+                            <option value="">All Status</option>
+                            <option value="true">Active</option>
+                            <option value="false">Archived</option>
+                        </select>
+                    </div>
+                    <div class="col-auto ms-auto d-flex gap-2">
+                        <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
+                            <option value="PDF">PDF</option>
+                            <option value="Excel">Excel</option>
+                            <option value="CSV">CSV</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" @onclick="ExportInventory" disabled="@_isExporting">
+                            @if (_isExporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-download me-1"></i>
+                            }
+                            Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading inventory..." />
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>SKU</th>
+                                    <th>Category</th>
+                                    <th class="text-center">Stock</th>
+                                    <th class="text-end">Unit Cost</th>
+                                    <th class="text-end">Retail Price</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_products.Items.Any())
+                                {
+                                    @foreach (var product in _products.Items)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-light rounded p-2 me-3">
+                                                        <i class="bi bi-box-seam text-muted"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">@product.Name</div>
+                                                        <small class="text-muted">@product.Brand</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td><code>@product.SKU</code></td>
+                                            <td>@(product.CategoryName ?? "Uncategorized")</td>
+                                            <td class="text-center">
+                                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                                    <span class="fw-medium @GetStockTextClass(product)">
+                                                        @product.QuantityInStock
+                                                    </span>
+                                                    @if (product.ReorderLevel > 0)
+                                                    {
+                                                        <small class="text-muted">/ @product.ReorderLevel min</small>
+                                                    }
+                                                </div>
+                                                @if (product.QuantityInStock <= product.ReorderLevel && product.ReorderLevel > 0)
+                                                {
+                                                    var stockPct = GetStockPercentage(product);
+                                                    var progressClass = $"progress-bar {GetProgressBarClass(product)}";
+                                                    var progressStyle = $"width: {stockPct}%";
+                                                    <div class="progress mt-1" style="height: 4px; width: 80px; margin: auto;">
+                                                        <div class="@progressClass" style="@progressStyle">
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td class="text-end">@product.UnitCost.ToString("C")</td>
+                                            <td class="text-end fw-medium">@product.RetailPrice.ToString("C")</td>
+                                            <td class="text-center">
+                                                <StatusBadge Status="@GetStockStatus(product)" />
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-success" @onclick="() => QuickStockAdd(product)"
+                                                            title="Add Stock">
+                                                        <i class="bi bi-plus"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-primary" @onclick="() => EditProduct(product)"
+                                                            title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    @if (product.IsActive)
+                                                    {
+                                                        <button class="btn btn-outline-warning"
+                                                                @onclick="() => ShowArchiveConfirmation(product)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-outline-success" @onclick="() => RestoreProduct(product)"
+                                                                title="Restore">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5">
+                                            <i class="bi bi-inbox display-4 text-muted"></i>
+                                            <p class="text-muted mt-2">No products found</p>
+                                            <button class="btn btn-primary btn-sm" @onclick="ShowNewProductModal">
+                                                <i class="bi bi-plus me-1"></i> Add Product
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if (_products.TotalPages > 1)
+                {
+                    <div class="card-footer bg-transparent">
+                        <Pagination CurrentPage="@_currentPage" TotalCount="@_products.TotalCount"
+                                    OnPageChanged="OnPageChanged" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Product Modal *@
+    <Modal @bind-IsVisible="_showProductModal" Title="@(_isEditing ? "Edit Product" : "New Product")"
+           Size="Modal.ModalSize.Large">
+        <ChildContent>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Product Name *</label>
+                    <input type="text" class="form-control" @bind="_productForm.Name"
+                           placeholder="e.g., Lavender Essential Oil" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">SKU *</label>
+                    <input type="text" class="form-control" @bind="_productForm.SKU" placeholder="e.g., LEO-001" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Brand</label>
+                    <input type="text" class="form-control" @bind="_productForm.Brand" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" @bind="_productForm.CategoryId">
+                        <option value="">Select Category...</option>
+                        @foreach (var category in _categories)
+                        {
+                            <option value="@category.CategoryId">@category.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" @bind="_productForm.Description"></textarea>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Unit Cost *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" @bind="_productForm.UnitCost" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Retail Price *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" @bind="_productForm.RetailPrice" min="0"
+                               step="0.01" />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    @if (_isEditing)
+                    {
+                        <label class="form-label">Current Stock</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" class="form-control bg-light" value="@_productForm.InitialStock"
+                                   disabled />
+                            <button type="button" class="btn btn-outline-primary btn-sm text-nowrap"
+                                    @onclick="OpenStockAdjustmentFromEdit">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Adjust
+                            </button>
+                        </div>
+                        <small class="text-muted">Use Stock Adjustment to modify</small>
+                    }
+                    else
+                    {
+                        <label class="form-label">Initial Stock</label>
+                        <input type="number" class="form-control" @bind="_productForm.InitialStock" min="0" />
+                    }
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Reorder Level</label>
+                    <input type="number" class="form-control" @bind="_productForm.ReorderLevel" min="0" />
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="isActive" @bind="_productForm.IsActive" />
+                        <label class="form-check-label" for="isActive">Product is active</label>
+                    </div>
+                </div>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseProductModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveProduct" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Product
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Stock Adjustment Modal *@
+    <Modal @bind-IsVisible="_showStockModal" Title="Stock Adjustment">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Product *</label>
+                <select class="form-select" @bind="_stockAdjustment.ProductId">
+                    <option value="0">Select Product...</option>
+                    @foreach (var product in _products.Items)
+                    {
+                        <option value="@product.ProductId">@product.Name (@product.SKU)</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Adjustment Type *</label>
+                <select class="form-select" @bind="_stockAdjustment.AdjustmentType">
+                    <option value="Received">Received (Purchase Order)</option>
+                    <option value="Increase">Increase (Manual Add)</option>
+                    <option value="Decrease">Decrease (Manual Remove)</option>
+                    <option value="Damaged">Damaged</option>
+                    <option value="Expired">Expired</option>
+                    <option value="Spoilage">Spoilage</option>
+                    <option value="Shrinkage">Shrinkage</option>
+                    <option value="Return to Stock">Return to Stock</option>
+                    <option value="Audit">Audit Adjustment</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Quantity *</label>
+                <input type="number" class="form-control" @bind="_stockAdjustment.Quantity" min="1" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" rows="2" @bind="_stockAdjustment.Reason"
+                          placeholder="e.g., Received shipment, Inventory adjustment..."></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseStockModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveStockAdjustment" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Apply Adjustment
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Category Modal *@
+    <Modal @bind-IsVisible="_showCategoryModal" Title="Product Category">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Category Name *</label>
+                <input type="text" class="form-control" @bind="_categoryForm.Name" placeholder="e.g., Essential Oils" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="2" @bind="_categoryForm.Description"></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseCategoryModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveCategory" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Category
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Quick Stock Add Modal *@
+    <Modal @bind-IsVisible="_showQuickStockModal" Title="Add Stock">
+        <ChildContent>
+            <div class="text-center mb-3">
+                <h5>@_selectedProduct?.Name</h5>
+                <p class="text-muted mb-0">Current Stock: <strong>@_selectedProduct?.QuantityInStock</strong></p>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Quantity to Add *</label>
+                <input type="number" class="form-control form-control-lg text-center" @bind="_quickStockQuantity"
+                       min="1" />
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary"
+                    @onclick="() => _showQuickStockModal = false">Cancel</button>
+            <button type="button" class="btn btn-success" @onclick="ApplyQuickStock" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                <i class="bi bi-plus me-1"></i> Add Stock
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Archive Confirmation *@
+    <ConfirmDialog @bind-IsVisible="_showDeleteConfirm" Title="Archive Product"
+                   Message="@($"Archive '{_productToDelete?.Name}'? It can be restored later.")" ConfirmText="Archive"
+                   IsDanger="true" OnConfirm="ArchiveProduct" />
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private PagedResponse<ProductResponse> _products = new();
+    private List<ProductCategoryResponse> _categories = new();
+    private bool _isLoading = true;
+    private int _currentPage = 1;
+    private string _searchTerm = string.Empty;
+    private int? _categoryFilter;
+    private string? _stockFilter;
+    private bool? _statusFilter;
+
+    // Stats
+    private int _totalProductCount;
+    private int _lowStockCount;
+    private int _outOfStockCount;
+    private decimal _totalValue;
+
+    // Product modal
+    private bool _showProductModal;
+    private bool _isEditing;
+    private bool _isSaving;
+    private CreateProductRequest _productForm = new() { IsActive = true };
+    private int? _editingProductId;
+
+    // Stock adjustment modal
+    private bool _showStockModal;
+    private StockAdjustmentRequest _stockAdjustment = new();
+
+    // Quick stock modal
+    private bool _showQuickStockModal;
+    private ProductResponse? _selectedProduct;
+    private int _quickStockQuantity = 1;
+
+    // Category modal
+    private bool _showCategoryModal;
+    private CreateCategoryRequest _categoryForm = new();
+
+    // Delete confirmation
+    private bool _showDeleteConfirm;
+    private ProductResponse? _productToDelete;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            await LoadCategories();
+            await Task.WhenAll(LoadProducts(), LoadStats());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading inventory data: {ex.Message}");
+            ShowAlert("Failed to load inventory data. Please check your connection and try again.", Alert.AlertType.Error);
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        try
+        {
+            // Load all active products (large page) to compute accurate global stats
+            var all = await InventoryService.GetProductsAsync(page: 1, pageSize: 9999, isActive: true);
+            _totalProductCount = all.TotalCount;
+            _lowStockCount = all.Items.Count(p => p.QuantityInStock > 0 && p.ReorderLevel > 0 && p.QuantityInStock <=
+p.ReorderLevel);
+            _outOfStockCount = all.Items.Count(p => p.QuantityInStock == 0);
+            _totalValue = all.Items.Sum(p => p.QuantityInStock * p.UnitCost);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading inventory stats: {ex.Message}");
+        }
+    }
+
+    private string _totalValueDisplay => _totalValue.ToString("C0");
+
+    private async Task OnStockFilterChanged()
+    {
+        _currentPage = 1;
+        await LoadProducts();
+    }
+
+    private async Task LoadCategories()
+    {
+        _categories = await InventoryService.GetCategoriesAsync();
+    }
+
+    private async Task LoadProducts()
+    {
+        _isLoading = true;
+        try
+        {
+            _products = await InventoryService.GetProductsAsync(
+            page: _currentPage,
+            search: _searchTerm,
+            categoryId: _categoryFilter,
+            stockFilter: _stockFilter,
+            isActive: _statusFilter);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+            _products = new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadProducts();
+    }
+
+    private async Task OnCategoryFilterChange(ChangeEventArgs e)
+    {
+        _categoryFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        _currentPage = 1;
+        await LoadProducts();
+    }
+
+    private async Task OnStatusFilterChange(ChangeEventArgs e)
+    {
+        _statusFilter = bool.TryParse(e.Value?.ToString(), out var status) ? status : null;
+        _currentPage = 1;
+        await LoadProducts();
+    }
+
+    private string _exportFormat = "PDF";
+    private bool _isExporting;
+
+    private async Task ExportInventory()
+    {
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("inventory",
+_exportFormat, DateTime.Today.AddYears(-1), DateTime.Today);
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert("Inventory report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    // Product CRUD
+    private void ShowNewProductModal()
+    {
+        _isEditing = false;
+        _editingProductId = null;
+        _productForm = new CreateProductRequest { IsActive = true };
+        _showProductModal = true;
+    }
+
+    private void EditProduct(ProductResponse product)
+    {
+        _isEditing = true;
+        _editingProductId = product.ProductId;
+        _productForm = new CreateProductRequest
+        {
+            Name = product.Name,
+            SKU = product.SKU,
+            Brand = product.Brand,
+            Description = product.Description,
+            CategoryId = product.ProductCategoryId,
+            UnitCost = product.UnitCost,
+            RetailPrice = product.RetailPrice,
+            ReorderLevel = product.ReorderLevel,
+            Unit = product.Unit,
+            IsActive = product.IsActive,
+            InitialStock = product.QuantityInStock
+        };
+        _showProductModal = true;
+    }
+
+    private void CloseProductModal() => _showProductModal = false;
+
+    private async Task SaveProduct()
+    {
+        if (string.IsNullOrWhiteSpace(_productForm.Name) || string.IsNullOrWhiteSpace(_productForm.SKU))
+        {
+            ShowAlert("Product name and SKU are required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            ProductResponse? result;
+            string? errorMessage = null;
+            if (_isEditing && _editingProductId.HasValue)
+            {
+                var updateRequest = new UpdateProductRequest
+                {
+                    Name = _productForm.Name,
+                    SKU = _productForm.SKU,
+                    Brand = _productForm.Brand,
+                    Description = _productForm.Description,
+                    CategoryId = _productForm.CategoryId,
+                    UnitCost = _productForm.UnitCost,
+                    RetailPrice = _productForm.RetailPrice,
+                    ReorderLevel = _productForm.ReorderLevel,
+                    IsActive = _productForm.IsActive
+                };
+                (result, errorMessage) = await InventoryService.UpdateProductWithErrorAsync(_editingProductId.Value, updateRequest);
+            }
+            else
+            {
+                (result, errorMessage) = await InventoryService.CreateProductWithErrorAsync(_productForm);
+
+                // If initial stock was specified, create a stock adjustment
+                if (result != null && _productForm.InitialStock > 0)
+                {
+                    var stockAdj = new StockAdjustmentRequest
+                    {
+                        ProductId = result.ProductId,
+                        AdjustmentType = "Increase",
+                        Quantity = _productForm.InitialStock,
+                        Reason = "Initial stock"
+                    };
+                    await InventoryService.AdjustStockAsync(stockAdj);
+                }
+            }
+
+            if (result != null)
+            {
+                ShowAlert($"Product {(_isEditing ? "updated" : "created")} successfully!", Alert.AlertType.Success);
+                _showProductModal = false;
+                await LoadProducts();
+                await LoadStats();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to save product. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveProduct error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the product.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private void ShowArchiveConfirmation(ProductResponse product)
+    {
+        _productToDelete = product;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ArchiveProduct()
+    {
+        if (_productToDelete != null)
+        {
+            var success = await InventoryService.ArchiveProductAsync(_productToDelete.ProductId);
+            if (success)
+            {
+                ShowAlert("Product archived.", Alert.AlertType.Success);
+                await LoadProducts();
+                await LoadStats();
+            }
+            else
+            {
+                ShowAlert("Failed to archive product. It may be referenced by active orders.", Alert.AlertType.Error);
+            }
+        }
+        _productToDelete = null;
+    }
+
+    private async Task RestoreProduct(ProductResponse product)
+    {
+        var success = await InventoryService.ReactivateProductAsync(product.ProductId);
+        if (success)
+        {
+            ShowAlert("Product restored successfully!", Alert.AlertType.Success);
+            await LoadProducts();
+            await LoadStats();
+        }
+        else
+        {
+            ShowAlert("Failed to restore product. Please try again.", Alert.AlertType.Error);
+        }
+    }
+
+    // Stock adjustment
+    private void ShowStockAdjustmentModal()
+    {
+        _stockAdjustment = new StockAdjustmentRequest { AdjustmentType = "Increase", Quantity = 1 };
+        _showStockModal = true;
+    }
+
+    private void OpenStockAdjustmentFromEdit()
+    {
+        var productId = _editingProductId ?? 0;
+        _showProductModal = false;
+        _stockAdjustment = new StockAdjustmentRequest
+        {
+            ProductId = productId,
+            AdjustmentType = "Increase",
+            Quantity = 1
+        };
+        _showStockModal = true;
+    }
+
+    private void CloseStockModal() => _showStockModal = false;
+
+    private async Task SaveStockAdjustment()
+    {
+        if (_stockAdjustment.ProductId == 0 || _stockAdjustment.Quantity <= 0)
+        {
+            ShowAlert("Please select a product and enter a quantity.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var (success, errorMessage) = await InventoryService.AdjustStockWithErrorAsync(_stockAdjustment);
+            if (success)
+            {
+                ShowAlert("Stock adjusted successfully!", Alert.AlertType.Success);
+                _showStockModal = false;
+                await LoadProducts();
+                await LoadStats();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to adjust stock. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AdjustStock error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while adjusting stock.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    // Quick stock add
+    private void QuickStockAdd(ProductResponse product)
+    {
+        _selectedProduct = product;
+        _quickStockQuantity = 1;
+        _showQuickStockModal = true;
+    }
+
+    private async Task ApplyQuickStock()
+    {
+        if (_selectedProduct != null && _quickStockQuantity > 0)
+        {
+            _isSaving = true;
+
+            var adjustment = new StockAdjustmentRequest
+            {
+                ProductId = _selectedProduct.ProductId,
+                AdjustmentType = "Increase",
+                Quantity = _quickStockQuantity,
+                Reason = "Quick stock addition"
+            };
+
+            var success = await InventoryService.AdjustStockAsync(adjustment);
+            if (success)
+            {
+                ShowAlert($"Added {_quickStockQuantity} units to {_selectedProduct.Name}", Alert.AlertType.Success);
+                _showQuickStockModal = false;
+                await LoadProducts();
+                await LoadStats();
+            }
+            else
+            {
+                ShowAlert("Failed to add stock.", Alert.AlertType.Error);
+            }
+
+            _isSaving = false;
+        }
+    }
+
+    // Category
+    private void ShowCategoryModalDialog()
+    {
+        _categoryForm = new CreateCategoryRequest();
+        _showCategoryModal = true;
+    }
+
+    private void CloseCategoryModal() => _showCategoryModal = false;
+
+    private async Task SaveCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_categoryForm.Name))
+        {
+            ShowAlert("Category name is required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var success = await InventoryService.SaveCategoryAsync(_categoryForm);
+            if (success)
+            {
+                ShowAlert("Category saved!", Alert.AlertType.Success);
+                _showCategoryModal = false;
+                await LoadCategories();
+            }
+            else
+            {
+                ShowAlert("Failed to save category. The name may already be in use.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveCategory error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the category.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    // Helper methods
+    private string GetStockStatus(ProductResponse product)
+    {
+        if (product.QuantityInStock == 0) return "Out of Stock";
+        if (product.QuantityInStock <= product.ReorderLevel) return "Low Stock";
+        return "In Stock";
+    }
+
+    private string GetStockTextClass(ProductResponse product)
+    {
+        if (product.QuantityInStock == 0) return "text-danger";
+        if (product.QuantityInStock <= product.ReorderLevel) return "text-warning";
+        return "text-success";
+    }
+
+    private string GetProgressBarClass(ProductResponse product)
+    {
+        if (product.QuantityInStock == 0) return "bg-danger";
+        return "bg-warning";
+    }
+
+    private int GetStockPercentage(ProductResponse product)
+    {
+        if (product.ReorderLevel == 0) return 100;
+        return Math.Min(100, (int)((double)product.QuantityInStock / (double)product.ReorderLevel * 100));
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+}

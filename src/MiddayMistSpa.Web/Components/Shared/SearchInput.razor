@@ -1,0 +1,69 @@
+@* Search Input Component *@
+<div class="input-group">
+    <span class="input-group-text bg-white border-end-0">
+        <i class="bi bi-search text-muted"></i>
+    </span>
+    <input type="text" 
+           class="form-control border-start-0" 
+           placeholder="@Placeholder"
+           value="@Value"
+           @oninput="OnInput"
+           @onkeydown="OnKeyDown" />
+    @if (!string.IsNullOrEmpty(Value))
+    {
+        <button class="btn btn-outline-secondary" type="button" @onclick="Clear">
+            <i class="bi bi-x"></i>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Search...";
+    [Parameter] public EventCallback<string> OnSearch { get; set; }
+    [Parameter] public int DebounceMs { get; set; } = 300;
+
+    private System.Timers.Timer? _debounceTimer;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? string.Empty;
+        
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Timers.Timer(DebounceMs);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            _debounceTimer?.Dispose();
+            await InvokeAsync(async () =>
+            {
+                await ValueChanged.InvokeAsync(Value);
+                await OnSearch.InvokeAsync(Value);
+            });
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _debounceTimer?.Dispose();
+            await ValueChanged.InvokeAsync(Value);
+            await OnSearch.InvokeAsync(Value);
+        }
+    }
+
+    private async Task Clear()
+    {
+        Value = string.Empty;
+        await ValueChanged.InvokeAsync(Value);
+        await OnSearch.InvokeAsync(Value);
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+}

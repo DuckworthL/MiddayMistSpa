@@ -1,0 +1,92 @@
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@* Component that requires authentication and optionally specific roles *@
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 200px;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_isAuthorized)
+{
+    @ChildContent
+}
+else
+{
+    @* Redirect to login handled in code *@
+    <div class="text-center py-5">
+        <i class="bi bi-shield-lock display-4 text-muted"></i>
+        <p class="text-muted mt-2">Redirecting to login...</p>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string[]? RequiredRoles { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isAuthorized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Subscribe to auth state changes
+            AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+
+            // Try to restore session
+            if (!AuthService.IsAuthenticated)
+            {
+                await AuthService.TryRestoreSessionAsync();
+            }
+
+            CheckAuthorization();
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CheckAuthorization()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            _isAuthorized = false;
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // Check role requirements
+        if (RequiredRoles != null && RequiredRoles.Length > 0)
+        {
+            var userRole = AuthService.CurrentUser?.Role;
+            _isAuthorized = RequiredRoles.Contains(userRole, StringComparer.OrdinalIgnoreCase);
+
+            if (!_isAuthorized)
+            {
+                Navigation.NavigateTo("/unauthorized");
+            }
+        }
+        else
+        {
+            _isAuthorized = true;
+        }
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        CheckAuthorization();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+    }
+}

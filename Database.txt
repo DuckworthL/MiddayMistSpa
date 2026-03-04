@@ -1,0 +1,852 @@
+-- ================================================================
+-- MiddayMist Spa ERP - Complete Database Schema
+-- Philippine Business Rules Compliant
+-- 3NF Normalized with One-to-Many Relationships
+-- Date: 2026-01-31
+-- ================================================================
+
+USE master;
+GO
+
+-- Drop database if exists (for fresh start)
+IF EXISTS (SELECT name FROM sys.databases WHERE name = 'MiddayMistSpaDB')
+BEGIN
+    ALTER DATABASE MiddayMistSpaDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE MiddayMistSpaDB;
+END
+GO
+
+-- Create database
+CREATE DATABASE MiddayMistSpaDB;
+GO
+
+USE MiddayMistSpaDB;
+GO
+
+-- ================================================================
+-- SECTION 1: IDENTITY & SECURITY TABLES
+-- ================================================================
+
+-- Roles Table
+CREATE TABLE Roles (
+    RoleId INT IDENTITY(1,1) PRIMARY KEY,
+    RoleCode VARCHAR(50) NOT NULL UNIQUE,
+    RoleName NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(500),
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Users Table (ASP.NET Identity compatible)
+CREATE TABLE Users (
+    UserId INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(256) NOT NULL UNIQUE,
+    Email NVARCHAR(256) NOT NULL UNIQUE,
+    EmailConfirmed BIT NOT NULL DEFAULT 0,
+    PasswordHash NVARCHAR(MAX) NOT NULL,
+    SecurityStamp NVARCHAR(MAX),
+    PhoneNumber NVARCHAR(50),
+    PhoneNumberConfirmed BIT NOT NULL DEFAULT 0,
+    TwoFactorEnabled BIT NOT NULL DEFAULT 0,
+    LockoutEnd DATETIME2 NULL,
+    LockoutEnabled BIT NOT NULL DEFAULT 1,
+    AccessFailedCount INT NOT NULL DEFAULT 0,
+    RoleId INT NOT NULL,
+    FirstName NVARCHAR(100) NOT NULL,
+    LastName NVARCHAR(100) NOT NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    LastLoginAt DATETIME2 NULL,
+    PasswordExpiryDate DATETIME2 NOT NULL,
+    MustChangePassword BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Users_Roles FOREIGN KEY (RoleId) REFERENCES Roles(RoleId)
+);
+
+-- Password History Table (prevents reuse of last 5 passwords)
+CREATE TABLE PasswordHistory (
+    PasswordHistoryId INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    PasswordHash NVARCHAR(MAX) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_PasswordHistory_Users FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE CASCADE
+);
+
+-- User Sessions Table (track concurrent sessions)
+CREATE TABLE UserSessions (
+    SessionId INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    Token NVARCHAR(MAX) NOT NULL,
+    IpAddress NVARCHAR(50),
+    UserAgent NVARCHAR(500),
+    IsActive BIT NOT NULL DEFAULT 1,
+    ExpiresAt DATETIME2 NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_UserSessions_Users FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE CASCADE
+);
+
+-- Audit Logs Table
+CREATE TABLE AuditLogs (
+    AuditLogId BIGINT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NULL,
+    Action NVARCHAR(100) NOT NULL, -- Login, Logout, Create, Update, Delete, etc.
+    TableName NVARCHAR(100),
+    RecordId NVARCHAR(50),
+    OldValues NVARCHAR(MAX), -- JSON format
+    NewValues NVARCHAR(MAX), -- JSON format
+    IpAddress NVARCHAR(50),
+    UserAgent NVARCHAR(500),
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_AuditLogs_Users FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- ================================================================
+-- SECTION 2: EMPLOYEE & HR TABLES
+-- ================================================================
+
+-- Employees Table
+CREATE TABLE Employees (
+    EmployeeId INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NULL, -- Links to Users table if employee has login access
+    EmployeeCode NVARCHAR(50) NOT NULL UNIQUE,
+    FirstName NVARCHAR(100) NOT NULL,
+    LastName NVARCHAR(100) NOT NULL,
+    MiddleName NVARCHAR(100),
+    DateOfBirth DATE NOT NULL,
+    Gender NVARCHAR(10) NOT NULL, -- Male, Female, Other
+    CivilStatus NVARCHAR(20), -- Single, Married, Widowed, Divorced
+    Address NVARCHAR(500),
+    City NVARCHAR(100),
+    Province NVARCHAR(100),
+    PostalCode NVARCHAR(20),
+    PhoneNumber NVARCHAR(50) NOT NULL,
+    Email NVARCHAR(256),
+    EmergencyContactName NVARCHAR(200),
+    EmergencyContactPhone NVARCHAR(50),
+    
+    -- Philippine Government IDs
+    SSSNumber NVARCHAR(20),
+    PhilHealthNumber NVARCHAR(20),
+    PagIBIGNumber NVARCHAR(20),
+    TINNumber NVARCHAR(20),
+    
+    -- Employment Details
+    Position NVARCHAR(100) NOT NULL,
+    Department NVARCHAR(100),
+    HireDate DATE NOT NULL,
+    EmploymentType NVARCHAR(50) NOT NULL, -- Regular, Contractual, Part-Time, Probationary
+    EmploymentStatus NVARCHAR(50) NOT NULL DEFAULT 'Active', -- Active, Resigned, Terminated, On Leave
+    
+    -- Salary Information
+    DailyRate DECIMAL(18,2) NOT NULL,
+    MonthlyBasicSalary DECIMAL(18,2) NOT NULL,
+    PayrollType NVARCHAR(50) NOT NULL DEFAULT 'Semi-Monthly', -- Semi-Monthly, Monthly, Daily
+    
+    -- Therapist Specific
+    IsTherapist BIT NOT NULL DEFAULT 0,
+    Specialization NVARCHAR(200), -- Swedish Massage, Deep Tissue, Reflexology, etc.
+    LicenseNumber NVARCHAR(100),
+    LicenseExpiryDate DATE,
+    
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Employees_Users FOREIGN KEY (UserId) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- Employee Schedules Table
+CREATE TABLE EmployeeSchedules (
+    ScheduleId INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeId INT NOT NULL,
+    DayOfWeek INT NOT NULL, -- 0=Sunday, 1=Monday, ..., 6=Saturday
+    ShiftStartTime TIME NOT NULL,
+    ShiftEndTime TIME NOT NULL,
+    BreakStartTime TIME,
+    BreakEndTime TIME,
+    IsRestDay BIT NOT NULL DEFAULT 0,
+    EffectiveDate DATE NOT NULL,
+    EndDate DATE NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_EmployeeSchedules_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE
+);
+
+-- Employee Time Off Requests
+CREATE TABLE TimeOffRequests (
+    TimeOffRequestId INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeId INT NOT NULL,
+    LeaveType NVARCHAR(50) NOT NULL, -- SIL, Sick Leave, Maternity, Paternity, Solo Parent, Emergency
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    TotalDays DECIMAL(5,2) NOT NULL,
+    Reason NVARCHAR(500),
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- Pending, Approved, Rejected
+    ApprovedBy INT NULL,
+    ApprovedAt DATETIME2 NULL,
+    RejectionReason NVARCHAR(500),
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_TimeOffRequests_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE,
+    CONSTRAINT FK_TimeOffRequests_ApprovedBy FOREIGN KEY (ApprovedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- Employee Leave Balances
+CREATE TABLE EmployeeLeaveBalances (
+    LeaveBalanceId INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeId INT NOT NULL,
+    Year INT NOT NULL,
+    SILDays DECIMAL(5,2) NOT NULL DEFAULT 5.0, -- Service Incentive Leave (5 days/year in PH)
+    SILUsed DECIMAL(5,2) NOT NULL DEFAULT 0,
+    SickLeaveDays DECIMAL(5,2) NOT NULL DEFAULT 0,
+    SickLeaveUsed DECIMAL(5,2) NOT NULL DEFAULT 0,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_EmployeeLeaveBalances_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE,
+    CONSTRAINT UQ_EmployeeLeaveBalances UNIQUE (EmployeeId, Year)
+);
+
+-- ================================================================
+-- SECTION 3: PAYROLL TABLES
+-- ================================================================
+
+-- Philippine Holidays Table
+CREATE TABLE PhilippineHolidays (
+    HolidayId INT IDENTITY(1,1) PRIMARY KEY,
+    HolidayName NVARCHAR(200) NOT NULL,
+    HolidayDate DATE NOT NULL,
+    HolidayType NVARCHAR(50) NOT NULL, -- Regular, Special Non-Working
+    Year INT NOT NULL,
+    IsRecurring BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- SSS Contribution Table
+CREATE TABLE SSSContributionRates (
+    SSSRateId INT IDENTITY(1,1) PRIMARY KEY,
+    MinSalary DECIMAL(18,2) NOT NULL,
+    MaxSalary DECIMAL(18,2) NOT NULL,
+    SalaryCredit DECIMAL(18,2) NOT NULL,
+    EmployeeShare DECIMAL(18,2) NOT NULL,
+    EmployerShare DECIMAL(18,2) NOT NULL,
+    TotalContribution DECIMAL(18,2) NOT NULL,
+    EffectiveYear INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- PhilHealth Contribution Table
+CREATE TABLE PhilHealthContributionRates (
+    PhilHealthRateId INT IDENTITY(1,1) PRIMARY KEY,
+    MinSalary DECIMAL(18,2) NOT NULL,
+    MaxSalary DECIMAL(18,2) NOT NULL,
+    PremiumRate DECIMAL(5,4) NOT NULL, -- e.g., 0.05 for 5%
+    EmployeeShare DECIMAL(5,4) NOT NULL, -- e.g., 0.025 for 2.5%
+    EmployerShare DECIMAL(5,4) NOT NULL, -- e.g., 0.025 for 2.5%
+    EffectiveYear INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Pag-IBIG Contribution Table
+CREATE TABLE PagIBIGContributionRates (
+    PagIBIGRateId INT IDENTITY(1,1) PRIMARY KEY,
+    MinSalary DECIMAL(18,2) NOT NULL,
+    MaxSalary DECIMAL(18,2) NOT NULL,
+    EmployeeRate DECIMAL(5,4) NOT NULL, -- e.g., 0.02 for 2%
+    EmployerRate DECIMAL(5,4) NOT NULL, -- e.g., 0.02 for 2%
+    EmployeeMaxContribution DECIMAL(18,2) NOT NULL, -- Capped at 200
+    EmployerMaxContribution DECIMAL(18,2) NOT NULL, -- Capped at 300
+    EffectiveYear INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Withholding Tax Table (BIR)
+CREATE TABLE WithholdingTaxBrackets (
+    TaxBracketId INT IDENTITY(1,1) PRIMARY KEY,
+    MinIncome DECIMAL(18,2) NOT NULL,
+    MaxIncome DECIMAL(18,2) NULL,
+    BaseTax DECIMAL(18,2) NOT NULL,
+    TaxRate DECIMAL(5,4) NOT NULL, -- e.g., 0.15 for 15%
+    ExcessOver DECIMAL(18,2) NOT NULL,
+    EffectiveYear INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Payroll Periods
+CREATE TABLE PayrollPeriods (
+    PayrollPeriodId INT IDENTITY(1,1) PRIMARY KEY,
+    PeriodName NVARCHAR(100) NOT NULL, -- e.g., "January 1-15, 2026"
+    StartDate DATE NOT NULL,
+    EndDate DATE NOT NULL,
+    PayrollType NVARCHAR(50) NOT NULL, -- Semi-Monthly, Monthly
+    CutoffDate DATE NOT NULL,
+    PaymentDate DATE NOT NULL,
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Draft', -- Draft, Finalized, Paid
+    FinalizedBy INT NULL,
+    FinalizedAt DATETIME2 NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_PayrollPeriods_FinalizedBy FOREIGN KEY (FinalizedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- Payroll Records
+CREATE TABLE PayrollRecords (
+    PayrollRecordId INT IDENTITY(1,1) PRIMARY KEY,
+    PayrollPeriodId INT NOT NULL,
+    EmployeeId INT NOT NULL,
+    
+    -- Work Hours
+    DaysWorked DECIMAL(5,2) NOT NULL,
+    HoursWorked DECIMAL(8,2) NOT NULL,
+    OvertimeHours DECIMAL(8,2) NOT NULL DEFAULT 0,
+    NightDifferentialHours DECIMAL(8,2) NOT NULL DEFAULT 0,
+    
+    -- Earnings
+    BasicSalary DECIMAL(18,2) NOT NULL,
+    OvertimePay DECIMAL(18,2) NOT NULL DEFAULT 0,
+    NightDifferentialPay DECIMAL(18,2) NOT NULL DEFAULT 0,
+    HolidayPay DECIMAL(18,2) NOT NULL DEFAULT 0,
+    RestDayPay DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Commissions DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Tips DECIMAL(18,2) NOT NULL DEFAULT 0,
+    RiceAllowance DECIMAL(18,2) NOT NULL DEFAULT 0,
+    LaundryAllowance DECIMAL(18,2) NOT NULL DEFAULT 0,
+    OtherAllowances DECIMAL(18,2) NOT NULL DEFAULT 0,
+    GrossPay DECIMAL(18,2) NOT NULL,
+    
+    -- Mandatory Deductions
+    SSSContribution DECIMAL(18,2) NOT NULL DEFAULT 0,
+    PhilHealthContribution DECIMAL(18,2) NOT NULL DEFAULT 0,
+    PagIBIGContribution DECIMAL(18,2) NOT NULL DEFAULT 0,
+    WithholdingTax DECIMAL(18,2) NOT NULL DEFAULT 0,
+    
+    -- Other Deductions
+    Tardiness DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Absences DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CashAdvances DECIMAL(18,2) NOT NULL DEFAULT 0,
+    LoanDeductions DECIMAL(18,2) NOT NULL DEFAULT 0,
+    OtherDeductions DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalDeductions DECIMAL(18,2) NOT NULL,
+    
+    -- Net Pay
+    NetPay DECIMAL(18,2) NOT NULL,
+    
+    -- Payment Details
+    PaymentMethod NVARCHAR(50), -- Cash, Bank Transfer
+    PaymentDate DATE,
+    PaymentStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- Pending, Paid
+    
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_PayrollRecords_PayrollPeriods FOREIGN KEY (PayrollPeriodId) REFERENCES PayrollPeriods(PayrollPeriodId) ON DELETE CASCADE,
+    CONSTRAINT FK_PayrollRecords_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE
+);
+
+-- Employee Advances/Loans
+CREATE TABLE EmployeeAdvances (
+    AdvanceId INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeId INT NOT NULL,
+    AdvanceType NVARCHAR(50) NOT NULL, -- Cash Advance, SSS Loan, Pag-IBIG Loan
+    Amount DECIMAL(18,2) NOT NULL,
+    Balance DECIMAL(18,2) NOT NULL,
+    MonthlyDeduction DECIMAL(18,2) NOT NULL,
+    StartDate DATE NOT NULL,
+    NumberOfInstallments INT NOT NULL,
+    InstallmentsPaid INT NOT NULL DEFAULT 0,
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Active', -- Active, Fully Paid
+    ApprovedBy INT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_EmployeeAdvances_Employees FOREIGN KEY (EmployeeId) REFERENCES Employees(EmployeeId) ON DELETE CASCADE,
+    CONSTRAINT FK_EmployeeAdvances_ApprovedBy FOREIGN KEY (ApprovedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- ================================================================
+-- SECTION 4: CUSTOMER MANAGEMENT TABLES
+-- ================================================================
+
+-- Customers Table
+CREATE TABLE Customers (
+    CustomerId INT IDENTITY(1,1) PRIMARY KEY,
+    CustomerCode NVARCHAR(50) NOT NULL UNIQUE,
+    FirstName NVARCHAR(100) NOT NULL,
+    LastName NVARCHAR(100) NOT NULL,
+    Email NVARCHAR(256),
+    PhoneNumber NVARCHAR(50) NOT NULL,
+    DateOfBirth DATE,
+    Gender NVARCHAR(10),
+    Address NVARCHAR(500),
+    City NVARCHAR(100),
+    Province NVARCHAR(100),
+    PostalCode NVARCHAR(20),
+    
+    -- Membership
+    MembershipType NVARCHAR(50) DEFAULT 'Regular', -- Regular, Silver, Gold, Platinum
+    MembershipStartDate DATE,
+    MembershipExpiryDate DATE,
+    LoyaltyPoints INT NOT NULL DEFAULT 0,
+    
+    -- Preferences
+    PreferredTherapistId INT NULL,
+    PressurePreference NVARCHAR(50), -- Light, Medium, Firm
+    TemperaturePreference NVARCHAR(50), -- Cool, Warm, Hot
+    MusicPreference NVARCHAR(50), -- Classical, Spa Music, Nature Sounds, Silence
+    Allergies NVARCHAR(500), -- IMPORTANT: Red alert in UI
+    MedicalNotes NVARCHAR(1000),
+    SpecialRequests NVARCHAR(500),
+    
+    -- Marketing
+    MarketingConsent BIT NOT NULL DEFAULT 0,
+    ReferralSource NVARCHAR(100), -- Walk-in, Facebook, Google, Referral, etc.
+    
+    -- Tracking
+    FirstVisitDate DATE,
+    LastVisitDate DATE,
+    TotalVisits INT NOT NULL DEFAULT 0,
+    TotalSpent DECIMAL(18,2) NOT NULL DEFAULT 0,
+    
+    -- Segmentation (DBSCAN results)
+    CustomerSegment NVARCHAR(50), -- VIP Platinum, Loyal Regulars, At-Risk, etc.
+    SegmentAssignedDate DATE,
+    
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Customers_PreferredTherapist FOREIGN KEY (PreferredTherapistId) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+);
+
+-- Customer Segments Table (DBSCAN results)
+CREATE TABLE CustomerSegments (
+    SegmentId INT IDENTITY(1,1) PRIMARY KEY,
+    SegmentName NVARCHAR(100) NOT NULL,
+    SegmentCode NVARCHAR(50) NOT NULL UNIQUE,
+    Description NVARCHAR(500),
+    ClusterId INT NOT NULL, -- DBSCAN cluster ID (-1 for noise/outliers)
+    AverageRecency DECIMAL(10,2), -- Days since last visit
+    AverageFrequency DECIMAL(10,2), -- Visits per month
+    AverageMonetaryValue DECIMAL(18,2), -- Lifetime value
+    CustomerCount INT NOT NULL DEFAULT 0,
+    RecommendedAction NVARCHAR(500),
+    LastAnalysisDate DATETIME2,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- ================================================================
+-- SECTION 5: SERVICES & INVENTORY TABLES
+-- ================================================================
+
+-- Service Categories
+CREATE TABLE ServiceCategories (
+    CategoryId INT IDENTITY(1,1) PRIMARY KEY,
+    CategoryName NVARCHAR(100) NOT NULL UNIQUE,
+    Description NVARCHAR(500),
+    DisplayOrder INT NOT NULL DEFAULT 0,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Services Table
+CREATE TABLE Services (
+    ServiceId INT IDENTITY(1,1) PRIMARY KEY,
+    CategoryId INT NOT NULL,
+    ServiceCode NVARCHAR(50) NOT NULL UNIQUE,
+    ServiceName NVARCHAR(200) NOT NULL,
+    Description NVARCHAR(1000),
+    DurationMinutes INT NOT NULL,
+    
+    -- Pricing (in PHP)
+    RegularPrice DECIMAL(18,2) NOT NULL,
+    MemberPrice DECIMAL(18,2),
+    PromoPrice DECIMAL(18,2),
+    
+    -- Commission Rates
+    TherapistCommissionRate DECIMAL(5,4) NOT NULL, -- e.g., 0.40 for 40%
+    
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Services_Categories FOREIGN KEY (CategoryId) REFERENCES ServiceCategories(CategoryId)
+);
+
+-- Product Categories (Inventory)
+CREATE TABLE ProductCategories (
+    ProductCategoryId INT IDENTITY(1,1) PRIMARY KEY,
+    CategoryName NVARCHAR(100) NOT NULL UNIQUE,
+    Description NVARCHAR(500),
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Products/Inventory Table
+CREATE TABLE Products (
+    ProductId INT IDENTITY(1,1) PRIMARY KEY,
+    ProductCategoryId INT NOT NULL,
+    ProductCode NVARCHAR(50) NOT NULL UNIQUE,
+    ProductName NVARCHAR(200) NOT NULL,
+    Description NVARCHAR(1000),
+    ProductType NVARCHAR(50) NOT NULL, -- Retail, Supply, Consumable
+    
+    -- Inventory
+    CurrentStock DECIMAL(18,3) NOT NULL DEFAULT 0,
+    ReorderLevel DECIMAL(18,3) NOT NULL,
+    UnitOfMeasure NVARCHAR(20) NOT NULL, -- pcs, ml, g, bottles, etc.
+    
+    -- Pricing
+    CostPrice DECIMAL(18,2) NOT NULL,
+    SellingPrice DECIMAL(18,2),
+    RetailCommissionRate DECIMAL(5,4) DEFAULT 0.10, -- 10% for retail products
+    
+    -- Tracking
+    ExpiryDate DATE,
+    Supplier NVARCHAR(200),
+    
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Products_ProductCategories FOREIGN KEY (ProductCategoryId) REFERENCES ProductCategories(ProductCategoryId)
+);
+
+-- Service-Product Requirements (Many-to-Many)
+CREATE TABLE ServiceProductRequirements (
+    RequirementId INT IDENTITY(1,1) PRIMARY KEY,
+    ServiceId INT NOT NULL,
+    ProductId INT NOT NULL,
+    QuantityRequired DECIMAL(18,3) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_ServiceProductReq_Services FOREIGN KEY (ServiceId) REFERENCES Services(ServiceId) ON DELETE CASCADE,
+    CONSTRAINT FK_ServiceProductReq_Products FOREIGN KEY (ProductId) REFERENCES Products(ProductId) ON DELETE CASCADE,
+    CONSTRAINT UQ_ServiceProduct UNIQUE (ServiceId, ProductId)
+);
+
+-- Suppliers Table
+CREATE TABLE Suppliers (
+    SupplierId INT IDENTITY(1,1) PRIMARY KEY,
+    SupplierCode NVARCHAR(50) NOT NULL UNIQUE,
+    SupplierName NVARCHAR(200) NOT NULL,
+    ContactPerson NVARCHAR(100),
+    Email NVARCHAR(256),
+    PhoneNumber NVARCHAR(50),
+    Address NVARCHAR(500),
+    City NVARCHAR(100),
+    Province NVARCHAR(100),
+    TINNumber NVARCHAR(20),
+    PaymentTerms NVARCHAR(100), -- Net 30, Net 60, COD, etc.
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+-- Purchase Orders
+CREATE TABLE PurchaseOrders (
+    PurchaseOrderId INT IDENTITY(1,1) PRIMARY KEY,
+    PONumber NVARCHAR(50) NOT NULL UNIQUE,
+    SupplierId INT NOT NULL,
+    OrderDate DATE NOT NULL,
+    ExpectedDeliveryDate DATE,
+    TotalAmount DECIMAL(18,2) NOT NULL,
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- Pending, Approved, Delivered, Cancelled
+    ApprovedBy INT NULL,
+    ApprovedAt DATETIME2 NULL,
+    ReceivedDate DATE,
+    Notes NVARCHAR(1000),
+    CreatedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_PurchaseOrders_Suppliers FOREIGN KEY (SupplierId) REFERENCES Suppliers(SupplierId),
+    CONSTRAINT FK_PurchaseOrders_ApprovedBy FOREIGN KEY (ApprovedBy) REFERENCES Users(UserId) ON DELETE SET NULL,
+    CONSTRAINT FK_PurchaseOrders_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(UserId)
+);
+
+-- Purchase Order Items
+CREATE TABLE PurchaseOrderItems (
+    POItemId INT IDENTITY(1,1) PRIMARY KEY,
+    PurchaseOrderId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity DECIMAL(18,3) NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    TotalPrice DECIMAL(18,2) NOT NULL,
+    QuantityReceived DECIMAL(18,3) NOT NULL DEFAULT 0,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_POItems_PurchaseOrders FOREIGN KEY (PurchaseOrderId) REFERENCES PurchaseOrders(PurchaseOrderId) ON DELETE CASCADE,
+    CONSTRAINT FK_POItems_Products FOREIGN KEY (ProductId) REFERENCES Products(ProductId)
+);
+
+-- Stock Adjustments
+CREATE TABLE StockAdjustments (
+    AdjustmentId INT IDENTITY(1,1) PRIMARY KEY,
+    ProductId INT NOT NULL,
+    AdjustmentType NVARCHAR(50) NOT NULL, -- Received, Sold, Damaged, Expired, Service Usage, Audit
+    QuantityBefore DECIMAL(18,3) NOT NULL,
+    QuantityChange DECIMAL(18,3) NOT NULL, -- Positive or negative
+    QuantityAfter DECIMAL(18,3) NOT NULL,
+    Reason NVARCHAR(500),
+    ReferenceNumber NVARCHAR(100), -- Links to PO, Invoice, Appointment, etc.
+    AdjustedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_StockAdjustments_Products FOREIGN KEY (ProductId) REFERENCES Products(ProductId),
+    CONSTRAINT FK_StockAdjustments_AdjustedBy FOREIGN KEY (AdjustedBy) REFERENCES Users(UserId)
+);
+
+-- ================================================================
+-- SECTION 6: APPOINTMENTS & BOOKINGS TABLES
+-- ================================================================
+
+-- Appointments Table
+CREATE TABLE Appointments (
+    AppointmentId INT IDENTITY(1,1) PRIMARY KEY,
+    AppointmentNumber NVARCHAR(50) NOT NULL UNIQUE,
+    CustomerId INT NOT NULL,
+    ServiceId INT NOT NULL,
+    TherapistId INT NULL,
+    
+    -- Scheduling
+    AppointmentDate DATE NOT NULL,
+    StartTime TIME NOT NULL,
+    EndTime TIME NOT NULL,
+    
+    -- Status Tracking
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Scheduled', -- Scheduled, Confirmed, Checked-In, In Progress, Completed, Cancelled, No-Show
+    
+    -- Calendly Integration
+    CalendlyEventId NVARCHAR(200), -- External booking ID
+    BookingSource NVARCHAR(50) DEFAULT 'Direct', -- Direct, Calendly, Walk-In
+    
+    -- Service Notes
+    CustomerNotes NVARCHAR(1000),
+    TherapistNotes NVARCHAR(1000),
+    
+    -- Timestamps
+    CheckedInAt DATETIME2,
+    ServiceStartedAt DATETIME2,
+    ServiceCompletedAt DATETIME2,
+    CancelledAt DATETIME2,
+    CancellationReason NVARCHAR(500),
+    
+    CreatedBy INT,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Appointments_Customers FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_Appointments_Services FOREIGN KEY (ServiceId) REFERENCES Services(ServiceId),
+    CONSTRAINT FK_Appointments_Therapists FOREIGN KEY (TherapistId) REFERENCES Employees(EmployeeId) ON DELETE SET NULL,
+    CONSTRAINT FK_Appointments_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- ================================================================
+-- SECTION 7: POINT OF SALE & TRANSACTIONS TABLES
+-- ================================================================
+
+-- Transactions Table (POS)
+CREATE TABLE Transactions (
+    TransactionId INT IDENTITY(1,1) PRIMARY KEY,
+    TransactionNumber NVARCHAR(50) NOT NULL UNIQUE,
+    CustomerId INT NOT NULL,
+    AppointmentId INT NULL, -- Links to appointment if checkout after service
+    
+    -- Amounts (in PHP)
+    Subtotal DECIMAL(18,2) NOT NULL,
+    DiscountAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DiscountPercentage DECIMAL(5,2) NOT NULL DEFAULT 0,
+    TaxAmount DECIMAL(18,2) NOT NULL DEFAULT 0, -- 12% VAT
+    TipAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount DECIMAL(18,2) NOT NULL,
+    
+    -- Payment
+    PaymentMethod NVARCHAR(50) NOT NULL, -- Cash, Card, Split
+    PaymentStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending', -- Pending, Paid, Refunded, Voided
+    
+    -- Stripe Integration
+    StripeSessionId NVARCHAR(200),
+    StripePaymentIntentId NVARCHAR(200),
+    StripeChargeId NVARCHAR(200),
+    
+    -- Tracking
+    TransactionDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+    VoidedAt DATETIME2,
+    VoidedBy INT NULL,
+    VoidReason NVARCHAR(500),
+    
+    CashierId INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Transactions_Customers FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId),
+    CONSTRAINT FK_Transactions_Appointments FOREIGN KEY (AppointmentId) REFERENCES Appointments(AppointmentId) ON DELETE SET NULL,
+    CONSTRAINT FK_Transactions_Cashiers FOREIGN KEY (CashierId) REFERENCES Users(UserId),
+    CONSTRAINT FK_Transactions_VoidedBy FOREIGN KEY (VoidedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- Transaction Items (Services)
+CREATE TABLE TransactionServiceItems (
+    TransactionServiceItemId INT IDENTITY(1,1) PRIMARY KEY,
+    TransactionId INT NOT NULL,
+    ServiceId INT NOT NULL,
+    TherapistId INT NULL,
+    Quantity INT NOT NULL DEFAULT 1,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    TotalPrice DECIMAL(18,2) NOT NULL,
+    CommissionRate DECIMAL(5,4) NOT NULL,
+    CommissionAmount DECIMAL(18,2) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_TransServiceItems_Transactions FOREIGN KEY (TransactionId) REFERENCES Transactions(TransactionId) ON DELETE CASCADE,
+    CONSTRAINT FK_TransServiceItems_Services FOREIGN KEY (ServiceId) REFERENCES Services(ServiceId),
+    CONSTRAINT FK_TransServiceItems_Therapists FOREIGN KEY (TherapistId) REFERENCES Employees(EmployeeId) ON DELETE SET NULL
+);
+
+-- Transaction Items (Products/Retail)
+CREATE TABLE TransactionProductItems (
+    TransactionProductItemId INT IDENTITY(1,1) PRIMARY KEY,
+    TransactionId INT NOT NULL,
+    ProductId INT NOT NULL,
+    Quantity DECIMAL(18,3) NOT NULL,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    TotalPrice DECIMAL(18,2) NOT NULL,
+    CommissionRate DECIMAL(5,4) NOT NULL DEFAULT 0.10,
+    CommissionAmount DECIMAL(18,2) NOT NULL,
+    SoldBy INT NULL, -- Employee who sold the product
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_TransProductItems_Transactions FOREIGN KEY (TransactionId) REFERENCES Transactions(TransactionId) ON DELETE CASCADE,
+    CONSTRAINT FK_TransProductItems_Products FOREIGN KEY (ProductId) REFERENCES Products(ProductId),
+    CONSTRAINT FK_TransProductItems_SoldBy FOREIGN KEY (SoldBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- Refunds Table
+CREATE TABLE Refunds (
+    RefundId INT IDENTITY(1,1) PRIMARY KEY,
+    TransactionId INT NOT NULL,
+    RefundAmount DECIMAL(18,2) NOT NULL,
+    RefundMethod NVARCHAR(50) NOT NULL, -- Cash, Card Reversal
+    Reason NVARCHAR(500),
+    RefundType NVARCHAR(50) NOT NULL, -- Full, Partial
+    ApprovedBy INT NOT NULL,
+    ProcessedBy INT NOT NULL,
+    RefundDate DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Refunds_Transactions FOREIGN KEY (TransactionId) REFERENCES Transactions(TransactionId),
+    CONSTRAINT FK_Refunds_ApprovedBy FOREIGN KEY (ApprovedBy) REFERENCES Users(UserId),
+    CONSTRAINT FK_Refunds_ProcessedBy FOREIGN KEY (ProcessedBy) REFERENCES Users(UserId)
+);
+
+-- ================================================================
+-- SECTION 8: ACCOUNTING TABLES
+-- ================================================================
+
+-- Chart of Accounts
+CREATE TABLE ChartOfAccounts (
+    AccountId INT IDENTITY(1,1) PRIMARY KEY,
+    AccountCode NVARCHAR(50) NOT NULL UNIQUE,
+    AccountName NVARCHAR(200) NOT NULL,
+    AccountType NVARCHAR(50) NOT NULL, -- Asset, Liability, Equity, Revenue, Expense
+    AccountCategory NVARCHAR(100), -- Cash, Accounts Receivable, Sales Revenue, etc.
+    ParentAccountId INT NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_ChartOfAccounts_Parent FOREIGN KEY (ParentAccountId) REFERENCES ChartOfAccounts(AccountId)
+);
+
+-- Journal Entries
+CREATE TABLE JournalEntries (
+    JournalEntryId INT IDENTITY(1,1) PRIMARY KEY,
+    EntryNumber NVARCHAR(50) NOT NULL UNIQUE,
+    EntryDate DATE NOT NULL,
+    Description NVARCHAR(500),
+    ReferenceType NVARCHAR(50), -- Transaction, Payroll, PO, Adjustment
+    ReferenceId NVARCHAR(50),
+    TotalDebit DECIMAL(18,2) NOT NULL,
+    TotalCredit DECIMAL(18,2) NOT NULL,
+    Status NVARCHAR(50) NOT NULL DEFAULT 'Posted', -- Draft, Posted, Voided
+    CreatedBy INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_JournalEntries_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(UserId)
+);
+
+-- Journal Entry Lines
+CREATE TABLE JournalEntryLines (
+    JournalLineId INT IDENTITY(1,1) PRIMARY KEY,
+    JournalEntryId INT NOT NULL,
+    AccountId INT NOT NULL,
+    DebitAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CreditAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Description NVARCHAR(500),
+    CreatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_JournalLines_JournalEntries FOREIGN KEY (JournalEntryId) REFERENCES JournalEntries(JournalEntryId) ON DELETE CASCADE,
+    CONSTRAINT FK_JournalLines_Accounts FOREIGN KEY (AccountId) REFERENCES ChartOfAccounts(AccountId)
+);
+
+-- ================================================================
+-- SECTION 9: SYSTEM CONFIGURATION TABLES
+-- ================================================================
+
+-- System Settings
+CREATE TABLE SystemSettings (
+    SettingId INT IDENTITY(1,1) PRIMARY KEY,
+    SettingKey NVARCHAR(100) NOT NULL UNIQUE,
+    SettingValue NVARCHAR(MAX),
+    SettingType NVARCHAR(50) NOT NULL, -- String, Number, Boolean, JSON
+    Description NVARCHAR(500),
+    Category NVARCHAR(100), -- General, Payroll, Stripe, Calendly, etc.
+    IsEditable BIT NOT NULL DEFAULT 1,
+    UpdatedBy INT,
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_SystemSettings_UpdatedBy FOREIGN KEY (UpdatedBy) REFERENCES Users(UserId) ON DELETE SET NULL
+);
+
+-- ================================================================
+-- CREATE INDEXES FOR PERFORMANCE
+-- ================================================================
+
+-- Users
+CREATE INDEX IX_Users_Email ON Users(Email);
+CREATE INDEX IX_Users_Username ON Users(Username);
+CREATE INDEX IX_Users_RoleId ON Users(RoleId);
+
+-- Employees
+CREATE INDEX IX_Employees_EmployeeCode ON Employees(EmployeeCode);
+CREATE INDEX IX_Employees_UserId ON Employees(UserId);
+CREATE INDEX IX_Employees_IsTherapist ON Employees(IsTherapist) WHERE IsTherapist = 1;
+
+-- Customers
+CREATE INDEX IX_Customers_Email ON Customers(Email);
+CREATE INDEX IX_Customers_PhoneNumber ON Customers(PhoneNumber);
+CREATE INDEX IX_Customers_CustomerSegment ON Customers(CustomerSegment);
+CREATE INDEX IX_Customers_LastVisitDate ON Customers(LastVisitDate);
+
+-- Appointments
+CREATE INDEX IX_Appointments_CustomerId ON Appointments(CustomerId);
+CREATE INDEX IX_Appointments_TherapistId ON Appointments(TherapistId);
+CREATE INDEX IX_Appointments_AppointmentDate ON Appointments(AppointmentDate);
+CREATE INDEX IX_Appointments_Status ON Appointments(Status);
+
+-- Transactions
+CREATE INDEX IX_Transactions_CustomerId ON Transactions(CustomerId);
+CREATE INDEX IX_Transactions_TransactionDate ON Transactions(TransactionDate);
+CREATE INDEX IX_Transactions_PaymentStatus ON Transactions(PaymentStatus);
+CREATE INDEX IX_Transactions_StripePaymentIntentId ON Transactions(StripePaymentIntentId);
+
+-- Payroll
+CREATE INDEX IX_PayrollRecords_EmployeeId ON PayrollRecords(EmployeeId);
+CREATE INDEX IX_PayrollRecords_PayrollPeriodId ON PayrollRecords(PayrollPeriodId);
+
+-- Audit Logs
+CREATE INDEX IX_AuditLogs_UserId ON AuditLogs(UserId);
+CREATE INDEX IX_AuditLogs_CreatedAt ON AuditLogs(CreatedAt);
+CREATE INDEX IX_AuditLogs_TableName ON AuditLogs(TableName);
+
+-- Products
+CREATE INDEX IX_Products_ProductCode ON Products(ProductCode);
+CREATE INDEX IX_Products_CurrentStock ON Products(CurrentStock);
+
+-- Purchase Orders
+CREATE INDEX IX_PurchaseOrders_PONumber ON PurchaseOrders(PONumber);
+CREATE INDEX IX_PurchaseOrders_SupplierId ON PurchaseOrders(SupplierId);
+CREATE INDEX IX_PurchaseOrders_Status ON PurchaseOrders(Status);
+
+GO
+
+PRINT 'MiddayMist Spa Database Schema Created Successfully!';
+PRINT 'Total Tables Created: 50+';
+PRINT 'Database: MiddayMistSpaDB';
+PRINT '';
+PRINT 'Next Steps:';
+PRINT '1. Verify database creation in SSMS';
+PRINT '2. Proceed to Entity Framework Models in VS Code';
+GO

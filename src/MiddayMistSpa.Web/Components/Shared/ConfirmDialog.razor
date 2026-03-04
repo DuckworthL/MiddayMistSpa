@@ -1,0 +1,42 @@
+@* Confirmation Dialog Component *@
+<Modal @bind-IsVisible="IsVisible" Title="@Title" Size="Modal.ModalSize.Small" Centered="true">
+    <ChildContent>
+        <p>@Message</p>
+    </ChildContent>
+    <FooterContent>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">@CancelText</button>
+        <button type="button" class="btn @ConfirmButtonClass" @onclick="Confirm">@ConfirmText</button>
+    </FooterContent>
+</Modal>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "Are you sure?";
+    [Parameter] public string ConfirmText { get; set; } = "Yes";
+    [Parameter] public string CancelText { get; set; } = "No";
+    [Parameter] public bool IsDanger { get; set; } = false;
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string ConfirmButtonClass => IsDanger ? "btn-danger" : "btn-primary";
+
+    private async Task Confirm()
+    {
+        await OnConfirm.InvokeAsync();
+        await Close();
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+}

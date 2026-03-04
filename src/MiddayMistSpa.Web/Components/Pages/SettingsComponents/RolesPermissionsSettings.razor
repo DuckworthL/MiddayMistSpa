@@ -1,0 +1,269 @@
+@* Roles & Permissions Settings Component *@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Roles & Permissions</h5>
+        <button class="btn btn-primary btn-sm" @onclick="ShowAddRoleModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Role
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="list-group">
+                    @foreach (var role in _roles)
+                    {
+                        <button type="button"
+                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(_selectedRole?.Id == role.Id ? "active" : "")"
+                            @onclick="() => SelectRole(role)">
+                            <div>
+                                <i class="bi @role.Icon me-2"></i>
+                                @role.Name
+                            </div>
+                            <span class="badge bg-secondary">@role.UserCount users</span>
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="col-md-8">
+                @if (_selectedRole != null)
+                {
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">@_selectedRole.Name Permissions</h6>
+                            @if (!_selectedRole.IsSystem)
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="DeleteRole">
+                                    <i class="bi bi-trash"></i> Delete Role
+                                </button>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (_selectedRole.IsSystem)
+                            {
+                                <div class="alert alert-info py-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    This is a system role. Some permissions cannot be modified.
+                                </div>
+                            }
+
+                            @foreach (var module in _permissionModules)
+                            {
+                                <div class="mb-4">
+                                    <h6 class="text-muted mb-2">@module.Name</h6>
+                                    <div class="row g-2">
+                                        @foreach (var permission in module.Permissions)
+                                        {
+                                            var permKey = $"{module.Key}.{permission.Key}";
+                                            var hasPermission = _selectedRole.Permissions.Contains(permKey);
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input type="checkbox" class="form-check-input" id="@permKey"
+                                                        checked="@hasPermission"
+                                                        disabled="@(_selectedRole.IsSystem && _selectedRole.Name == "Admin")"
+                                                        @onchange="() => TogglePermission(permKey)" />
+                                                    <label class="form-check-label" for="@permKey">
+                                                        @permission.Name
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="d-flex gap-2 mt-4">
+                                <button class="btn btn-primary" @onclick="SavePermissions">
+                                    <i class="bi bi-check-lg me-1"></i> Save Permissions
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="ResetPermissions">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-shield display-4"></i>
+                        <p class="mt-2">Select a role to view and edit permissions</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Add Role Modal *@
+@if (_showModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Role</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Role Name</label>
+                        <input type="text" class="form-control" @bind="_newRoleName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" rows="2" @bind="_newRoleDescription"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Copy Permissions From</label>
+                        <select class="form-select" @bind="_copyFromRoleId">
+                            <option value="0">-- Start with no permissions --</option>
+                            @foreach (var role in _roles)
+                            {
+                                <option value="@role.Id">@role.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="AddRole">Add Role</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<RoleModel> _roles = new()
+{
+new() { Id = 1, Name = "Admin", Icon = "bi-person-gear", IsSystem = true, UserCount = 1,
+Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
+"appointments.delete",
+"customers.view", "customers.create", "customers.edit", "customers.delete",
+"services.view", "services.create", "services.edit", "services.delete",
+"employees.view", "employees.create", "employees.edit", "employees.delete",
+"inventory.view", "inventory.manage", "pos.access", "pos.refund", "pos.discount",
+"payroll.view", "payroll.manage", "reports.view", "reports.export", "settings.access", "settings.manage" } },
+new() { Id = 2, Name = "Manager", Icon = "bi-person-badge", IsSystem = true, UserCount = 1,
+Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
+"customers.view", "customers.create", "customers.edit", "services.view", "services.edit",
+"employees.view", "employees.edit", "inventory.view", "inventory.manage",
+"pos.access", "pos.discount", "payroll.view", "reports.view", "reports.export" } },
+new() { Id = 3, Name = "Therapist", Icon = "bi-person-heart", IsSystem = true, UserCount = 3,
+Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "customers.view", "services.view" } },
+new() { Id = 4, Name = "Receptionist", Icon = "bi-person-workspace", IsSystem = true, UserCount = 1,
+Permissions = new HashSet<string> { "dashboard.view", "appointments.view", "appointments.create", "appointments.edit",
+"customers.view", "customers.create", "customers.edit", "pos.access" } }
+};
+
+    private List<PermissionModule> _permissionModules = new()
+{
+new() { Key = "dashboard", Name = "Dashboard", Permissions = new() { new("view", "View Dashboard") } },
+new() { Key = "appointments", Name = "Appointments", Permissions = new() {
+new("view", "View Appointments"), new("create", "Create Appointments"),
+new("edit", "Edit Appointments"), new("delete", "Delete Appointments") } },
+new() { Key = "customers", Name = "Customers", Permissions = new() {
+new("view", "View Customers"), new("create", "Add Customers"),
+new("edit", "Edit Customers"), new("delete", "Delete Customers") } },
+new() { Key = "services", Name = "Services", Permissions = new() {
+new("view", "View Services"), new("create", "Add Services"),
+new("edit", "Edit Services"), new("delete", "Delete Services") } },
+new() { Key = "employees", Name = "Employees", Permissions = new() {
+new("view", "View Employees"), new("create", "Add Employees"),
+new("edit", "Edit Employees"), new("delete", "Delete Employees") } },
+new() { Key = "inventory", Name = "Inventory", Permissions = new() {
+new("view", "View Inventory"), new("manage", "Manage Stock") } },
+new() { Key = "pos", Name = "Point of Sale", Permissions = new() {
+new("access", "Access POS"), new("refund", "Process Refunds"), new("discount", "Apply Discounts") } },
+new() { Key = "payroll", Name = "Payroll", Permissions = new() {
+new("view", "View Payroll"), new("manage", "Manage Payroll") } },
+new() { Key = "reports", Name = "Reports", Permissions = new() {
+new("view", "View Reports"), new("export", "Export Reports") } },
+new() { Key = "settings", Name = "Settings", Permissions = new() {
+new("access", "Access Settings"), new("manage", "Manage Settings") } }
+};
+
+    private RoleModel? _selectedRole = null;
+    private bool _showModal = false;
+    private string _newRoleName = "";
+    private string _newRoleDescription = "";
+    private int _copyFromRoleId = 0;
+
+    private void SelectRole(RoleModel role)
+    {
+        _selectedRole = role;
+    }
+
+    private void TogglePermission(string permKey)
+    {
+        if (_selectedRole == null) return;
+        if (_selectedRole.Permissions.Contains(permKey))
+            _selectedRole.Permissions.Remove(permKey);
+        else
+            _selectedRole.Permissions.Add(permKey);
+    }
+
+    private void SavePermissions()
+    {
+        // TODO: Save to API
+    }
+
+    private void ResetPermissions()
+    {
+        // TODO: Reset to original
+    }
+
+    private void ShowAddRoleModal()
+    {
+        _newRoleName = "";
+        _newRoleDescription = "";
+        _copyFromRoleId = 0;
+        _showModal = true;
+    }
+
+    private void AddRole()
+    {
+        var newRole = new RoleModel
+        {
+            Id = _roles.Max(r => r.Id) + 1,
+            Name = _newRoleName,
+            Icon = "bi-person",
+            IsSystem = false,
+            UserCount = 0,
+            Permissions = _copyFromRoleId > 0
+        ? new HashSet<string>(_roles.First(r => r.Id == _copyFromRoleId).Permissions)
+        : new HashSet<string>()
+        };
+        _roles.Add(newRole);
+        _showModal = false;
+        _selectedRole = newRole;
+    }
+
+    private void DeleteRole()
+    {
+        if (_selectedRole != null && !_selectedRole.IsSystem)
+        {
+            _roles.Remove(_selectedRole);
+            _selectedRole = null;
+        }
+    }
+
+    private class RoleModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Icon { get; set; } = "bi-person";
+        public bool IsSystem { get; set; }
+        public int UserCount { get; set; }
+        public HashSet<string> Permissions { get; set; } = new();
+    }
+
+    private class PermissionModule
+    {
+        public string Key { get; set; } = "";
+        public string Name { get; set; } = "";
+        public List<Permission> Permissions { get; set; } = new();
+    }
+
+    private record Permission(string Key, string Name);
+}

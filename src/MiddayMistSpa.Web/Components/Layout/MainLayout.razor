@@ -1,0 +1,266 @@
+﻿@inherits LayoutComponentBase
+@inject IAuthStateService AuthService
+@inject INotificationApiService NotificationService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="page @(sidebarExpanded ? "sidebar-expanded" : "")">
+    <div class="sidebar @(sidebarExpanded ? "show" : "")">
+        <NavMenu OnNavItemClicked="CloseSidebar" />
+    </div>
+
+    @* Mobile overlay *@
+    @if (sidebarExpanded)
+    {
+        <div class="sidebar-overlay" @onclick="ToggleSidebar"></div>
+    }
+
+    <main>
+        <div class="top-row">
+            <div class="d-flex align-items-center gap-3">
+                @* Mobile menu toggle *@
+                <button class="btn btn-link text-dark d-lg-none menu-toggle" @onclick="ToggleSidebar"
+                    title="Toggle Menu">
+                    <i class="bi @(sidebarExpanded ? "bi-x-lg" : "bi-list") fs-4"></i>
+                </button>
+                @{
+                    var currentDate = DateTime.Now.ToString("dddd, MMMM dd, yyyy");
+                }
+                <span class="text-muted small d-none d-md-inline">@currentDate</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 gap-md-3">
+                @* Notification Bell *@
+                <div class="dropdown">
+                    <button class="btn btn-link text-dark position-relative" type="button" data-bs-toggle="dropdown"
+                        @onclick="LoadNotifications"
+                        title="Notifications" style="overflow: visible;">
+                        <i class="bi bi-bell fs-5"></i>
+                        @if (_unreadCount > 0)
+                        {
+                            <span class="badge rounded-pill bg-danger"
+                                style="font-size: 0.55rem; position: absolute; top: -2px; right: -6px; min-width: 18px;">
+                                @(_unreadCount > 99 ? "99+" : _unreadCount.ToString())
+                            </span>
+                        }
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown">
+                        <li class="dropdown-header d-flex justify-content-between align-items-center">
+                            <strong>Notifications</strong>
+                            @if (_unreadCount > 0)
+                            {
+                                <span class="badge bg-primary rounded-pill">@_unreadCount</span>
+                            }
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        @if (_notifications.Any())
+                        {
+                            @foreach (var n in _notifications.Take(5))
+                            {
+                                <li>
+                                    <a class="dropdown-item d-flex gap-2 py-2 @(!n.IsRead ? "fw-semibold" : "")"
+                                       href="@(n.ActionUrl ?? "/notifications")"
+                                       @onclick="() => MarkAsRead(n)"
+                                       @onclick:preventDefault="@(n.ActionUrl == null)">
+                                        <i class="bi @GetNotificationIcon(n.Category) @GetNotificationIconColor(n.Category)"></i>
+                                        <div>
+                                            <div class="small @(!n.IsRead ? "fw-medium" : "")">@n.Title</div>
+                                            <div class="small text-muted">@n.TimeAgo</div>
+                                        </div>
+                                    </a>
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            <li>
+                                <div class="dropdown-item text-center text-muted small py-3">
+                                    <i class="bi bi-bell-slash me-1"></i>No notifications
+                                </div>
+                            </li>
+                        }
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <a class="dropdown-item text-center text-primary small" href="/notifications">
+                                View all notifications
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                @* User Dropdown *@
+                <div class="dropdown">
+                    <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button"
+                        data-bs-toggle="dropdown">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                            style="width: 32px; height: 32px;">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <span class="d-none d-md-inline">@GetDisplayName()</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end user-dropdown">
+                        <li class="dropdown-header">
+                            <strong>@GetDisplayName()</strong>
+                            <div class="small text-muted">@GetUserRole()</div>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li><a class="dropdown-item" href="/profile"><i class="bi bi-person me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                        <li>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <li>
+                            <button class="dropdown-item text-danger" @onclick="HandleLogout">
+                                <i class="bi bi-box-arrow-right me-2"></i>Logout
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool sidebarExpanded = false;
+    private List<NotificationResponse> _notifications = new();
+    private int _unreadCount = 0;
+    private System.Threading.Timer? _notificationTimer;
+
+    protected override void OnInitialized()
+    {
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefreshNotificationCount();
+            // Poll every 30 seconds for new notifications
+            _notificationTimer = new System.Threading.Timer(async _ =>
+            {
+                await RefreshNotificationCount();
+                await InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+    }
+
+    private async Task RefreshNotificationCount()
+    {
+        try
+        {
+            _unreadCount = await NotificationService.GetUnreadCountAsync();
+        }
+        catch
+        {
+            _unreadCount = 0;
+        }
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            _notifications = await NotificationService.GetMyNotificationsAsync();
+            _unreadCount = _notifications.Count(n => !n.IsRead);
+        }
+        catch
+        {
+            _notifications = new();
+        }
+    }
+
+    private async Task MarkAsRead(NotificationResponse notification)
+    {
+        if (!notification.IsRead)
+        {
+            try
+            {
+                await NotificationService.MarkAsReadAsync(notification.NotificationId);
+                notification.ReadAt = DateTime.UtcNow;
+                _unreadCount = Math.Max(0, _unreadCount - 1);
+            }
+            catch { }
+        }
+    }
+
+    private string GetNotificationIcon(string category) => category switch
+    {
+        "Appointment" => "bi-calendar-check",
+        "Inventory" => "bi-box-seam",
+        "Payroll" => "bi-cash-stack",
+        "Customer" => "bi-person-plus",
+        "Transaction" => "bi-receipt",
+        "System" => "bi-gear",
+        _ => "bi-bell"
+    };
+
+    private string GetNotificationIconColor(string category) => category switch
+    {
+        "Appointment" => "text-primary",
+        "Inventory" => "text-warning",
+        "Payroll" => "text-info",
+        "Customer" => "text-success",
+        "Transaction" => "text-secondary",
+        "System" => "text-dark",
+        _ => "text-muted"
+    };
+
+    private void ToggleSidebar()
+    {
+        sidebarExpanded = !sidebarExpanded;
+    }
+
+    private void CloseSidebar()
+    {
+        sidebarExpanded = false;
+    }
+
+    private string GetDisplayName()
+    {
+        if (AuthService.CurrentUser != null)
+        {
+            return !string.IsNullOrEmpty(AuthService.CurrentUser.FullName)
+            ? AuthService.CurrentUser.FullName
+            : AuthService.CurrentUser.Username;
+        }
+        return "User";
+    }
+
+    private string GetUserRole()
+    {
+        return AuthService.CurrentUser?.Role ?? "Guest";
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+        _notificationTimer?.Dispose();
+    }
+}

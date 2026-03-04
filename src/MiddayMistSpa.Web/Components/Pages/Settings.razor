@@ -1,0 +1,131 @@
+@page "/settings"
+@using MiddayMistSpa.Web.Components.Pages.SettingsComponents
+@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject NavigationManager Navigation
+
+<PageTitle>Settings - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage>
+    <div class="container-fluid fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1" style="color: #2C2C2C;">Settings</h1>
+                <p class="mb-0" style="color: #6B7280;">Manage system configuration and preferences</p>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            @* Settings Navigation *@
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body p-0">
+                        <nav class="nav flex-column settings-nav">
+                            <button class="nav-link @(_activeTab == "general" ? "active" : "")"
+                                    @onclick='() => _activeTab = "general"'>
+                                <i class="bi bi-gear me-2"></i> General
+                            </button>
+                            <button class="nav-link @(_activeTab == "business" ? "active" : "")"
+                                    @onclick='() => _activeTab = "business"'>
+                                <i class="bi bi-building me-2"></i> Business Info
+                            </button>
+                            <button class="nav-link @(_activeTab == "services" ? "active" : "")"
+                                    @onclick='() => _activeTab = "services"'>
+                                <i class="bi bi-gem me-2"></i> Service Categories
+                            </button>
+                            <button class="nav-link @(_activeTab == "users" ? "active" : "")"
+                                    @onclick='() => _activeTab = "users"'>
+                                <i class="bi bi-people me-2"></i> User Management
+                            </button>
+                            <button class="nav-link @(_activeTab == "security" ? "active" : "")"
+                                    @onclick='() => _activeTab = "security"'>
+                                <i class="bi bi-shield-lock me-2"></i> Security
+                            </button>
+                            <button class="nav-link @(_activeTab == "roles" ? "active" : "")"
+                                    @onclick='() => _activeTab = "roles"'>
+                                <i class="bi bi-shield-check me-2"></i> Roles & Permissions
+                            </button>
+                            <button class="nav-link @(_activeTab == "notifications" ? "active" : "")"
+                                    @onclick='() => _activeTab = "notifications"'>
+                                <i class="bi bi-bell me-2"></i> Notifications
+                            </button>
+                            <button class="nav-link @(_activeTab == "integrations" ? "active" : "")"
+                                    @onclick='() => _activeTab = "integrations"'>
+                                <i class="bi bi-hdd-network me-2"></i> API Services
+                            </button>
+                            <button class="nav-link @(_activeTab == "backup" ? "active" : "")"
+                                    @onclick='() => _activeTab = "backup"'>
+                                <i class="bi bi-cloud-upload me-2"></i> Backup & Restore
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            @* Settings Content *@
+            <div class="col-md-9">
+                @switch (_activeTab)
+                {
+                    case "general":
+                        <GeneralSettings />
+                        break;
+                    case "business":
+                        <BusinessInfoSettings />
+                        break;
+                    case "services":
+                        <ServiceCategorySettings />
+                        break;
+                    case "users":
+                        <UserManagementSettings />
+                        break;
+                    case "security":
+                        <SecuritySettings />
+                        break;
+                    case "roles":
+                        <RolesPermissionsSettings />
+                        break;
+                    case "notifications":
+                        <NotificationSettings />
+                        break;
+                    case "integrations":
+                        <IntegrationSettings />
+                        break;
+                    case "backup":
+                        <BackupSettings />
+                        break;
+                }
+            </div>
+        </div>
+    </div>
+</AuthorizedPage>
+
+<style>
+    .settings-nav .nav-link {
+        color: #6B7280;
+        padding: 0.875rem 1.25rem;
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+        background: none;
+        border-right: none;
+        border-top: none;
+        border-bottom: none;
+        text-align: left;
+        width: 100%;
+    }
+
+    .settings-nav .nav-link:hover {
+        background: #F3F4F6;
+        color: #6A9C89;
+    }
+
+    .settings-nav .nav-link.active {
+        background: #E8F2EE;
+        color: #6A9C89;
+        border-left-color: #6A9C89;
+        font-weight: 500;
+    }
+</style>
+
+@code {
+    private string _activeTab = "general";
+}

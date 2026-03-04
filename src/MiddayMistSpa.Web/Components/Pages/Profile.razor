@@ -1,0 +1,462 @@
+@page "/profile"
+@inject IAuthStateService AuthService
+@inject IProfileApiService ProfileService
+@inject NavigationManager Navigation
+
+<PageTitle>My Profile - MiddayMist Spa</PageTitle>
+
+<div class="profile-page">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="page-header mb-4">
+                    <h1 class="page-title">
+                        <i class="bi bi-person-circle me-2"></i>My Profile
+                    </h1>
+                    <p class="text-muted">Manage your account settings and preferences</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Profile Card -->
+            <div class="col-lg-4 mb-4">
+                <div class="card profile-card h-100">
+                    <div class="card-body text-center">
+                        <div class="profile-avatar mx-auto mb-3">
+                            <i class="bi bi-person-fill"></i>
+                        </div>
+                        <h4 class="profile-name">@_userFullName</h4>
+                        <span class="badge bg-primary-subtle text-primary mb-3">@_userRole</span>
+                        <p class="text-muted small mb-0">@_userEmail</p>
+                        <p class="text-muted small">Member since @_memberSince</p>
+                        <hr>
+                        <div class="profile-stats">
+                            <div class="stat-item">
+                                <span class="stat-value">@_lastLoginText</span>
+                                <span class="stat-label">Last Login</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Details -->
+            <div class="col-lg-8">
+                <!-- Personal Information -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-person me-2"></i>Personal Information</h5>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="ToggleEditMode">
+                            <i class="bi @(_isEditing ? "bi-x" : "bi-pencil") me-1"></i>
+                            @(_isEditing ? "Cancel" : "Edit")
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="_profileModel" OnValidSubmit="SaveProfile">
+                            <DataAnnotationsValidator />
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">First Name</label>
+                                    <InputText @bind-Value="_profileModel.FirstName" class="form-control"
+                                        disabled="@(!_isEditing)" />
+                                    <ValidationMessage For="@(() => _profileModel.FirstName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Last Name</label>
+                                    <InputText @bind-Value="_profileModel.LastName" class="form-control"
+                                        disabled="@(!_isEditing)" />
+                                    <ValidationMessage For="@(() => _profileModel.LastName)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <InputText @bind-Value="_profileModel.Email" class="form-control"
+                                        disabled="@(!_isEditing)" />
+                                    <ValidationMessage For="@(() => _profileModel.Email)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Phone Number</label>
+                                    <InputText @bind-Value="_profileModel.PhoneNumber" class="form-control"
+                                        disabled="@(!_isEditing)" />
+                                </div>
+                            </div>
+                            @if (_isEditing)
+                            {
+                                <div class="mt-3">
+                                    <button type="submit" class="btn btn-primary" disabled="@_isSaving">
+                                        @if (_isSaving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                        }
+                                        <i class="bi bi-check-lg me-1"></i> Save Changes
+                                    </button>
+                                </div>
+                            }
+                        </EditForm>
+                    </div>
+                </div>
+
+                <!-- Change Password -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Change Password</h5>
+                    </div>
+                    <div class="card-body">
+                        <EditForm Model="_passwordModel" OnValidSubmit="ChangePassword">
+                            <DataAnnotationsValidator />
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Current Password</label>
+                                    <div class="input-group">
+                                        <InputText @bind-Value="_passwordModel.CurrentPassword"
+                                            type="@(_showCurrentPassword ? "text" : "password")" class="form-control" />
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => _showCurrentPassword = !_showCurrentPassword">
+                                            <i class="bi @(_showCurrentPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="@(() => _passwordModel.CurrentPassword)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">New Password</label>
+                                    <div class="input-group">
+                                        <InputText @bind-Value="_passwordModel.NewPassword"
+                                            type="@(_showNewPassword ? "text" : "password")" class="form-control" />
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => _showNewPassword = !_showNewPassword">
+                                            <i class="bi @(_showNewPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="@(() => _passwordModel.NewPassword)" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Confirm Password</label>
+                                    <div class="input-group">
+                                        <InputText @bind-Value="_passwordModel.ConfirmPassword"
+                                            type="@(_showConfirmPassword ? "text" : "password")" class="form-control" />
+                                        <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => _showConfirmPassword = !_showConfirmPassword">
+                                            <i class="bi @(_showConfirmPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                                        </button>
+                                    </div>
+                                    <ValidationMessage For="@(() => _passwordModel.ConfirmPassword)" />
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button type="submit" class="btn btn-warning" disabled="@_isChangingPassword">
+                                    @if (_isChangingPassword)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-key me-1"></i> Update Password
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+
+                <!-- Activity & Security -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-activity me-2"></i>Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-list">
+                            @foreach (var activity in _recentActivities)
+                            {
+                                <div class="activity-item d-flex align-items-center py-2 border-bottom">
+                                    <div class="activity-icon me-3">
+                                        <i class="bi @activity.Icon text-@activity.Color"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <p class="mb-0">@activity.Description</p>
+                                        <small class="text-muted">@activity.Time</small>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast show bg-success text-white" role="alert">
+            <div class="toast-body d-flex align-items-center">
+                <i class="bi bi-check-circle me-2"></i>
+                @_successMessage
+                <button type="button" class="btn-close btn-close-white ms-auto"
+                    @onclick="() => _successMessage = null"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast show bg-danger text-white" role="alert">
+            <div class="toast-body d-flex align-items-center">
+                <i class="bi bi-exclamation-circle me-2"></i>
+                @_errorMessage
+                <button type="button" class="btn-close btn-close-white ms-auto"
+                    @onclick="() => _errorMessage = null"></button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .profile-page {
+        min-height: 100vh;
+        background: var(--bg-light, #F8FAF8);
+    }
+
+    .profile-card {
+        border: 1px solid #E5E7EB;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, #3D5A4F 0%, #2A3F36 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: white;
+    }
+
+    .profile-name {
+        font-weight: 700;
+        color: #2C2C2C;
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-stats {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        display: block;
+        font-weight: 600;
+        color: #3D5A4F;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6B7280;
+    }
+
+    .card {
+        border: 1px solid #E5E7EB;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-header {
+        background: transparent;
+        border-bottom: 1px solid #E5E7EB;
+        padding: 1rem 1.5rem;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        background: #F3F4F6;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .activity-icon i {
+        font-size: 1.1rem;
+    }
+</style>
+
+@code {
+    private ProfileModel _profileModel = new();
+    private PasswordModel _passwordModel = new();
+    private bool _isEditing;
+    private bool _isSaving;
+    private bool _isChangingPassword;
+    private bool _showCurrentPassword;
+    private bool _showNewPassword;
+    private bool _showConfirmPassword;
+    private string? _successMessage;
+    private string? _errorMessage;
+
+    private string _userFullName = "Loading...";
+    private string _userRole = "User";
+    private string _userEmail = "";
+    private string _memberSince = "N/A";
+    private string _lastLoginText = "Just now";
+
+    private List<ActivityItem> _recentActivities = new()
+{
+new() { Icon = "bi-box-arrow-in-right", Color = "success", Description = "Logged in successfully", Time = "Just now" },
+new() { Icon = "bi-person-check", Color = "primary", Description = "Profile information updated", Time = "2 days ago" },
+new() { Icon = "bi-key", Color = "warning", Description = "Password changed", Time = "1 week ago" }
+};
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        LoadUserProfile();
+    }
+
+    private void LoadUserProfile()
+    {
+        var user = AuthService.CurrentUser;
+        if (user != null)
+        {
+            _userFullName = user.FullName ?? user.Username;
+            _userRole = user.Role ?? "User";
+            _userEmail = user.Email ?? "";
+            _memberSince = "January 2026";
+
+            // Parse FullName into first/last if available
+            var nameParts = (user.FullName ?? "").Split(' ', 2);
+            _profileModel.FirstName = nameParts.Length > 0 ? nameParts[0] : "";
+            _profileModel.LastName = nameParts.Length > 1 ? nameParts[1] : "";
+            _profileModel.Email = user.Email ?? "";
+            _profileModel.PhoneNumber = "";
+        }
+    }
+
+    private void ToggleEditMode()
+    {
+        _isEditing = !_isEditing;
+        if (!_isEditing)
+        {
+            LoadUserProfile();
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Profile updates are handled locally for now
+            // In a full implementation, this would call an API to update the user profile
+            await Task.CompletedTask;
+            _successMessage = "Profile updated successfully!";
+            _isEditing = false;
+
+            // Update displayed name
+            _userFullName = $"{_profileModel.FirstName} {_profileModel.LastName}";
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Failed to update profile. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        if (_passwordModel.NewPassword != _passwordModel.ConfirmPassword)
+        {
+            _errorMessage = "New passwords do not match.";
+            return;
+        }
+
+        _isChangingPassword = true;
+        _errorMessage = null;
+
+        try
+        {
+            var request = new ChangePasswordRequest
+            {
+                CurrentPassword = _passwordModel.CurrentPassword,
+                NewPassword = _passwordModel.NewPassword,
+                ConfirmPassword = _passwordModel.ConfirmPassword
+            };
+
+            var result = await ProfileService.ChangePasswordAsync(request);
+
+            if (result?.Success == true)
+            {
+                _successMessage = "Password changed successfully!";
+                _passwordModel = new PasswordModel();
+            }
+            else
+            {
+                _errorMessage = result?.Message ?? "Failed to change password.";
+                if (result?.ValidationErrors?.Any() == true)
+                {
+                    _errorMessage += " " + string.Join(" ", result.ValidationErrors);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Failed to change password. Please try again.";
+        }
+        finally
+        {
+            _isChangingPassword = false;
+        }
+    }
+
+    public class ProfileModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FirstName { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string LastName { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        public string PhoneNumber { get; set; } = "";
+    }
+
+    public class PasswordModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string CurrentPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(8)]
+        public string NewPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string ConfirmPassword { get; set; } = "";
+    }
+
+    public class ActivityItem
+    {
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Time { get; set; } = "";
+    }
+}

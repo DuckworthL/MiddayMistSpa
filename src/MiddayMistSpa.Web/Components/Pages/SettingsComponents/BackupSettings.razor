@@ -1,0 +1,349 @@
+@* Backup & Restore Settings Component *@
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cloud-arrow-up me-2"></i>Backup & Restore</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            @* Backup Section *@
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-cloud-upload me-2"></i>Create Backup</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Create a complete backup of your database and settings.</p>
+
+                        <div class="mb-3">
+                            <label class="form-label">Backup Name (Optional)</label>
+                            <input type="text" class="form-control" @bind="_backupName"
+                                placeholder="e.g., Before-Update-2024" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Include in Backup</label>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="incDb" @bind="_includeDatabase" />
+                                <label class="form-check-label" for="incDb">Database (Customers, Appointments,
+                                    Transactions)</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="incSettings"
+                                    @bind="_includeSettings" />
+                                <label class="form-check-label" for="incSettings">Application Settings</label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="incMedia" @bind="_includeMedia" />
+                                <label class="form-check-label" for="incMedia">Media & Uploads</label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" @onclick="CreateBackup" disabled="@_isCreatingBackup">
+                            @if (_isCreatingBackup)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-download me-1"></i>
+                                <span>Create Backup</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @* Auto Backup Settings *@
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Automatic Backups</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input type="checkbox" class="form-check-input" id="autoBackup"
+                                @bind="_autoBackupSettings.Enabled" />
+                            <label class="form-check-label" for="autoBackup">Enable Automatic Backups</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Frequency</label>
+                            <select class="form-select" @bind="_autoBackupSettings.Frequency"
+                                disabled="@(!_autoBackupSettings.Enabled)">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Time</label>
+                            <input type="time" class="form-control" value="@_autoBackupSettings.Time"
+                                @onchange="HandleTimeChange" disabled="@(!_autoBackupSettings.Enabled)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Retention (keep last N backups)</label>
+                            <input type="number" class="form-control" @bind="_autoBackupSettings.RetentionCount" min="1"
+                                max="30" disabled="@(!_autoBackupSettings.Enabled)" />
+                        </div>
+
+                        <button class="btn btn-outline-primary" @onclick="SaveAutoBackupSettings">
+                            Save Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @* Backup History *@
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-archive me-2"></i>Backup History</h6>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="RefreshBackups">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Backup Name</th>
+                                        <th>Date</th>
+                                        <th>Size</th>
+                                        <th>Type</th>
+                                        <th>Contents</th>
+                                        <th style="width: 150px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var backup in _backups)
+                                    {
+                                        <tr>
+                                            <td class="fw-medium">@backup.Name</td>
+                                            <td>@backup.CreatedAt.ToString("MMM dd, yyyy HH:mm")</td>
+                                            <td>@backup.Size</td>
+                                            <td>
+                                                <span
+                                                    class="badge @(backup.Type == "Auto" ? "bg-info" : "bg-secondary")">@backup.Type</span>
+                                            </td>
+                                            <td>
+                                                @if (backup.IncludesDatabase)
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">DB</span>
+                                                }
+                                                @if (backup.IncludesSettings)
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">Settings</span>
+                                                }
+                                                @if (backup.IncludesMedia)
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">Media</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-link btn-sm p-1"
+                                                    @onclick="() => DownloadBackup(backup)" title="Download">
+                                                    <i class="bi bi-download text-primary"></i>
+                                                </button>
+                                                <button class="btn btn-link btn-sm p-1"
+                                                    @onclick="() => RestoreBackup(backup)" title="Restore">
+                                                    <i class="bi bi-arrow-counterclockwise text-warning"></i>
+                                                </button>
+                                                <button class="btn btn-link btn-sm p-1"
+                                                    @onclick="() => DeleteBackup(backup)" title="Delete">
+                                                    <i class="bi bi-trash text-danger"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (!_backups.Any())
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-archive display-4"></i>
+                                <p class="mt-2">No backups yet</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Restore Section *@
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Restore from File
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            <strong>Warning:</strong> Restoring from a backup will overwrite current data. This action
+                            cannot be undone.
+                        </div>
+
+                        <div class="row align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label">Upload Backup File</label>
+                                <input type="file" class="form-control" accept=".zip,.bak" />
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-warning" disabled>
+                                    <i class="bi bi-upload me-1"></i> Restore
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Restore Confirmation Modal *@
+@if (_showRestoreModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Confirm Restore</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showRestoreModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to restore from backup:</p>
+                    <p class="fw-bold">@_selectedBackup?.Name</p>
+                    <p class="text-danger">This will overwrite all current data. This action cannot be undone!</p>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="confirmRestore" @bind="_confirmRestore" />
+                        <label class="form-check-label" for="confirmRestore">I understand and want to proceed</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showRestoreModal = false">Cancel</button>
+                    <button class="btn btn-warning" @onclick="ConfirmRestore" disabled="@(!_confirmRestore)">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _backupName = "";
+    private bool _includeDatabase = true;
+    private bool _includeSettings = true;
+    private bool _includeMedia = false;
+    private bool _isCreatingBackup = false;
+
+    private AutoBackupSettings _autoBackupSettings = new()
+    {
+        Enabled = true,
+        Frequency = "daily",
+        Time = "02:00",
+        RetentionCount = 7
+    };
+
+    private List<BackupModel> _backups = new()
+{
+new() { Id = 1, Name = "Auto-Backup-20240115", CreatedAt = DateTime.Now.AddDays(-1), Size = "45.2 MB", Type = "Auto",
+IncludesDatabase = true, IncludesSettings = true, IncludesMedia = false },
+new() { Id = 2, Name = "Auto-Backup-20240114", CreatedAt = DateTime.Now.AddDays(-2), Size = "44.8 MB", Type = "Auto",
+IncludesDatabase = true, IncludesSettings = true, IncludesMedia = false },
+new() { Id = 3, Name = "Pre-Update-Backup", CreatedAt = DateTime.Now.AddDays(-5), Size = "52.1 MB", Type = "Manual",
+IncludesDatabase = true, IncludesSettings = true, IncludesMedia = true },
+new() { Id = 4, Name = "Auto-Backup-20240110", CreatedAt = DateTime.Now.AddDays(-6), Size = "43.5 MB", Type = "Auto",
+IncludesDatabase = true, IncludesSettings = true, IncludesMedia = false }
+};
+
+    private bool _showRestoreModal = false;
+    private BackupModel? _selectedBackup = null;
+    private bool _confirmRestore = false;
+
+    private async Task CreateBackup()
+    {
+        _isCreatingBackup = true;
+        await Task.Delay(2000); // Simulate backup creation
+
+        var newBackup = new BackupModel
+        {
+            Id = _backups.Max(b => b.Id) + 1,
+            Name = string.IsNullOrEmpty(_backupName) ? $"Manual-Backup-{DateTime.Now:yyyyMMdd-HHmm}" : _backupName,
+            CreatedAt = DateTime.Now,
+            Size = "48.3 MB",
+            Type = "Manual",
+            IncludesDatabase = _includeDatabase,
+            IncludesSettings = _includeSettings,
+            IncludesMedia = _includeMedia
+        };
+
+        _backups.Insert(0, newBackup);
+        _backupName = "";
+        _isCreatingBackup = false;
+    }
+
+    private void SaveAutoBackupSettings()
+    {
+        // TODO: Save to API
+    }
+
+    private void HandleTimeChange(ChangeEventArgs e)
+    {
+        _autoBackupSettings.Time = e.Value?.ToString() ?? "02:00";
+    }
+
+    private void RefreshBackups()
+    {
+        // TODO: Refresh from API
+    }
+
+    private void DownloadBackup(BackupModel backup)
+    {
+        // TODO: Trigger download
+    }
+
+    private void RestoreBackup(BackupModel backup)
+    {
+        _selectedBackup = backup;
+        _confirmRestore = false;
+        _showRestoreModal = true;
+    }
+
+    private void ConfirmRestore()
+    {
+        // TODO: Perform restore
+        _showRestoreModal = false;
+    }
+
+    private void DeleteBackup(BackupModel backup)
+    {
+        _backups.Remove(backup);
+    }
+
+    private class AutoBackupSettings
+    {
+        public bool Enabled { get; set; }
+        public string Frequency { get; set; } = "daily";
+        public string Time { get; set; } = "02:00";
+        public int RetentionCount { get; set; } = 7;
+    }
+
+    private class BackupModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public string Size { get; set; } = "";
+        public string Type { get; set; } = "Manual";
+        public bool IncludesDatabase { get; set; }
+        public bool IncludesSettings { get; set; }
+        public bool IncludesMedia { get; set; }
+    }
+}

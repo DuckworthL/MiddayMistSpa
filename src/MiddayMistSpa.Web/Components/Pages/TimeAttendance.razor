@@ -1,0 +1,1004 @@
+@page "/time-attendance"
+@inject IEmployeeApiService EmployeeService
+@inject ITimeAttendanceApiService TimeAttendanceService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Time & Attendance - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="InitializeData">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Time & Attendance</h1>
+                <p class="text-muted mb-0">Track employee hours and attendance</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" @onclick="ShowManualEntryModal">
+                    <i class="bi bi-pencil-square me-1"></i> Manual Entry
+                </button>
+                <button class="btn btn-primary" @onclick="ShowClockModal">
+                    <i class="bi bi-clock me-1"></i> Clock In/Out
+                </button>
+            </div>
+        </div>
+
+        @* Current Status *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <StatCard Title="Clocked In" Value="@_clockedInCount.ToString()" Icon="bi-person-check"
+                          Color="StatCard.CardColor.Success" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="On Break" Value="@_onBreakCount.ToString()" Icon="bi-cup-hot"
+                          Color="StatCard.CardColor.Warning" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Clocked Out" Value="@_clockedOutCount.ToString()" Icon="bi-box-arrow-right"
+                          Color="StatCard.CardColor.Info" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Not Yet In" Value="@_notYetInCount.ToString()" Icon="bi-person-dash"
+                          Color="StatCard.CardColor.Secondary" />
+            </div>
+        </div>
+
+        @* Date Navigation *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary" @onclick="PreviousWeek">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="GoToCurrentWeek">This Week</button>
+                            <button class="btn btn-outline-secondary" @onclick="NextWeek"
+                                    disabled="@(_weekEnd >= DateTime.Today)">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <h5 class="mb-0">@_weekStart.ToString("MMM dd") - @_weekEnd.ToString("MMM dd, yyyy")</h5>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @onchange="OnEmployeeFilterChange">
+                            <option value="">All Employees</option>
+                            @foreach (var emp in _employeeLookup)
+                            {
+                                <option value="@emp.Id">@emp.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading time records..." />
+        }
+        else
+        {
+            @* Live Status *@
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0"><i class="bi bi-activity text-success me-2"></i>Current Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        @foreach (var status in _liveStatus)
+                        {
+                            var bgClass = status.Status switch
+                            {
+                                "ClockedIn" => "bg-success bg-opacity-10",
+                                "OnBreak" => "bg-warning bg-opacity-10",
+                                "ClockedOut" => "bg-info bg-opacity-10",
+                                _ => "bg-light"
+                            };
+                            var circleColor = status.Status switch
+                            {
+                                "ClockedIn" => "success",
+                                "OnBreak" => "warning",
+                                "ClockedOut" => "info",
+                                _ => "secondary"
+                            };
+                            var textClass = status.Status switch
+                            {
+                                "ClockedIn" => "text-success",
+                                "OnBreak" => "text-warning",
+                                "ClockedOut" => "text-info",
+                                _ => "text-muted"
+                            };
+                            <div class="col-md-4 col-lg-3">
+                                <div class="d-flex align-items-center p-2 rounded @bgClass">
+                                    <div class="position-relative me-3">
+                                        <div class="bg-@circleColor text-white rounded-circle d-flex align-items-center justify-content-center"
+                                             style="width: 40px; height: 40px;">
+                                            @status.Initials
+                                        </div>
+                                        @if (status.Status == "OnBreak")
+                                        {
+                                            <span
+                                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning">
+                                                <i class="bi bi-cup-hot-fill"></i>
+                                            </span>
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="fw-medium">@status.EmployeeName</div>
+                                        <small class="@textClass">
+                                            @switch (status.Status)
+                                            {
+                                                case "ClockedIn":
+                                                    <text>In since @status.ClockIn?.ToString("h:mm tt")</text>
+                                                    break;
+                                                case "OnBreak":
+                                                    <text>On Break since @status.BreakStart?.ToString("h:mm tt")</text>
+                                                    break;
+                                                case "ClockedOut":
+                                                    <text>Out at @status.ClockOut?.ToString("h:mm tt")</text>
+                                                    break;
+                                                default:
+                                                    <text>Not yet in</text>
+                                                    break;
+                                            }
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Timesheet Table *@
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <span>Weekly Timesheet</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ExportTimesheet">
+                        <i class="bi bi-download me-1"></i> Export
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    @for (var d = 0; d < 7; d++)
+                                    {
+                                        var date = _weekStart.AddDays(d);
+                                        <th
+                                            class="text-center @(date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday ? "bg-light" : "")">
+                                            <div>@date.ToString("ddd")</div>
+                                            <small class="text-muted">@date.ToString("M/d")</small>
+                                        </th>
+                                    }
+                                    <th class="text-center">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var timesheet in _timesheets)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                     style="width: 30px; height: 30px; font-size: 0.75rem;">
+                                                    @timesheet.Initials
+                                                </div>
+                                                <div>
+                                                    <div class="fw-medium small">@timesheet.EmployeeName</div>
+                                                    <small class="text-muted">@timesheet.Position</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        @for (var d = 0; d < 7; d++)
+                                        {
+                                            var dayHours = timesheet.DailyHours.ElementAtOrDefault(d);
+                                            var isWeekend = _weekStart.AddDays(d).DayOfWeek == DayOfWeek.Saturday ||
+                                            _weekStart.AddDays(d).DayOfWeek == DayOfWeek.Sunday;
+                                            <td class="text-center @(isWeekend ? "bg-light" : "")">
+                                                @if (dayHours > 0)
+                                                {
+                                                    var hoursClass = dayHours >= 8 ? "bg-success" : dayHours >= 4 ? "bg-warning" :
+                                                    "bg-secondary";
+                                                    <span class="badge @hoursClass">
+                                                        @dayHours.ToString("N1")h
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                        }
+                                        <td class="text-center">
+                                            <strong class="@(timesheet.TotalHours >= 40 ? "text-success" : "")">
+                                                @timesheet.TotalHours.ToString("N1")h
+                                            </strong>
+                                            @if (timesheet.OvertimeHours > 0)
+                                            {
+                                                <br />
+
+                                                <small class="text-warning">+@timesheet.OvertimeHours.ToString("N1") OT</small>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @* Time Entries Table *@
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0">Time Entries</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Employee</th>
+                                    <th class="text-center">Clock In</th>
+                                    <th class="text-center">Clock Out</th>
+                                    <th class="text-center">Break</th>
+                                    <th class="text-center">Total Hours</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e =>
+                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
+                                {
+                                    <tr>
+                                        <td>@entry.Date.ToString("ddd, MMM dd")</td>
+                                        <td>@entry.EmployeeName</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-success">@entry.ClockIn.ToString("hh\\:mm")</span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (entry.ClockOut.HasValue)
+                                            {
+                                                <span class="badge bg-secondary">@entry.ClockOut.Value.ToString("hh\\:mm")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">Still In</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">@entry.BreakMinutes min</td>
+                                        <td class="text-center fw-medium">@entry.TotalHours.ToString("N2")h</td>
+                                        <td class="text-center">
+                                            @if (entry.IsApproved)
+                                            {
+                                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Approved</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">Pending</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" @onclick="() => EditTimeEntry(entry)"
+                                                        title="Edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                @if (!entry.IsApproved)
+                                                {
+                                                    <button class="btn btn-outline-success" @onclick="() => ApproveEntry(entry)"
+                                                            title="Approve">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Clock In/Out Modal *@
+    <Modal @bind-IsVisible="_showClockModal" Title="Clock In/Out">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Employee *</label>
+                @if (_isAdminUser)
+                {
+                    <select class="form-select form-select-lg" value="@_clockForm.EmployeeId"
+                            @onchange="OnEmployeeSelected">
+                        <option value="0">Select Employee...</option>
+                        @foreach (var emp in _employeeLookup)
+                        {
+                            <option value="@emp.Id">@emp.Name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <div class="form-control form-control-lg bg-light">
+                        <i class="bi bi-person-fill me-2"></i>@_currentEmployeeName
+                    </div>
+                }
+            </div>
+
+            @if (_selectedEmployeeStatus != null)
+            {
+                <div class="alert @(_selectedEmployeeStatus.IsClockedIn ? "alert-success" : "alert-secondary")">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>
+                            @if (_selectedEmployeeStatus.IsClockedIn)
+                            {
+                                <i class="bi bi-check-circle me-2"></i>
+                                <text>Clocked in since @_selectedEmployeeStatus.ClockIn?.ToString("h:mm tt")</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-circle me-2"></i>
+                                <text>Not clocked in</text>
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <div class="text-center py-4">
+                    <div class="h1 mb-3">@DateTime.Now.ToString("h:mm:ss tt")</div>
+                    @if (_selectedEmployeeStatus.IsClockedIn)
+                    {
+                        <div class="d-flex justify-content-center gap-3">
+                            @if (!_selectedEmployeeStatus.OnBreak)
+                            {
+                                <button class="btn btn-warning btn-lg" @onclick="StartBreak">
+                                    <i class="bi bi-cup-hot me-2"></i> Start Break
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-info btn-lg" @onclick="EndBreak">
+                                    <i class="bi bi-cup me-2"></i> End Break
+                                </button>
+                            }
+                            <button class="btn btn-danger btn-lg" @onclick="ClockOut">
+                                <i class="bi bi-box-arrow-right me-2"></i> Clock Out
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="btn btn-success btn-lg px-5" @onclick="ClockIn">
+                            <i class="bi bi-box-arrow-in-right me-2"></i> Clock In
+                        </button>
+                    }
+                </div>
+            }
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showClockModal = false">Close</button>
+        </FooterContent>
+    </Modal>
+
+    @* Manual Entry Modal *@
+    <Modal @bind-IsVisible="_showManualEntryModal" Title="Manual Time Entry">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Employee *</label>
+                <select class="form-select" @bind="_manualEntry.EmployeeId">
+                    <option value="0">Select Employee...</option>
+                    @foreach (var emp in _employeeLookup)
+                    {
+                        <option value="@emp.Id">@emp.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Date *</label>
+                @{
+                    var maxDate = DateTime.Today.ToString("yyyy-MM-dd");
+                }
+                <input type="date" class="form-control" @bind="_manualEntry.Date" max="@maxDate" />
+            </div>
+            <div class="row mb-3">
+                <div class="col">
+                    <label class="form-label">Clock In *</label>
+                    <input type="time" class="form-control" @bind="_manualEntry.ClockIn" />
+                </div>
+                <div class="col">
+                    <label class="form-label">Clock Out *</label>
+                    <input type="time" class="form-control" @bind="_manualEntry.ClockOut" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Break (minutes)</label>
+                <input type="number" class="form-control" @bind="_manualEntry.BreakMinutes" min="0" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" rows="2" @bind="_manualEntry.Notes"
+                          placeholder="Reason for manual entry..."></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary"
+                    @onclick="() => _showManualEntryModal = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveManualEntry" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Entry
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private bool _isLoading = true;
+    private DateTime _weekStart;
+    private DateTime _weekEnd;
+    private int? _employeeFilter;
+
+    // Stats
+    private int _clockedInCount;
+    private int _onBreakCount;
+    private int _clockedOutCount;
+    private int _notYetInCount;
+    private decimal _todayHours;
+
+    // Data
+    private List<LookupItem> _employeeLookup = new();
+    private List<LiveStatusViewModel> _liveStatus = new();
+    private List<TimesheetViewModel> _timesheets = new();
+    private List<TimeEntryViewModel> _timeEntries = new();
+
+    // Clock modal
+    private bool _showClockModal;
+    private ClockFormModel _clockForm = new();
+    private LiveStatusViewModel? _selectedEmployeeStatus;
+    private bool _isAdminUser;
+    private string _currentEmployeeName = string.Empty;
+
+    // Manual entry modal
+    private bool _showManualEntryModal;
+    private bool _isSaving;
+    private ManualEntryFormModel _manualEntry = new();
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data loading moved to InitializeData, triggered by AuthorizedPage.OnAuthReady
+        SetCurrentWeek();
+    }
+
+    private async Task InitializeData()
+    {
+        // Check if user is admin/HR (can select other employees)
+        var userRole = AuthService.CurrentUser?.RoleName;
+        _isAdminUser = userRole == "SuperAdmin" || userRole == "Admin" || userRole == "HR";
+
+        await LoadTimeData();
+
+        // Build employee lookup from live status data (always available)
+        if (!_employeeLookup.Any() && _liveStatus.Any())
+        {
+            _employeeLookup = _liveStatus.Select(s => new LookupItem
+            {
+                Id = s.EmployeeId,
+                Name = s.EmployeeName
+            }).OrderBy(e => e.Name).ToList();
+        }
+
+        // Fallback: try the employees API
+        if (!_employeeLookup.Any())
+        {
+            await LoadEmployees();
+        }
+
+        // Get current employee's name if not admin
+        if (!_isAdminUser)
+        {
+            var currentEmployeeId = AuthService.CurrentUser?.EmployeeId;
+            if (currentEmployeeId.HasValue)
+            {
+                var emp = _employeeLookup.FirstOrDefault(e => e.Id == currentEmployeeId.Value);
+                _currentEmployeeName = emp?.Name ?? AuthService.CurrentUser?.FullName ?? "You";
+            }
+        }
+    }
+
+    private void SetCurrentWeek()
+    {
+        var today = DateTime.Today;
+        var diff = (int)today.DayOfWeek - (int)DayOfWeek.Monday;
+        if (diff < 0) diff += 7;
+        _weekStart = today.AddDays(-diff);
+        _weekEnd = _weekStart.AddDays(6);
+    }
+
+    private void PreviousWeek()
+    {
+        _weekStart = _weekStart.AddDays(-7);
+        _weekEnd = _weekStart.AddDays(6);
+        _ = LoadTimeData();
+    }
+
+    private void NextWeek()
+    {
+        _weekStart = _weekStart.AddDays(7);
+        _weekEnd = _weekStart.AddDays(6);
+        _ = LoadTimeData();
+    }
+
+    private void GoToCurrentWeek()
+    {
+        SetCurrentWeek();
+        _ = LoadTimeData();
+    }
+
+    private async Task OnEmployeeFilterChange(ChangeEventArgs e)
+    {
+        _employeeFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadTimeData();
+    }
+
+    private async Task LoadEmployees()
+    {
+        try
+        {
+            Console.WriteLine("TimeAttendance: LoadEmployees starting...");
+            var employees = await EmployeeService.GetEmployeesAsync(pageSize: 200);
+            Console.WriteLine($"TimeAttendance: Got {employees.Items.Count} employees (Total: {employees.TotalCount})");
+            _employeeLookup = employees.Items.Select(e => new LookupItem
+            {
+                Id = e.EmployeeId,
+                Name = e.FullName
+            }).ToList();
+            Console.WriteLine($"TimeAttendance: _employeeLookup has {_employeeLookup.Count} items");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"TimeAttendance: LoadEmployees ERROR: {ex.Message}");
+            _employeeLookup = new List<LookupItem>();
+        }
+    }
+
+    private async Task LoadTimeData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load live status from API
+            var liveStatusTask = TimeAttendanceService.GetLiveStatusAsync();
+            var attendanceTask = TimeAttendanceService.GetAttendanceAsync(_employeeFilter, null);
+
+            await Task.WhenAll(liveStatusTask, attendanceTask);
+
+            var liveStatus = await liveStatusTask;
+            var attendance = await attendanceTask;
+
+            // Convert API response to view models
+            var allLiveStatus = liveStatus.Select(s => new LiveStatusViewModel
+            {
+                EmployeeId = s.EmployeeId,
+                EmployeeName = s.EmployeeName,
+                Initials = !string.IsNullOrEmpty(s.Initials) ? s.Initials : GetInitials(s.EmployeeName),
+                IsClockedIn = s.IsClockedIn,
+                ClockIn = s.ClockIn,
+                ClockOut = s.ClockOut,
+                OnBreak = s.OnBreak,
+                BreakStart = s.BreakStart,
+                Status = s.Status ?? "NotYetIn"
+            }).ToList();
+
+            // Apply employee filter to live status
+            _liveStatus = _employeeFilter.HasValue
+                ? allLiveStatus.Where(s => s.EmployeeId == _employeeFilter.Value).ToList()
+                : allLiveStatus;
+
+            // Build timesheets and entries from attendance records
+            _timesheets = BuildTimesheetsFromAttendance(attendance);
+            _timeEntries = BuildTimeEntriesFromAttendance(attendance);
+
+            _clockedInCount = _liveStatus.Count(s => s.Status == "ClockedIn");
+            _onBreakCount = _liveStatus.Count(s => s.Status == "OnBreak");
+            _clockedOutCount = _liveStatus.Count(s => s.Status == "ClockedOut");
+            _notYetInCount = _liveStatus.Count(s => s.Status == "NotYetIn");
+            _todayHours = _timeEntries.Where(e => e.Date == DateTime.Today).Sum(e => e.TotalHours);
+        }
+        catch (Exception ex)
+        {
+            _alertMessage = $"Error loading data: {ex.Message}";
+            _alertType = Alert.AlertType.Error;
+            // Fall back to empty data
+            _liveStatus = new List<LiveStatusViewModel>();
+            _timesheets = new List<TimesheetViewModel>();
+            _timeEntries = new List<TimeEntryViewModel>();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+                ? $"{parts[0][0]}{parts[^1][0]}"
+        : parts.Length == 1 ? parts[0][..Math.Min(2, parts[0].Length)] : "";
+    }
+
+    private List<TimesheetViewModel> BuildTimesheetsFromAttendance(List<AttendanceRecordResponse> attendance)
+    {
+        var grouped = attendance
+        .GroupBy(a => a.EmployeeId)
+        .Select(g => new TimesheetViewModel
+        {
+            EmployeeName = g.First().EmployeeName,
+            Initials = GetInitials(g.First().EmployeeName),
+            Position = g.First().Position ?? "Staff",
+            DailyHours = GetDailyHours(g.ToList())
+        })
+        .ToList();
+        return grouped;
+    }
+
+    private decimal[] GetDailyHours(List<AttendanceRecordResponse> records)
+    {
+        var hours = new decimal[7];
+        foreach (var record in records)
+        {
+            var dayIndex = ((int)record.Date.DayOfWeek - 1 + 7) % 7; // Monday = 0
+            if (dayIndex >= 0 && dayIndex < 7)
+            {
+                hours[dayIndex] += record.TotalHours;
+            }
+        }
+        return hours;
+    }
+
+    private List<TimeEntryViewModel> BuildTimeEntriesFromAttendance(List<AttendanceRecordResponse> attendance)
+    {
+        return attendance
+        .Where(a => a.ClockIn.HasValue) // Only include records with clock-in
+        .Select(a => new TimeEntryViewModel
+        {
+            EmployeeName = a.EmployeeName,
+            Date = a.Date,
+            ClockIn = a.ClockIn!.Value.TimeOfDay,
+            ClockOut = a.ClockOut?.TimeOfDay,
+            BreakMinutes = (int)a.BreakMinutes,
+            IsApproved = a.IsApproved
+        }).OrderByDescending(e => e.Date).ThenBy(e => e.EmployeeName).ToList();
+    }
+
+    // Clock Modal
+    private void ShowClockModal()
+    {
+        _clockForm = new ClockFormModel();
+
+        // Auto-select the logged-in employee if they have an EmployeeId
+        var currentEmployeeId = AuthService.CurrentUser?.EmployeeId;
+        if (currentEmployeeId.HasValue && currentEmployeeId.Value > 0)
+        {
+            _clockForm.EmployeeId = currentEmployeeId.Value;
+            _selectedEmployeeStatus = _liveStatus.FirstOrDefault(s => s.EmployeeId == currentEmployeeId.Value);
+        }
+        else
+        {
+            _selectedEmployeeStatus = null;
+        }
+
+        _showClockModal = true;
+    }
+
+    private void OnEmployeeSelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id))
+        {
+            _clockForm.EmployeeId = id;
+            _selectedEmployeeStatus = _liveStatus.FirstOrDefault(s => s.EmployeeId == id);
+        }
+    }
+
+    private async Task ClockIn()
+    {
+        if (_clockForm.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+
+        try
+        {
+            var (result, errorMessage) = await TimeAttendanceService.ClockInWithErrorAsync(_clockForm.EmployeeId);
+            if (result != null)
+            {
+                ShowAlert($"{result.EmployeeName} clocked in at {result.ClockIn:h:mm tt}", Alert.AlertType.Success);
+                _showClockModal = false;
+                await LoadTimeData();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to clock in. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private async Task ClockOut()
+    {
+        if (_clockForm.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+
+        try
+        {
+            var (result, errorMessage) = await TimeAttendanceService.ClockOutWithErrorAsync(_clockForm.EmployeeId);
+            if (result != null)
+            {
+                ShowAlert($"{result.EmployeeName} clocked out at {result.ClockOut:h:mm tt}", Alert.AlertType.Success);
+                _showClockModal = false;
+                await LoadTimeData();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to clock out. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private async Task StartBreak()
+    {
+        if (_clockForm.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+
+        try
+        {
+            var result = await TimeAttendanceService.StartBreakAsync(_clockForm.EmployeeId);
+            if (result != null)
+            {
+                ShowAlert($"Break started at {DateTime.Now:h:mm tt}", Alert.AlertType.Info);
+                await LoadTimeData();
+            }
+            else
+            {
+                ShowAlert("Failed to start break.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private async Task EndBreak()
+    {
+        if (_clockForm.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+
+        try
+        {
+            var result = await TimeAttendanceService.EndBreakAsync(_clockForm.EmployeeId);
+            if (result != null)
+            {
+                ShowAlert("Break ended", Alert.AlertType.Info);
+                await LoadTimeData();
+            }
+            else
+            {
+                ShowAlert("Failed to end break.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    // Manual Entry Modal
+    private void ShowManualEntryModal()
+    {
+        _manualEntry = new ManualEntryFormModel { Date = DateTime.Today };
+        _showManualEntryModal = true;
+    }
+
+    private async Task SaveManualEntry()
+    {
+        if (_manualEntry.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+        if (!_manualEntry.ClockIn.HasValue)
+        {
+            ShowAlert("Clock In time is required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await TimeAttendanceService.CreateManualEntryAsync(new CreateManualEntryRequest
+            {
+                EmployeeId = _manualEntry.EmployeeId,
+                Date = _manualEntry.Date,
+                ClockIn = _manualEntry.Date.Date + _manualEntry.ClockIn.Value.ToTimeSpan(),
+                ClockOut = _manualEntry.ClockOut.HasValue ? _manualEntry.Date.Date + _manualEntry.ClockOut.Value.ToTimeSpan() : null,
+                BreakMinutes = _manualEntry.BreakMinutes,
+                Notes = _manualEntry.Notes
+            });
+
+            if (result != null)
+            {
+                ShowAlert("Time entry saved successfully!", Alert.AlertType.Success);
+                _showManualEntryModal = false;
+                await LoadTimeData();
+            }
+            else
+            {
+                ShowAlert("Failed to save entry. The employee may already have a record for that date.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error saving entry: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void EditTimeEntry(TimeEntryViewModel entry)
+    {
+        // Find the employee ID by name from lookup
+        var emp = _employeeLookup.FirstOrDefault(e => e.Name == entry.EmployeeName);
+        _manualEntry = new ManualEntryFormModel
+        {
+            EmployeeId = emp?.Id ?? 0,
+            Date = entry.Date,
+            ClockIn = TimeOnly.FromTimeSpan(entry.ClockIn),
+            ClockOut = entry.ClockOut.HasValue ? TimeOnly.FromTimeSpan(entry.ClockOut.Value) : null,
+            BreakMinutes = entry.BreakMinutes
+        };
+        _showManualEntryModal = true;
+    }
+
+    private async Task ApproveEntry(TimeEntryViewModel entry)
+    {
+        entry.IsApproved = true;
+        ShowAlert("Time entry approved.", Alert.AlertType.Success);
+        await Task.CompletedTask;
+    }
+
+    private async Task ExportTimesheet()
+    {
+        try
+        {
+            var q = '"';
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("MiddayMist Spa - Time & Attendance Report");
+            sb.AppendLine($"Period: {_weekStart:MMM dd, yyyy} to {_weekEnd:MMM dd, yyyy}");
+            sb.AppendLine();
+            sb.AppendLine("Employee,Date,Clock In,Clock Out,Break (min),Total Hours,Approved");
+            foreach (var entry in _timeEntries.OrderBy(e => e.EmployeeName).ThenBy(e => e.Date))
+            {
+                var clockOut = entry.ClockOut.HasValue ? entry.ClockOut.Value.ToString(@"hh\:mm") : "";
+                var approved = entry.IsApproved ? "Yes" : "No";
+                sb.AppendLine($"{q}{entry.EmployeeName}{q},{entry.Date:yyyy-MM-dd},{entry.ClockIn:hh\\:mm},{clockOut},{entry.BreakMinutes},{entry.TotalHours:N2},{approved}");
+            }
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Timesheet_{_weekStart:yyyyMMdd}_{_weekEnd:yyyyMMdd}.csv", "text/csv",
+base64);
+            ShowAlert("Timesheet exported successfully!", Alert.AlertType.Success);
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+
+    // View Models
+    private class LiveStatusViewModel
+    {
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string Initials { get; set; } = string.Empty;
+        public bool IsClockedIn { get; set; }
+        public DateTime? ClockIn { get; set; }
+        public DateTime? ClockOut { get; set; }
+        public bool OnBreak { get; set; }
+        public DateTime? BreakStart { get; set; }
+        /// <summary>NotYetIn | ClockedIn | OnBreak | ClockedOut</summary>
+        public string Status { get; set; } = "NotYetIn";
+    }
+
+    private class TimesheetViewModel
+    {
+        public string EmployeeName { get; set; } = string.Empty;
+        public string Initials { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public decimal[] DailyHours { get; set; } = new decimal[7];
+        public decimal TotalHours => DailyHours.Sum();
+        public decimal OvertimeHours => Math.Max(0, TotalHours - 40);
+    }
+
+    private class TimeEntryViewModel
+    {
+        public string EmployeeName { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public TimeSpan ClockIn { get; set; }
+        public TimeSpan? ClockOut { get; set; }
+        public int BreakMinutes { get; set; }
+        public bool IsApproved { get; set; }
+        public decimal TotalHours => ClockOut.HasValue
+        ? (decimal)(ClockOut.Value - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours
+        : (decimal)(DateTime.Now.TimeOfDay - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours;
+    }
+
+    private class ClockFormModel
+    {
+        public int EmployeeId { get; set; }
+    }
+
+    private class ManualEntryFormModel
+    {
+        public int EmployeeId { get; set; }
+        public DateTime Date { get; set; }
+        public TimeOnly? ClockIn { get; set; }
+        public TimeOnly? ClockOut { get; set; }
+        public int BreakMinutes { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+}

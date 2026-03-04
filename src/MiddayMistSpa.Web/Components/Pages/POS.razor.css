@@ -1,0 +1,177 @@
+/* ============================================
+   POS Page - Scoped Styles (Additional)
+   Note: Most styles come from app.css
+   These are page-specific overrides
+   ============================================ */
+
+/* Cart item layout */
+.cart-item-row-top {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.cart-item-row-bottom {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-left: 1rem;
+}
+
+.cart-item-qty {
+    margin-left: auto;
+}
+
+/* Discount section */
+.discount-section {
+    padding: 0.75rem 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Summary rows */
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.375rem 0;
+    font-size: 0.9375rem;
+}
+
+.summary-row.total {
+    border-top: 2px solid rgba(0, 0, 0, 0.08);
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+/* Payment section */
+.payment-section {
+    margin-bottom: 1rem;
+}
+
+.payment-methods {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.payment-method {
+    padding: 0.75rem;
+    border: 2px solid rgba(0, 0, 0, 0.08);
+    border-radius: var(--radius-md);
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: all var(--transition-fast);
+}
+
+.payment-method:hover {
+    border-color: var(--spa-primary);
+}
+
+.payment-method.active {
+    border-color: var(--spa-primary);
+    background: rgba(106, 156, 137, 0.1);
+    color: var(--spa-primary);
+}
+
+.payment-method i {
+    display: block;
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.payment-method span {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Cash section */
+.cash-section {
+    margin-bottom: 1rem;
+}
+
+.change-display {
+    display: flex;
+    justify-content: space-between;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    margin-top: 0.75rem;
+    font-size: 1.125rem;
+}
+
+.quick-cash {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+}
+
+/* Checkout button */
+.checkout-btn {
+    padding: 1rem;
+    font-size: 1.125rem;
+}
+
+/* Success icon */
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.success-icon i {
+    font-size: 3rem;
+    color: #10B981;
+}
+
+/* Receipt summary */
+.receipt-summary {
+    background: #F8FAF8;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+    .payment-methods {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .payment-methods {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .payment-method {
+        padding: 0.5rem;
+    }
+    
+    .payment-method i {
+        font-size: 1.25rem;
+    }
+    
+    .quick-cash .btn {
+        flex: 1;
+        min-width: 60px;
+    }
+    
+    .checkout-btn {
+        padding: 0.875rem;
+        font-size: 1rem;
+    }
+}
+
+/* Multi-currency converted price on item cards */
+.pos-item-converted {
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: -2px;
+}

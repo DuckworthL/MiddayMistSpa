@@ -1,0 +1,1280 @@
+@page "/shifts"
+@inject IShiftApiService ShiftService
+@inject IEmployeeApiService EmployeeService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Shift Management - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Shift Management</h1>
+                <p class="text-muted mb-0">Manage employee work schedules, exceptions, and availability</p>
+            </div>
+        </div>
+
+        @* View Tabs *@
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == Tab.Schedule ? "active" : "")"
+                        @onclick="() => SwitchTab(Tab.Schedule)">
+                    <i class="bi bi-calendar-week me-1"></i> Weekly Schedule
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == Tab.Exceptions ? "active" : "")"
+                        @onclick="() => SwitchTab(Tab.Exceptions)">
+                    <i class="bi bi-calendar-x me-1"></i> Exceptions
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == Tab.Availability ? "active" : "")"
+                        @onclick="() => SwitchTab(Tab.Availability)">
+                    <i class="bi bi-calendar-check me-1"></i> Availability
+                </button>
+            </li>
+        </ul>
+
+        @* ======== TAB 1: WEEKLY SCHEDULE ======== *@
+        @if (_activeTab == Tab.Schedule)
+        {
+            @* Employee Picker *@
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Employee</label>
+                            <select class="form-select" value="@_selectedEmployeeId" @onchange="OnEmployeeChanged">
+                                <option value="0">-- Select Employee --</option>
+                                @foreach (var emp in _employees)
+                                {
+                                    <option value="@emp.EmployeeId">@emp.FullName (@emp.Position)</option>
+                                }
+                            </select>
+                        </div>
+                        @if (_selectedEmployeeId > 0)
+                        {
+                            <div class="col-auto">
+                                <button class="btn btn-primary" @onclick="ShowAddShiftModal">
+                                    <i class="bi bi-plus-lg me-1"></i> Add Shift
+                                </button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-primary" @onclick="ShowBulkScheduleModal">
+                                    <i class="bi bi-calendar-plus me-1"></i> Set Weekly Schedule
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (_isLoading)
+            {
+                <LoadingSpinner Message="Loading schedule..." />
+            }
+            else if (_selectedEmployeeId == 0)
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-calendar-week display-4 text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted">Select an employee to view their weekly schedule</h5>
+                    </div>
+                </div>
+            }
+            else if (_weeklySchedule != null)
+            {
+                @* Stats Row *@
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <StatCard Title="Weekly Hours" Value="@_weeklySchedule.TotalWeeklyHours.ToString("N1")" Icon="bi-clock"
+                                  Color="StatCard.CardColor.Primary" />
+                    </div>
+                    <div class="col-md-4">
+                        <StatCard Title="Working Days" Value="@_weeklySchedule.Shifts.Count.ToString()" Icon="bi-calendar-check"
+                                  Color="StatCard.CardColor.Success" />
+                    </div>
+                    <div class="col-md-4">
+                        <StatCard Title="Days Off"
+                                  Value="@((7 - _weeklySchedule.Shifts.Select(s => s.DayOfWeek).Distinct().Count()).ToString())"
+                                  Icon="bi-calendar-x" Color="StatCard.CardColor.Secondary" />
+                    </div>
+                </div>
+
+                @* Weekly Grid *@
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="bi bi-calendar-week text-primary me-2"></i>
+                            @_weeklySchedule.EmployeeName — Weekly Schedule
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 shift-grid-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 140px;">Day</th>
+                                        <th>Shift</th>
+                                        <th style="width: 100px;">Hours</th>
+                                        <th style="width: 100px;">Status</th>
+                                        <th class="text-end" style="width: 140px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var dayOfWeek in Enumerable.Range(0, 7))
+                                    {
+                                        var dayName =
+                                        System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.DayNames[dayOfWeek];
+                                        var shift = _weeklySchedule.Shifts.FirstOrDefault(s => s.DayOfWeek == dayOfWeek);
+                                        <tr class="@(shift == null ? "table-light text-muted" : "")">
+                                            <td class="fw-medium">
+                                                <i class="bi @(shift != null ? "bi-circle-fill text-success" : "bi-circle text-muted") me-2"
+                                                   style="font-size: 0.5rem; vertical-align: middle;"></i>
+                                                @dayName
+                                            </td>
+                                            <td>
+                                                @if (shift != null)
+                                                {
+                                                    <span class="shift-time-badge">
+                                                        <i class="bi bi-clock me-1"></i>
+                                                        @FormatTime(shift.StartTime) — @FormatTime(shift.EndTime)
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted fst-italic">Day Off</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (shift != null)
+                                                {
+                                                    <span>@shift.Duration</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>—</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (shift != null)
+                                                {
+                                                    <span class="badge bg-success-subtle text-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary-subtle text-secondary">Off</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                @if (shift != null)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                                            @onclick="() => ShowEditShiftModal(shift)" title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => PrepareDeleteShift(shift)" title="Delete">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @* ======== TAB 2: EXCEPTIONS ======== *@
+        @if (_activeTab == Tab.Exceptions)
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Employee</label>
+                            <select class="form-select" value="@_excEmployeeId" @onchange="OnExcEmployeeChanged">
+                                <option value="0">All Employees</option>
+                                @foreach (var emp in _employees)
+                                {
+                                    <option value="@emp.EmployeeId">@emp.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted">From Date</label>
+                            <input type="date" class="form-control" value="@_excFromDate?.ToString("yyyy-MM-dd")"
+                                   @onchange="OnExcFromDateChanged" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted">To Date</label>
+                            <input type="date" class="form-control" value="@_excToDate?.ToString("yyyy-MM-dd")"
+                                   @onchange="OnExcToDateChanged" />
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary" @onclick="ShowAddExceptionModal">
+                                <i class="bi bi-plus-lg me-1"></i> Add Exception
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (_isLoading)
+            {
+                <LoadingSpinner Message="Loading exceptions..." />
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Employee</th>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Time</th>
+                                        <th>Reason</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (_exceptions.Any())
+                                    {
+                                        @foreach (var exc in _exceptions)
+                                        {
+                                            <tr>
+                                                <td class="fw-medium">@exc.EmployeeName</td>
+                                                <td>@exc.ExceptionDate.ToString("ddd, MMM dd, yyyy")</td>
+                                                <td>
+                                                    <span class="badge @GetExceptionBadgeClass(exc.ExceptionType)">
+                                                        <i class="bi @GetExceptionIcon(exc.ExceptionType) me-1"></i>
+                                                        @FormatExceptionType(exc.ExceptionType)
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    @if (exc.IsFullDayOff)
+                                                    {
+                                                        <span class="text-muted">Full Day</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@FormatTime(exc.StartTime) — @FormatTime(exc.EndTime)</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <span class="text-muted">@(exc.Reason ?? "—")</span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-primary me-1"
+                                                            @onclick="() => ShowEditExceptionModal(exc)" title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @onclick="() => PrepareDeleteException(exc)" title="Delete">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center py-4 text-muted">
+                                                <i class="bi bi-calendar-x display-6 d-block mb-2"></i>
+                                                No exceptions found for the selected criteria
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @* ======== TAB 3: AVAILABILITY ======== *@
+        @if (_activeTab == Tab.Availability)
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-auto">
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" @onclick="PreviousWeek">
+                                    <i class="bi bi-chevron-left"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="GoToCurrentWeek">This Week</button>
+                                <button class="btn btn-outline-secondary" @onclick="NextWeek">
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <h5 class="mb-0">@_availWeekStart.ToString("MMM dd") — @_availWeekEnd.ToString("MMM dd, yyyy")
+                            </h5>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted">Filter</label>
+                            <select class="form-select" @onchange="OnAvailFilterChanged">
+                                <option value="all">All Employees</option>
+                                <option value="therapists">Therapists Only</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (_isLoading)
+            {
+                <LoadingSpinner Message="Loading availability..." />
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 availability-calendar-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 180px;">Employee</th>
+                                        @for (int d = 0; d < 7; d++)
+                                        {
+                                            var date = _availWeekStart.AddDays(d);
+                                            <th class="text-center avail-header @(date == DateTime.Today ? "today-header" : "")">
+                                                <div class="small text-muted">@date.ToString("ddd")</div>
+                                                <div class="@(date == DateTime.Today ? "fw-bold text-primary" : "")">
+                                                    @date.ToString("MMM dd")</div>
+                                                </th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (_availabilityMap.Any())
+                                        {
+                                            @foreach (var group in _availabilityMap)
+                                            {
+                                                <tr>
+                                                    <td class="fw-medium">@group.Key</td>
+                                                    @for (int d = 0; d < 7; d++)
+                                                    {
+                                                        var date = _availWeekStart.AddDays(d);
+                                                        var avail = group.Value.FirstOrDefault(a => a.Date.Date == date.Date);
+                                                        <td class="text-center avail-cell @(date == DateTime.Today ? "today-col" : "")">
+                                                            @if (avail != null)
+                                                            {
+                                                                <div class="avail-badge @GetAvailabilityClass(avail.Status)"
+                                                                     title="@GetAvailTooltip(avail)">
+                                                                    <i class="bi @GetAvailabilityIcon(avail.Status)"></i>
+                                                                    @if (avail.IsAvailable && avail.ShiftStart.HasValue)
+                                                                    {
+                                                                        <div class="avail-time">@FormatTime(avail.ShiftStart) -
+                                                                            @FormatTime(avail.ShiftEnd)</div>
+                                                                        }
+                                        else
+                                                                        {
+                                                                            <div class="avail-status-text">@GetShortStatus(avail.Status)</div>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                    else
+                                                                {
+                                                                    <div class="avail-badge avail-unknown">
+                                                                        <i class="bi bi-question-circle"></i>
+                                                                        <div class="avail-status-text">N/A</div>
+                                                                    </div>
+                                                                }
+                                                            </td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            }
+                            else
+                                            {
+                                                <tr>
+                                                    <td colspan="8" class="text-center py-4 text-muted">
+                                                        <i class="bi bi-people display-6 d-block mb-2"></i>
+                                                        No availability data found
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Legend *@
+                        <div class="d-flex flex-wrap gap-3 mt-3 px-1">
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-success"></span> Working</span>
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-secondary"></span> Day Off</span>
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-info"></span> Time Off</span>
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-danger"></span> Sick Leave</span>
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-warning"></span> Emergency</span>
+                            <span class="d-flex align-items-center gap-1"><span class="legend-dot bg-primary"></span> Custom
+                                Hours</span>
+                            </div>
+                        }
+                    }
+                </div>
+
+                @* ======== MODALS ======== *@
+
+                @* Add/Edit Shift Modal *@
+                <Modal @bind-IsVisible="_showShiftModal" Title="@(_editingShift != null ? "Edit Shift" : "Add Shift")">
+                    <div class="mb-3">
+                        <label class="form-label">Day of Week</label>
+                        <select class="form-select" @bind="_shiftForm_DayOfWeek" disabled="@(_editingShift != null)">
+                            @for (int i = 0; i < 7; i++)
+                            {
+                                <option value="@i">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.DayNames[i]</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Start Time</label>
+                            <input type="time" class="form-control" @bind="_shiftForm_StartTime" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">End Time</label>
+                            <input type="time" class="form-control" @bind="_shiftForm_EndTime" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Effective From</label>
+                        <input type="date" class="form-control" @bind="_shiftForm_EffectiveFrom" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Effective To <small class="text-muted">(optional)</small></label>
+                        <input type="date" class="form-control" value="@_shiftForm_EffectiveTo?.ToString("yyyy-MM-dd")"
+                               @onchange="OnEffectiveToChanged" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_shiftFormError))
+                    {
+                        <Alert Type="Alert.AlertType.Error" Message="@_shiftFormError" />
+                    }
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-secondary" @onclick="() => _showShiftModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveShift" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(_editingShift != null ? "Update" : "Create") Shift
+                        </button>
+                    </div>
+                </Modal>
+
+                @* Bulk Schedule Modal *@
+                <Modal @bind-IsVisible="_showBulkModal" Title="Set Weekly Schedule" Size="Modal.ModalSize.Large">
+                    <p class="text-muted mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        This will replace all existing active shifts for <strong>@_employees.FirstOrDefault(e => e.EmployeeId ==
+                                        _selectedEmployeeId)?.FullName</strong>.
+                        Toggle days on/off and set times for each working day.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">Effective From</label>
+                        <input type="date" class="form-control" style="max-width: 200px;" @bind="_bulkEffectiveFrom" />
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;"></th>
+                                    <th>Day</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < 7; i++)
+                                {
+                                    var idx = i;
+                                    <tr class="@(!_bulkDays[idx].Enabled ? "table-light" : "")">
+                                        <td>
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" checked="@_bulkDays[idx].Enabled"
+                                                       @onchange="(e) => _bulkDays[idx].Enabled = (bool)(e.Value ?? false)" />
+                                            </div>
+                                        </td>
+                                        <td class="@(!_bulkDays[idx].Enabled ? "text-muted" : "fw-medium")">
+                                            @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.DayNames[idx]
+                                        </td>
+                                        <td>
+                                            <input type="time" class="form-control form-control-sm" style="max-width: 140px;"
+                                                   disabled="@(!_bulkDays[idx].Enabled)" @bind="_bulkDays[idx].StartTime" />
+                                        </td>
+                                        <td>
+                                            <input type="time" class="form-control form-control-sm" style="max-width: 140px;"
+                                                   disabled="@(!_bulkDays[idx].Enabled)" @bind="_bulkDays[idx].EndTime" />
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_bulkFormError))
+                    {
+                        <Alert Type="Alert.AlertType.Error" Message="@_bulkFormError" />
+                    }
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button class="btn btn-secondary" @onclick="() => _showBulkModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveBulkSchedule" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Apply Schedule
+                        </button>
+                    </div>
+                </Modal>
+
+                @* Add/Edit Exception Modal *@
+                <Modal @bind-IsVisible="_showExceptionModal"
+                       Title="@(_editingException != null ? "Edit Exception" : "Add Exception")">
+                    @if (_editingException == null)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Employee</label>
+                            <select class="form-select" @bind="_excForm_EmployeeId">
+                                <option value="0">-- Select Employee --</option>
+                                @foreach (var emp in _employees)
+                                {
+                                    <option value="@emp.EmployeeId">@emp.FullName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Exception Date</label>
+                            <input type="date" class="form-control" @bind="_excForm_Date" />
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Exception Type</label>
+                        <select class="form-select" @bind="_excForm_Type">
+                            <option value="TimeOff">Time Off</option>
+                            <option value="SickLeave">Sick Leave</option>
+                            <option value="Emergency">Emergency</option>
+                            <option value="CustomHours">Custom Hours</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="fullDayCheck" @bind="_excForm_IsFullDay" />
+                        <label class="form-check-label" for="fullDayCheck">Full day off</label>
+                    </div>
+                    @if (!_excForm_IsFullDay)
+                    {
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Start Time</label>
+                                <input type="time" class="form-control" @bind="_excForm_StartTime" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">End Time</label>
+                                <input type="time" class="form-control" @bind="_excForm_EndTime" />
+                            </div>
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Reason <small class="text-muted">(optional)</small></label>
+                        <textarea class="form-control" rows="2" @bind="_excForm_Reason"></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_excFormError))
+                    {
+                        <Alert Type="Alert.AlertType.Error" Message="@_excFormError" />
+                    }
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-secondary" @onclick="() => _showExceptionModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveException" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(_editingException != null ? "Update" : "Create") Exception
+                        </button>
+                    </div>
+                </Modal>
+
+                @* Delete Shift Confirmation *@
+                <ConfirmDialog @bind-IsVisible="_showDeleteShiftConfirm" Title="Delete Shift" Message="@_deleteConfirmMessage"
+                               IsDanger="true" OnConfirm="DeleteShift" />
+
+                @* Delete Exception Confirmation *@
+                <ConfirmDialog @bind-IsVisible="_showDeleteExcConfirm" Title="Delete Exception" Message="@_deleteConfirmMessage"
+                               IsDanger="true" OnConfirm="DeleteException" />
+
+                @* Toast *@
+                @if (_showToast)
+                {
+                    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+                        <div class="toast show align-items-center text-bg-@(_toastIsError ? "danger" : "success") border-0">
+                            <div class="d-flex">
+                                <div class="toast-body">@_toastMessage</div>
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                                        @onclick="() => _showToast = false"></button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </AuthorizedPage>
+
+@code {
+    // =================== State ===================
+    private enum Tab { Schedule, Exceptions, Availability }
+    private Tab _activeTab = Tab.Schedule;
+
+    private bool _isLoading;
+    private bool _isSaving;
+    private List<EmployeeResponse> _employees = new();
+
+    // Toast
+    private bool _showToast;
+    private string _toastMessage = "";
+    private bool _toastIsError;
+
+    // Schedule tab
+    private int _selectedEmployeeId;
+    private WeeklyShiftScheduleResponse? _weeklySchedule;
+
+    // Exception tab
+    private int _excEmployeeId;
+    private DateTime? _excFromDate;
+    private DateTime? _excToDate;
+    private List<ShiftExceptionResponse> _exceptions = new();
+
+    // Availability tab
+    private DateTime _availWeekStart;
+    private DateTime _availWeekEnd;
+    private bool _therapistsOnly;
+    private Dictionary<string, List<EmployeeAvailabilityResponse>> _availabilityMap = new();
+
+    // Shift modal
+    private bool _showShiftModal;
+    private ShiftResponse? _editingShift;
+    private int _shiftForm_DayOfWeek;
+    private TimeOnly _shiftForm_StartTime = new(9, 0);
+    private TimeOnly _shiftForm_EndTime = new(17, 0);
+    private DateTime _shiftForm_EffectiveFrom = PhilippineTime.Today;
+    private DateTime? _shiftForm_EffectiveTo;
+    private string? _shiftFormError;
+
+    // Bulk modal
+    private bool _showBulkModal;
+    private DateTime _bulkEffectiveFrom = PhilippineTime.Today;
+    private BulkDayEntry[] _bulkDays = new BulkDayEntry[7];
+    private string? _bulkFormError;
+
+    // Exception modal
+    private bool _showExceptionModal;
+    private ShiftExceptionResponse? _editingException;
+    private int _excForm_EmployeeId;
+    private DateTime _excForm_Date = PhilippineTime.Today;
+    private string _excForm_Type = "TimeOff";
+    private bool _excForm_IsFullDay = true;
+    private TimeOnly _excForm_StartTime = new(9, 0);
+    private TimeOnly _excForm_EndTime = new(17, 0);
+    private string? _excForm_Reason;
+    private string? _excFormError;
+
+    // Delete confirmations
+    private bool _showDeleteShiftConfirm;
+    private bool _showDeleteExcConfirm;
+    private string _deleteConfirmMessage = "";
+    private ShiftResponse? _shiftToDelete;
+    private ShiftExceptionResponse? _excToDelete;
+
+    private class BulkDayEntry
+    {
+        public bool Enabled { get; set; }
+        public TimeOnly StartTime { get; set; } = new(9, 0);
+        public TimeOnly EndTime { get; set; } = new(17, 0);
+    }
+
+    // =================== Init ===================
+    protected override void OnInitialized()
+    {
+        var today = PhilippineTime.Today;
+        var diff = (int)today.DayOfWeek;
+        _availWeekStart = today.AddDays(-diff);
+        _availWeekEnd = _availWeekStart.AddDays(6);
+
+        for (int i = 0; i < 7; i++)
+            _bulkDays[i] = new BulkDayEntry { Enabled = i >= 1 && i <= 5 };
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var empResult = await EmployeeService.GetEmployeesAsync(page: 1, pageSize: 200, activeOnly: true);
+            _employees = empResult.Items.OrderBy(e => e.FullName).ToList();
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Error loading employees: " + ex.Message, true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // =================== Tab Navigation ===================
+    private async Task SwitchTab(Tab tab)
+    {
+        _activeTab = tab;
+        if (tab == Tab.Exceptions)
+            await LoadExceptions();
+        else if (tab == Tab.Availability)
+            await LoadAvailability();
+    }
+
+    // =================== Schedule Tab ===================
+    private async Task OnEmployeeChanged(ChangeEventArgs e)
+    {
+        _selectedEmployeeId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        if (_selectedEmployeeId > 0)
+            await LoadWeeklySchedule();
+        else
+            _weeklySchedule = null;
+    }
+
+    private async Task LoadWeeklySchedule()
+    {
+        _isLoading = true;
+        try
+        {
+            _weeklySchedule = await ShiftService.GetWeeklyScheduleAsync(_selectedEmployeeId);
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Error loading schedule: " + ex.Message, true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowAddShiftModal()
+    {
+        _editingShift = null;
+        _shiftForm_DayOfWeek = 0;
+        _shiftForm_StartTime = new(9, 0);
+        _shiftForm_EndTime = new(17, 0);
+        _shiftForm_EffectiveFrom = PhilippineTime.Today;
+        _shiftForm_EffectiveTo = null;
+        _shiftFormError = null;
+        _showShiftModal = true;
+    }
+
+    private void ShowEditShiftModal(ShiftResponse shift)
+    {
+        _editingShift = shift;
+        _shiftForm_DayOfWeek = shift.DayOfWeek;
+        _shiftForm_StartTime = new TimeOnly(shift.StartTime.Hours, shift.StartTime.Minutes);
+        _shiftForm_EndTime = new TimeOnly(shift.EndTime.Hours, shift.EndTime.Minutes);
+        _shiftForm_EffectiveFrom = shift.EffectiveFrom;
+        _shiftForm_EffectiveTo = shift.EffectiveTo;
+        _shiftFormError = null;
+        _showShiftModal = true;
+    }
+
+    private void OnEffectiveToChanged(ChangeEventArgs e)
+    {
+        _shiftForm_EffectiveTo = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null;
+    }
+
+    private async Task SaveShift()
+    {
+        _shiftFormError = null;
+        _isSaving = true;
+        try
+        {
+            if (_editingShift != null)
+            {
+                var request = new UpdateShiftRequest
+                {
+                    StartTime = _shiftForm_StartTime.ToTimeSpan(),
+                    EndTime = _shiftForm_EndTime.ToTimeSpan(),
+                    IsRecurring = true,
+                    EffectiveTo = _shiftForm_EffectiveTo,
+                    IsActive = true
+                };
+                var result = await ShiftService.UpdateShiftAsync(_editingShift.ShiftId, request);
+                if (result != null)
+                {
+                    ShowToast("Shift updated successfully");
+                    _showShiftModal = false;
+                    await LoadWeeklySchedule();
+                }
+                else
+                    _shiftFormError = "Failed to update shift. Please try again.";
+            }
+            else
+            {
+                var request = new CreateShiftRequest
+                {
+                    EmployeeId = _selectedEmployeeId,
+                    DayOfWeek = _shiftForm_DayOfWeek,
+                    StartTime = _shiftForm_StartTime.ToTimeSpan(),
+                    EndTime = _shiftForm_EndTime.ToTimeSpan(),
+                    IsRecurring = true,
+                    EffectiveFrom = _shiftForm_EffectiveFrom,
+                    EffectiveTo = _shiftForm_EffectiveTo
+                };
+                var result = await ShiftService.CreateShiftAsync(request);
+                if (result != null)
+                {
+                    ShowToast("Shift created successfully");
+                    _showShiftModal = false;
+                    await LoadWeeklySchedule();
+                }
+                else
+                    _shiftFormError = "Failed to create shift. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _shiftFormError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void PrepareDeleteShift(ShiftResponse shift)
+    {
+        _shiftToDelete = shift;
+        _deleteConfirmMessage = $"Are you sure you want to delete the {shift.DayName} shift ({FormatTime(shift.StartTime)} \u2014 {FormatTime(shift.EndTime)})? This action cannot be undone.";
+        _showDeleteShiftConfirm = true;
+    }
+
+    private async Task DeleteShift()
+    {
+        if (_shiftToDelete == null) return;
+        var success = await ShiftService.DeleteShiftAsync(_shiftToDelete.ShiftId);
+        if (success)
+        {
+            ShowToast("Shift deleted successfully");
+            await LoadWeeklySchedule();
+        }
+        else
+            ShowToast("Failed to delete shift", true);
+        _shiftToDelete = null;
+    }
+
+    // =================== Bulk Schedule ===================
+    private void ShowBulkScheduleModal()
+    {
+        _bulkEffectiveFrom = PhilippineTime.Today;
+        _bulkFormError = null;
+
+        for (int i = 0; i < 7; i++)
+            _bulkDays[i] = new BulkDayEntry { Enabled = false, StartTime = new(9, 0), EndTime = new(17, 0) };
+
+        if (_weeklySchedule != null)
+        {
+            foreach (var shift in _weeklySchedule.Shifts)
+            {
+                _bulkDays[shift.DayOfWeek].Enabled = true;
+                _bulkDays[shift.DayOfWeek].StartTime = new TimeOnly(shift.StartTime.Hours, shift.StartTime.Minutes);
+                _bulkDays[shift.DayOfWeek].EndTime = new TimeOnly(shift.EndTime.Hours, shift.EndTime.Minutes);
+            }
+        }
+        else
+        {
+            for (int i = 1; i <= 5; i++)
+                _bulkDays[i].Enabled = true;
+        }
+
+        _showBulkModal = true;
+    }
+
+    private async Task SaveBulkSchedule()
+    {
+        _bulkFormError = null;
+        _isSaving = true;
+        try
+        {
+            var shifts = new List<DayShiftModel>();
+            for (int i = 0; i < 7; i++)
+            {
+                if (_bulkDays[i].Enabled)
+                {
+                    shifts.Add(new DayShiftModel
+                    {
+                        DayOfWeek = i,
+                        StartTime = _bulkDays[i].StartTime.ToTimeSpan(),
+                        EndTime = _bulkDays[i].EndTime.ToTimeSpan()
+                    });
+                }
+            }
+
+            if (!shifts.Any())
+            {
+                _bulkFormError = "Please enable at least one working day.";
+                _isSaving = false;
+                return;
+            }
+
+            var request = new BulkShiftRequest
+            {
+                EmployeeId = _selectedEmployeeId,
+                EffectiveFrom = _bulkEffectiveFrom,
+                Shifts = shifts
+            };
+
+            var result = await ShiftService.SetBulkShiftsAsync(_selectedEmployeeId, request);
+            ShowToast("Weekly schedule applied \u2014 " + result.Count + " shifts created");
+            _showBulkModal = false;
+            await LoadWeeklySchedule();
+        }
+        catch (Exception ex)
+        {
+            _bulkFormError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    // =================== Exceptions Tab ===================
+    private async Task OnExcEmployeeChanged(ChangeEventArgs e)
+    {
+        _excEmployeeId = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        await LoadExceptions();
+    }
+
+    private async Task OnExcFromDateChanged(ChangeEventArgs e)
+    {
+        _excFromDate = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null;
+        await LoadExceptions();
+    }
+
+    private async Task OnExcToDateChanged(ChangeEventArgs e)
+    {
+        _excToDate = DateTime.TryParse(e.Value?.ToString(), out var dt) ? dt : null;
+        await LoadExceptions();
+    }
+
+    private async Task LoadExceptions()
+    {
+        _isLoading = true;
+        try
+        {
+            if (_excEmployeeId > 0)
+            {
+                _exceptions = await ShiftService.GetEmployeeExceptionsAsync(_excEmployeeId, _excFromDate, _excToDate);
+            }
+            else
+            {
+                var from = _excFromDate ?? PhilippineTime.Today.AddDays(-30);
+                var to = _excToDate ?? PhilippineTime.Today.AddDays(30);
+
+                var allExceptions = new List<ShiftExceptionResponse>();
+                foreach (var emp in _employees.Take(50))
+                {
+                    var empExc = await ShiftService.GetEmployeeExceptionsAsync(emp.EmployeeId, from, to);
+                    allExceptions.AddRange(empExc);
+                }
+                _exceptions = allExceptions.OrderBy(e => e.ExceptionDate).ThenBy(e => e.EmployeeName).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Error loading exceptions: " + ex.Message, true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowAddExceptionModal()
+    {
+        _editingException = null;
+        _excForm_EmployeeId = _excEmployeeId > 0 ? _excEmployeeId : 0;
+        _excForm_Date = PhilippineTime.Today;
+        _excForm_Type = "TimeOff";
+        _excForm_IsFullDay = true;
+        _excForm_StartTime = new(9, 0);
+        _excForm_EndTime = new(17, 0);
+        _excForm_Reason = null;
+        _excFormError = null;
+        _showExceptionModal = true;
+    }
+
+    private void ShowEditExceptionModal(ShiftExceptionResponse exc)
+    {
+        _editingException = exc;
+        _excForm_EmployeeId = exc.EmployeeId;
+        _excForm_Date = exc.ExceptionDate;
+        _excForm_Type = exc.ExceptionType;
+        _excForm_IsFullDay = exc.IsFullDayOff;
+        _excForm_StartTime = exc.StartTime.HasValue ? new TimeOnly(exc.StartTime.Value.Hours, exc.StartTime.Value.Minutes) : new
+        TimeOnly(9, 0);
+        _excForm_EndTime = exc.EndTime.HasValue ? new TimeOnly(exc.EndTime.Value.Hours, exc.EndTime.Value.Minutes) : new
+        TimeOnly(17, 0);
+        _excForm_Reason = exc.Reason;
+        _excFormError = null;
+        _showExceptionModal = true;
+    }
+
+    private async Task SaveException()
+    {
+        _excFormError = null;
+        _isSaving = true;
+        try
+        {
+            if (_editingException != null)
+            {
+                var request = new UpdateShiftExceptionRequest
+                {
+                    ExceptionType = _excForm_Type,
+                    StartTime = _excForm_IsFullDay ? null : _excForm_StartTime.ToTimeSpan(),
+                    EndTime = _excForm_IsFullDay ? null : _excForm_EndTime.ToTimeSpan(),
+                    Reason = _excForm_Reason
+                };
+                var result = await ShiftService.UpdateShiftExceptionAsync(_editingException.ExceptionId, request);
+                if (result != null)
+                {
+                    ShowToast("Exception updated successfully");
+                    _showExceptionModal = false;
+                    await LoadExceptions();
+                }
+                else
+                    _excFormError = "Failed to update exception.";
+            }
+            else
+            {
+                if (_excForm_EmployeeId == 0)
+                {
+                    _excFormError = "Please select an employee.";
+                    _isSaving = false;
+                    return;
+                }
+
+                var request = new CreateShiftExceptionRequest
+                {
+                    EmployeeId = _excForm_EmployeeId,
+                    ExceptionDate = _excForm_Date,
+                    ExceptionType = _excForm_Type,
+                    StartTime = _excForm_IsFullDay ? null : _excForm_StartTime.ToTimeSpan(),
+                    EndTime = _excForm_IsFullDay ? null : _excForm_EndTime.ToTimeSpan(),
+                    Reason = _excForm_Reason
+                };
+                var result = await ShiftService.CreateShiftExceptionAsync(request);
+                if (result != null)
+                {
+                    ShowToast("Exception created successfully");
+                    _showExceptionModal = false;
+                    await LoadExceptions();
+                }
+                else
+                    _excFormError = "Failed to create exception.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _excFormError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void PrepareDeleteException(ShiftExceptionResponse exc)
+    {
+        _excToDelete = exc;
+        _deleteConfirmMessage = "Are you sure you want to delete the " + FormatExceptionType(exc.ExceptionType) + " exception for " + exc.EmployeeName + " on " + exc.ExceptionDate.ToString("MMM dd, yyyy") + "?";
+        _showDeleteExcConfirm = true;
+    }
+
+    private async Task DeleteException()
+    {
+        if (_excToDelete == null) return;
+        var success = await ShiftService.DeleteShiftExceptionAsync(_excToDelete.ExceptionId);
+        if (success)
+        {
+            ShowToast("Exception deleted successfully");
+            await LoadExceptions();
+        }
+        else
+            ShowToast("Failed to delete exception", true);
+        _excToDelete = null;
+    }
+
+    // =================== Availability Tab ===================
+    private async Task PreviousWeek()
+    {
+        _availWeekStart = _availWeekStart.AddDays(-7);
+        _availWeekEnd = _availWeekEnd.AddDays(-7);
+        await LoadAvailability();
+    }
+
+    private async Task NextWeek()
+    {
+        _availWeekStart = _availWeekStart.AddDays(7);
+        _availWeekEnd = _availWeekEnd.AddDays(7);
+        await LoadAvailability();
+    }
+
+    private async Task GoToCurrentWeek()
+    {
+        var today = PhilippineTime.Today;
+        var diff = (int)today.DayOfWeek;
+        _availWeekStart = today.AddDays(-diff);
+        _availWeekEnd = _availWeekStart.AddDays(6);
+        await LoadAvailability();
+    }
+
+    private async Task OnAvailFilterChanged(ChangeEventArgs e)
+    {
+        _therapistsOnly = e.Value?.ToString() == "therapists";
+        await LoadAvailability();
+    }
+
+    private async Task LoadAvailability()
+    {
+        _isLoading = true;
+        try
+        {
+            _availabilityMap.Clear();
+
+            for (int d = 0; d < 7; d++)
+            {
+                var date = _availWeekStart.AddDays(d);
+                var staff = await ShiftService.GetAvailableStaffAsync(date, therapistsOnly: _therapistsOnly);
+                foreach (var avail in staff)
+                {
+                    if (!_availabilityMap.ContainsKey(avail.EmployeeName))
+                        _availabilityMap[avail.EmployeeName] = new();
+                    _availabilityMap[avail.EmployeeName].Add(avail);
+                }
+            }
+
+            _availabilityMap = _availabilityMap
+            .OrderBy(k => k.Key)
+            .ToDictionary(k => k.Key, v => v.Value);
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Error loading availability: " + ex.Message, true);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // =================== Helpers ===================
+    private static string FormatTime(TimeSpan? ts)
+    {
+        if (ts == null) return "\u2014";
+        var t = DateTime.Today.Add(ts.Value);
+        return t.ToString("h:mm tt");
+    }
+
+    private static string FormatTime(TimeSpan ts)
+    {
+        var t = DateTime.Today.Add(ts);
+        return t.ToString("h:mm tt");
+    }
+
+    private static string FormatExceptionType(string type) => type switch
+    {
+        "TimeOff" => "Time Off",
+        "SickLeave" => "Sick Leave",
+        "CustomHours" => "Custom Hours",
+        _ => type
+    };
+
+    private static string GetExceptionBadgeClass(string type) => type switch
+    {
+        "TimeOff" => "bg-info-subtle text-info",
+        "SickLeave" => "bg-danger-subtle text-danger",
+        "Emergency" => "bg-warning-subtle text-warning",
+        "CustomHours" => "bg-primary-subtle text-primary",
+        _ => "bg-secondary-subtle text-secondary"
+    };
+
+    private static string GetExceptionIcon(string type) => type switch
+    {
+        "TimeOff" => "bi-calendar-minus",
+        "SickLeave" => "bi-thermometer-half",
+        "Emergency" => "bi-exclamation-triangle",
+        "CustomHours" => "bi-clock",
+        _ => "bi-calendar-x"
+    };
+
+    private static string GetAvailabilityClass(string status) => status switch
+    {
+        "Working" => "avail-working",
+        "DayOff" => "avail-dayoff",
+        "TimeOff" => "avail-timeoff",
+        "SickLeave" => "avail-sick",
+        "Emergency" => "avail-emergency",
+        "CustomHours" => "avail-custom",
+        _ => "avail-unknown"
+    };
+
+    private static string GetAvailabilityIcon(string status) => status switch
+    {
+        "Working" => "bi-check-circle-fill",
+        "DayOff" => "bi-dash-circle",
+        "TimeOff" => "bi-calendar-minus",
+        "SickLeave" => "bi-thermometer-half",
+        "Emergency" => "bi-exclamation-triangle-fill",
+        "CustomHours" => "bi-clock-fill",
+        _ => "bi-question-circle"
+    };
+
+    private static string GetShortStatus(string status) => status switch
+    {
+        "Working" => "Work",
+        "DayOff" => "Off",
+        "TimeOff" => "Off",
+        "SickLeave" => "Sick",
+        "Emergency" => "Emrg",
+        "CustomHours" => "Custom",
+        _ => "N/A"
+    };
+
+    private static string GetAvailTooltip(EmployeeAvailabilityResponse avail)
+    {
+        if (string.IsNullOrEmpty(avail.ExceptionReason))
+            return avail.Status;
+        return avail.Status + ": " + avail.ExceptionReason;
+    }
+
+    private void ShowToast(string message, bool isError = false)
+    {
+        _toastMessage = message;
+        _toastIsError = isError;
+        _showToast = true;
+        _ = Task.Delay(4000).ContinueWith(_ =>
+        {
+            _showToast = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+}

@@ -1,0 +1,355 @@
+@page "/accounting/invoices"
+@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject NavigationManager Navigation
+
+<PageTitle>Invoices - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage>
+    <div class="container-fluid fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/accounting">Accounting</a></li>
+                        <li class="breadcrumb-item active">Invoices</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 mb-0" style="color: #2C2C2C;">Invoices</h1>
+            </div>
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-lg me-1"></i> Create Invoice
+            </button>
+        </div>
+
+        @* Summary Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Total Invoiced</p>
+                        <h4 class="mb-0">₱@_totalInvoiced.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-success bg-opacity-10">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Paid</p>
+                        <h4 class="text-success mb-0">₱@_totalPaid.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-warning bg-opacity-10">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Pending</p>
+                        <h4 class="text-warning mb-0">₱@_totalPending.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-danger bg-opacity-10">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Overdue</p>
+                        <h4 class="text-danger mb-0">₱@_totalOverdue.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card mb-4">
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" placeholder="Search invoices..." @bind="_searchTerm"
+                            @bind:event="oninput" />
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @bind="_statusFilter">
+                            <option value="">All Status</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Overdue">Overdue</option>
+                            <option value="Draft">Draft</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" @bind="_dateFrom" />
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" @bind="_dateTo" />
+                    </div>
+                    <div class="col-md-2 ms-auto">
+                        <button class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-download me-1"></i> Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Invoices Table *@
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Issue Date</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
+                                <th class="text-end">Amount</th>
+                                <th style="width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var invoice in FilteredInvoices)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="/accounting/invoices/@invoice.Id" class="text-decoration-none fw-medium">
+                                            @invoice.InvoiceNumber
+                                        </a>
+                                    </td>
+                                    <td>@invoice.CustomerName</td>
+                                    <td>@invoice.IssueDate.ToString("MMM dd, yyyy")</td>
+                                    <td
+                                        class="@(invoice.DueDate < DateTime.Today && invoice.Status != "Paid" ? "text-danger" : "")">
+                                        @invoice.DueDate.ToString("MMM dd, yyyy")
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadge(invoice.Status)">@invoice.Status</span>
+                                    </td>
+                                    <td class="text-end fw-medium">₱@invoice.Amount.ToString("N2")</td>
+                                    <td>
+                                        <button class="btn btn-link btn-sm p-1" @onclick="() => ViewInvoice(invoice)"
+                                            title="View">
+                                            <i class="bi bi-eye text-info"></i>
+                                        </button>
+                                        <button class="btn btn-link btn-sm p-1" @onclick="() => PrintInvoice(invoice)"
+                                            title="Print">
+                                            <i class="bi bi-printer text-secondary"></i>
+                                        </button>
+                                        @if (invoice.Status == "Pending" || invoice.Status == "Overdue")
+                                        {
+                                            <button class="btn btn-link btn-sm p-1" @onclick="() => MarkAsPaid(invoice)"
+                                                title="Mark as Paid">
+                                                <i class="bi bi-check-circle text-success"></i>
+                                            </button>
+                                        }
+                                        @if (invoice.Status == "Draft")
+                                        {
+                                            <button class="btn btn-link btn-sm p-1" @onclick="() => SendInvoice(invoice)"
+                                                title="Send">
+                                                <i class="bi bi-send text-primary"></i>
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Create Invoice Modal *@
+    @if (_showModal)
+    {
+        <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Create Invoice</h5>
+                        <button type="button" class="btn-close" @onclick="() => _showModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Customer</label>
+                                <select class="form-select" @bind="_newInvoice.CustomerId">
+                                    <option value="">Select Customer</option>
+                                    <option value="1">Maria Santos</option>
+                                    <option value="2">Ana Reyes</option>
+                                    <option value="3">Sofia Garcia</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" @bind="_newInvoice.DueDate" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Items</label>
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Description</th>
+                                            <th style="width: 80px;">Qty</th>
+                                            <th style="width: 120px;">Price</th>
+                                            <th style="width: 120px;">Total</th>
+                                            <th style="width: 40px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in _newInvoice.Items)
+                                        {
+                                            <tr>
+                                                <td><input type="text" class="form-control form-control-sm"
+                                                        @bind="item.Description" /></td>
+                                                <td><input type="number" class="form-control form-control-sm"
+                                                        @bind="item.Quantity" /></td>
+                                                <td><input type="number" class="form-control form-control-sm"
+                                                        @bind="item.Price" /></td>
+                                                <td class="text-end align-middle">₱@((item.Quantity *
+                                                                                                item.Price).ToString("N2"))</td>
+                                                <td>
+                                                    <button class="btn btn-link btn-sm text-danger p-0"
+                                                        @onclick="() => RemoveItem(item)">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="AddItem">
+                                    <i class="bi bi-plus me-1"></i> Add Item
+                                </button>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" rows="2" @bind="_newInvoice.Notes"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <div class="me-auto">
+                            <strong>Total: ₱@_newInvoice.Items.Sum(i => i.Quantity * i.Price).ToString("N2")</strong>
+                        </div>
+                        <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
+                        <button class="btn btn-outline-primary" @onclick="SaveAsDraft">Save as Draft</button>
+                        <button class="btn btn-primary" @onclick="CreateAndSend">Create & Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private List<InvoiceModel> _invoices = new()
+{
+new() { Id = 1, InvoiceNumber = "INV-2024-001", CustomerName = "Maria Santos", IssueDate = DateTime.Now.AddDays(-10),
+DueDate = DateTime.Now.AddDays(5), Status = "Pending", Amount = 5500 },
+new() { Id = 2, InvoiceNumber = "INV-2024-002", CustomerName = "Corporate Client A", IssueDate =
+DateTime.Now.AddDays(-15), DueDate = DateTime.Now.AddDays(-5), Status = "Overdue", Amount = 15200 },
+new() { Id = 3, InvoiceNumber = "INV-2024-003", CustomerName = "Ana Reyes", IssueDate = DateTime.Now.AddDays(-5),
+DueDate = DateTime.Now.AddDays(10), Status = "Paid", Amount = 3200 },
+new() { Id = 4, InvoiceNumber = "INV-2024-004", CustomerName = "Sofia Garcia", IssueDate = DateTime.Now.AddDays(-2),
+DueDate = DateTime.Now.AddDays(13), Status = "Pending", Amount = 2800 },
+new() { Id = 5, InvoiceNumber = "INV-2024-005", CustomerName = "Carmen Lopez", IssueDate = DateTime.Now, DueDate =
+DateTime.Now.AddDays(15), Status = "Draft", Amount = 4500 }
+};
+
+    private string _searchTerm = "";
+    private string _statusFilter = "";
+    private DateTime? _dateFrom;
+    private DateTime? _dateTo;
+
+    private decimal _totalInvoiced = 31200m;
+    private decimal _totalPaid = 3200m;
+    private decimal _totalPending = 12800m;
+    private decimal _totalOverdue = 15200m;
+
+    private bool _showModal = false;
+    private NewInvoiceModel _newInvoice = new();
+
+    private IEnumerable<InvoiceModel> FilteredInvoices => _invoices.Where(i =>
+    (string.IsNullOrEmpty(_searchTerm) ||
+    i.InvoiceNumber.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+    i.CustomerName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+    (string.IsNullOrEmpty(_statusFilter) || i.Status == _statusFilter) &&
+    (!_dateFrom.HasValue || i.IssueDate >= _dateFrom.Value) &&
+    (!_dateTo.HasValue || i.IssueDate <= _dateTo.Value)
+    );
+
+    private string GetStatusBadge(string status) => status switch
+    {
+        "Paid" => "bg-success",
+        "Pending" => "bg-warning text-dark",
+        "Overdue" => "bg-danger",
+        "Draft" => "bg-secondary",
+        "Cancelled" => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private void ShowCreateModal()
+    {
+        _newInvoice = new NewInvoiceModel
+        {
+            DueDate = DateTime.Now.AddDays(15),
+            Items = new List<InvoiceItemModel> { new() }
+        };
+        _showModal = true;
+    }
+
+    private void AddItem()
+    {
+        _newInvoice.Items.Add(new InvoiceItemModel());
+    }
+
+    private void RemoveItem(InvoiceItemModel item)
+    {
+        if (_newInvoice.Items.Count > 1)
+            _newInvoice.Items.Remove(item);
+    }
+
+    private void SaveAsDraft()
+    {
+        // TODO: Save as draft
+        _showModal = false;
+    }
+
+    private void CreateAndSend()
+    {
+        // TODO: Create and send invoice
+        _showModal = false;
+    }
+
+    private void ViewInvoice(InvoiceModel invoice) { }
+    private void PrintInvoice(InvoiceModel invoice) { }
+    private void MarkAsPaid(InvoiceModel invoice) { invoice.Status = "Paid"; }
+    private void SendInvoice(InvoiceModel invoice) { invoice.Status = "Pending"; }
+
+    private class InvoiceModel
+    {
+        public int Id { get; set; }
+        public string InvoiceNumber { get; set; } = "";
+        public string CustomerName { get; set; } = "";
+        public DateTime IssueDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public string Status { get; set; } = "";
+        public decimal Amount { get; set; }
+    }
+
+    private class NewInvoiceModel
+    {
+        public int CustomerId { get; set; }
+        public DateTime DueDate { get; set; }
+        public string Notes { get; set; } = "";
+        public List<InvoiceItemModel> Items { get; set; } = new();
+    }
+
+    private class InvoiceItemModel
+    {
+        public string Description { get; set; } = "";
+        public int Quantity { get; set; } = 1;
+        public decimal Price { get; set; }
+    }
+}

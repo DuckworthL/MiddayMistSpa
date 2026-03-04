@@ -1,0 +1,162 @@
+Using launch settings from src\MiddayMistSpa.API\Properties\launchSettings.json...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Roles already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      All users already seeded, skipping inserts...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Re-synced passwords for 8 demo users
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      System settings already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      SSS contribution rates already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      PhilHealth contribution rates already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Pag-IBIG contribution rates already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Withholding tax brackets already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Philippine holidays for 2026 already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Service categories already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Product categories already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Customers already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Employees already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Employee shifts already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Attendance records already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Rooms already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Chart of accounts already seeded, skipping...
+info: MiddayMistSpa.API.Services.DatabaseSeeder[0]
+      Database seeding completed successfully
+info: MiddayMistSpa.API.Services.CurrencyRateRefreshService[0]
+      Currency rate refresh service started. Interval: 30 minutes
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5286
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\golia\MiddayMistSpa\src\MiddayMistSpa.API
+info: MiddayMistSpa.API.Services.CurrencyRateRefreshService[0]
+      Scheduled currency rate refresh starting...
+info: MiddayMistSpa.API.Services.CurrencyService[0]
+      Refreshing exchange rates from Frankfurter API...
+info: MiddayMistSpa.API.Services.FrankfurterService[0]
+      Fetching exchange rates from Frankfurter: /v1/latest?base=PHP&symbols=USD,EUR,JPY,GBP,SGD,AUD,KRW,CNY
+info: System.Net.Http.HttpClient.IFrankfurterService.LogicalHandler[100]
+      Start processing HTTP request GET https://api.frankfurter.dev/v1/latest?base=PHP&symbols=USD,EUR,JPY,GBP,SGD,AUD,KRW,CNY
+info: System.Net.Http.HttpClient.IFrankfurterService.ClientHandler[100]
+      Sending HTTP request GET https://api.frankfurter.dev/v1/latest?base=PHP&symbols=USD,EUR,JPY,GBP,SGD,AUD,KRW,CNY
+info: System.Net.Http.HttpClient.IFrankfurterService.ClientHandler[101]
+      Received HTTP response headers after 1163.7222ms - 200
+info: System.Net.Http.HttpClient.IFrankfurterService.LogicalHandler[101]
+      End processing HTTP request after 1172.1494ms - 200
+info: MiddayMistSpa.API.Services.FrankfurterService[0]
+      Fetched 8 exchange rates from Frankfurter (base: PHP, date: 2026-02-20)
+info: MiddayMistSpa.API.Services.CurrencyService[0]
+      Refreshed 8 exchange rates (base: PHP)
+info: MiddayMistSpa.API.Services.CurrencyRateRefreshService[0]
+      Scheduled currency rate refresh completed: 8 rates updated
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+info: MiddayMistSpa.API.Services.AuthService[0]
+      User superadmin logged in successfully
+info: MiddayMistSpa.API.Services.AuthService[0]
+      User superadmin logged in successfully
+info: MiddayMistSpa.API.Services.AuthService[0]
+      User superadmin logged in successfully
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (21ms) [Parameters=[@__request_DateFrom_Value_Date_0='?' (DbType = DateTime2), @__request_DateTo_Value_Date_1='?' (DbType = DateTime2), @__p_2='?' (DbType = Int32), @__p_3='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT [t].[AppointmentId], [t].[AppointmentDate], [t].[AppointmentNumber], [t].[BookingSource], [t].[CancellationReason], [t].[CancelledAt], [t].[CheckedInAt], [t].[CreatedAt], [t].[CreatedBy], [t].[CustomerId], [t].[CustomerNotes], [t].[EndTime], [t].[RoomId], [t].[ServiceCompletedAt], [t].[ServiceId], [t].[ServiceStartedAt], [t].[StartTime], [t].[Status], [t].[TherapistId], [t].[TherapistNotes], [t].[UpdatedAt], [c].[CustomerId], [c].[Address], [c].[Allergies], [c].[City], [c].[CreatedAt], [c].[CustomerCode], [c].[CustomerSegment], [c].[DateOfBirth], [c].[Email], [c].[EmergencyContactName], [c].[EmergencyContactPhone], [c].[EmergencyContactRelationship], [c].[FirstName], [c].[FirstVisitDate], [c].[Gender], [c].[IsActive], [c].[LastName], [c].[LastVisitDate], [c].[LoyaltyPoints], [c].[MarketingConsent], [c].[MedicalNotes], [c].[MembershipExpiryDate], [c].[MembershipStartDate], [c].[MembershipType], [c].[MusicPreference], [c].[PhoneNumber], [c].[PostalCode], [c].[PreferredCommunicationChannel], [c].[PreferredTherapistId], [c].[PressurePreference], [c].[Province], [c].[ReferralSource], [c].[SegmentAssignedDate], [c].[SmsConsent], [c].[SpecialRequests], [c].[TemperaturePreference], [c].[TotalSpent], [c].[TotalVisits], [c].[UpdatedAt], [s].[ServiceId], [s].[CategoryId], [s].[CreatedAt], [s].[Description], [s].[DurationMinutes], [s].[IsActive], [s].[MemberPrice], [s].[PromoPrice], [s].[RegularPrice], [s].[ServiceCode], [s].[ServiceName], [s].[TherapistCommissionRate], [s].[UpdatedAt], [e].[EmployeeId], [r].[RoomId], [t0].[AppointmentServiceItemId], [t0].[AddedAt], [t0].[AppointmentId], [t0].[DurationMinutes], [t0].[Quantity], [t0].[ServiceId], [t0].[UnitPrice], [t0].[ServiceId0], [t0].[CategoryId], [t0].[CreatedAt], [t0].[Description], [t0].[DurationMinutes0], [t0].[IsActive], [t0].[MemberPrice], [t0].[PromoPrice], [t0].[RegularPrice], [t0].[ServiceCode], [t0].[ServiceName], [t0].[TherapistCommissionRate], [t0].[UpdatedAt], [e].[Address], [e].[City], [e].[CivilStatus], [e].[CreatedAt], [e].[DailyRate], [e].[DateOfBirth], [e].[Department], [e].[Email], [e].[EmergencyContactName], [e].[EmergencyContactPhone], [e].[EmployeeCode], [e].[EmploymentStatus], [e].[EmploymentType], [e].[FirstName], [e].[Gender], [e].[HireDate], [e].[IsActive], [e].[IsTherapist], [e].[LastName], [e].[LicenseExpiryDate], [e].[LicenseNumber], [e].[MiddleName], [e].[MonthlyBasicSalary], [e].[PagIBIGNumber], [e].[PayrollType], [e].[PhilHealthNumber], [e].[PhoneNumber], [e].[Position], [e].[PostalCode], [e].[Province], [e].[SSSNumber], [e].[Specialization], [e].[TINNumber], [e].[UpdatedAt], [e].[UserId], [r].[Capacity], [r].[CreatedAt], [r].[Description], [r].[IsActive], [r].[RoomCode], [r].[RoomName], [r].[RoomType], [r].[UpdatedAt]
+      FROM (
+          SELECT [a].[AppointmentId], [a].[AppointmentDate], [a].[AppointmentNumber], [a].[BookingSource], [a].[CancellationReason], [a].[CancelledAt], [a].[CheckedInAt], [a].[CreatedAt], [a].[CreatedBy], [a].[CustomerId], [a].[CustomerNotes], [a].[EndTime], [a].[RoomId], [a].[ServiceCompletedAt], [a].[ServiceId], [a].[ServiceStartedAt], [a].[StartTime], [a].[Status], [a].[TherapistId], [a].[TherapistNotes], [a].[UpdatedAt]
+          FROM [Appointments] AS [a]
+          WHERE [a].[AppointmentDate] >= @__request_DateFrom_Value_Date_0 AND [a].[AppointmentDate] <= @__request_DateTo_Value_Date_1
+          ORDER BY [a].[AppointmentDate], [a].[StartTime]
+          OFFSET @__p_2 ROWS FETCH NEXT @__p_3 ROWS ONLY
+      ) AS [t]
+      INNER JOIN [Customers] AS [c] ON [t].[CustomerId] = [c].[CustomerId]
+      INNER JOIN [Services] AS [s] ON [t].[ServiceId] = [s].[ServiceId]
+      LEFT JOIN [Employees] AS [e] ON [t].[TherapistId] = [e].[EmployeeId]
+      LEFT JOIN [Rooms] AS [r] ON [t].[RoomId] = [r].[RoomId]
+      LEFT JOIN (
+          SELECT [a0].[AppointmentServiceItemId], [a0].[AddedAt], [a0].[AppointmentId], [a0].[DurationMinutes], [a0].[Quantity], [a0].[ServiceId], [a0].[UnitPrice], [s0].[ServiceId] AS [ServiceId0], [s0].[CategoryId], [s0].[CreatedAt], [s0].[Description], [s0].[DurationMinutes] AS [DurationMinutes0], [s0].[IsActive], [s0].[MemberPrice], [s0].[PromoPrice], [s0].[RegularPrice], [s0].[ServiceCode], [s0].[ServiceName], [s0].[TherapistCommissionRate], [s0].[UpdatedAt]
+          FROM [AppointmentServiceItems] AS [a0]
+          INNER JOIN [Services] AS [s0] ON [a0].[ServiceId] = [s0].[ServiceId]
+      ) AS [t0] ON [t].[AppointmentId] = [t0].[AppointmentId]
+      ORDER BY [t].[AppointmentDate], [t].[StartTime], [t].[AppointmentId], [c].[CustomerId], [s].[ServiceId], [e].[EmployeeId], [r].[RoomId], [t0].[AppointmentServiceItemId]
+fail: Microsoft.EntityFrameworkCore.Query[10100]
+      An exception occurred while iterating over the results of a query for context type 'MiddayMistSpa.Infrastructure.Data.SpaDbContext'.
+      Microsoft.Data.SqlClient.SqlException (0x80131904): Invalid object name 'AppointmentServiceItems'.
+         at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+      --- End of stack trace from previous location ---
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+         at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      ClientConnectionId:535c324b-30bd-4aec-8faa-47c0189cfba3
+      Error Number:208,State:1,Class:16
+      Microsoft.Data.SqlClient.SqlException (0x80131904): Invalid object name 'AppointmentServiceItems'.
+         at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+      --- End of stack trace from previous location ---
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+         at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+      ClientConnectionId:535c324b-30bd-4aec-8faa-47c0189cfba3
+      Error Number:208,State:1,Class:16
+fail: Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware[1]
+      An unhandled exception has occurred while executing the request.
+      Microsoft.Data.SqlClient.SqlException (0x80131904): Invalid object name 'AppointmentServiceItems'.
+         at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+      --- End of stack trace from previous location ---
+         at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+         at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+      --- End of stack trace from previous location ---
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Storage.RelationalCommand.ExecuteReaderAsync(RelationalCommandParameterObject parameterObject, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.InitializeReaderAsync(AsyncEnumerator enumerator, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal.SqlServerExecutionStrategy.ExecuteAsync[TState,TResult](TState state, Func`4 operation, Func`4 verifySucceeded, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
+         at MiddayMistSpa.API.Services.AppointmentService.SearchAppointmentsAsync(AppointmentSearchRequest request) in C:\Users\golia\MiddayMistSpa\src\MiddayMistSpa.API\Services\AppointmentService.cs:line 204
+         at MiddayMistSpa.API.Controllers.AppointmentsController.SearchAppointments(AppointmentSearchRequest request) in C:\Users\golia\MiddayMistSpa\src\MiddayMistSpa.API\Controllers\AppointmentsController.cs:line 71
+         at lambda_method1451(Closure, Object)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.AwaitableObjectResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)
+      ClientConnectionId:535c324b-30bd-4aec-8faa-47c0189cfba3
+      Error Number:208,State:1,Class:16

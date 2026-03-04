@@ -1,0 +1,941 @@
+@page "/reports"
+@inject IDashboardService DashboardService
+@inject ITransactionApiService TransactionService
+@inject IReportsApiService ReportsService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Reports - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadReportData">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Reports & Analytics</h1>
+                <p class="text-muted mb-0">Business insights and performance metrics</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select" style="width: auto;" @bind="_selectedPeriod" @bind:after="LoadReportData">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="quarter">This Quarter</option>
+                    <option value="year">This Year</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+                <select class="form-select" style="width: auto;" @bind="_exportFormat">
+                    <option value="PDF">PDF</option>
+                    <option value="Excel">Excel</option>
+                    <option value="CSV">CSV</option>
+                </select>
+                <button class="btn btn-outline-primary" @onclick="ExportReport" disabled="@_isExporting">
+                    @if (_isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span> <text>Exporting...</text>
+                    }
+                    else
+                    {
+                        <i class="bi bi-download me-1"></i> <text>Export</text>
+                    }
+                </button>
+            </div>
+        </div>
+
+        @* Custom Date Range *@
+        @if (_selectedPeriod == "custom")
+        {
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-auto">
+                            <label class="form-label mb-0">From:</label>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="date" class="form-control" @bind="_customStart" />
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label mb-0">To:</label>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="date" class="form-control" @bind="_customEnd" />
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-primary" @onclick="LoadReportData">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading reports..." />
+        }
+        else
+        {
+            @* KPI Summary Cards *@
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <p class="text-muted mb-1 small">Total Revenue</p>
+                                    <h3 class="mb-0">@_totalRevenue.ToString("C")</h3>
+                                    <small class="@(_revenueChange >= 0 ? "text-success" : "text-danger")">
+                                        <i class="bi bi-@(_revenueChange >= 0 ? "arrow-up" : "arrow-down")"></i>
+                                        @Math.Abs(_revenueChange).ToString("N1")% vs last period
+                                    </small>
+                                </div>
+                                <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 50px; height: 50px;">
+                                    <i class="bi bi-currency-dollar text-success fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <p class="text-muted mb-1 small">Total Appointments</p>
+                                    <h3 class="mb-0">@_totalAppointments</h3>
+                                    <small class="@(_appointmentChange >= 0 ? "text-success" : "text-danger")">
+                                        <i class="bi bi-@(_appointmentChange >= 0 ? "arrow-up" : "arrow-down")"></i>
+                                        @Math.Abs(_appointmentChange).ToString("N1")% vs last period
+                                    </small>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 50px; height: 50px;">
+                                    <i class="bi bi-calendar-check text-primary fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <p class="text-muted mb-1 small">New Customers</p>
+                                    <h3 class="mb-0">@_newCustomers</h3>
+                                    <small class="@(_customerChange >= 0 ? "text-success" : "text-danger")">
+                                        <i class="bi bi-@(_customerChange >= 0 ? "arrow-up" : "arrow-down")"></i>
+                                        @Math.Abs(_customerChange).ToString("N1")% vs last period
+                                    </small>
+                                </div>
+                                <div class="bg-info bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 50px; height: 50px;">
+                                    <i class="bi bi-person-plus text-info fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <p class="text-muted mb-1 small">Avg. Transaction</p>
+                                    <h3 class="mb-0">@_avgTransaction.ToString("C")</h3>
+                                    <small class="@(_avgChange >= 0 ? "text-success" : "text-danger")">
+                                        <i class="bi bi-@(_avgChange >= 0 ? "arrow-up" : "arrow-down")"></i>
+                                        @Math.Abs(_avgChange).ToString("N1")% vs last period
+                                    </small>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                     style="width: 50px; height: 50px;">
+                                    <i class="bi bi-graph-up text-warning fs-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                @* Revenue Chart *@
+                <div class="col-md-8">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Revenue Trend</h6>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn @(_chartView == "daily" ? "btn-primary" : "btn-outline-primary")"
+                                        @onclick='() => ChangeChartView("daily")'>Daily</button>
+                                <button class="btn @(_chartView == "weekly" ? "btn-primary" : "btn-outline-primary")"
+                                        @onclick='() => ChangeChartView("weekly")'>Weekly</button>
+                                <button class="btn @(_chartView == "monthly" ? "btn-primary" : "btn-outline-primary")"
+                                        @onclick='() => ChangeChartView("monthly")'>Monthly</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="revenueChart" style="height: 220px; width: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                @* Top Services *@
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Top Services</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                @foreach (var service in _topServices)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-medium">@service.Name</div>
+                                            <small class="text-muted">@service.Count bookings</small>
+                                        </div>
+                                        <span class="badge bg-primary rounded-pill">@service.Revenue.ToString("C0")</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-0">
+                @* Payment Methods *@
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Payment Methods</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="paymentChart" style="height: 220px; width: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                @* Staff Performance *@
+                <div class="col-md-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Staff Performance</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Staff Member</th>
+                                            <th class="text-center">Appointments</th>
+                                            <th class="text-end">Revenue Generated</th>
+                                            <th class="text-center">Utilization</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var staff in _staffPerformance)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                             style="width: 30px; height: 30px; font-size: 0.75rem;">
+                                                            @staff.Initials
+                                                        </div>
+                                                        @staff.Name
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">@staff.Appointments</td>
+                                                <td class="text-end">@staff.Revenue.ToString("C")</td>
+                                                @{
+                                                    var utilizationClass = staff.Utilization >= 80 ? "bg-success" :
+                                                    staff.Utilization >=
+                                                    60 ? "bg-warning" : "bg-danger";
+                                                }
+                                                <td class="text-center">
+                                                    <div class="progress"
+                                                         style="height: 6px; width: 80px; display: inline-flex;">
+                                                        <div class="progress-bar @utilizationClass"
+                                                             style="width: @(staff.Utilization)%"></div>
+                                                    </div>
+                                                    <small class="ms-1">@staff.Utilization%</small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-0">
+                @* Appointment Status *@
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Appointment Status</h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="appointmentChart" style="height: 220px; width: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                @* Customer Insights *@
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Customer Insights</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-6 border-end">
+                                    <h4 class="mb-0">@_repeatRate.ToString("N0")%</h4>
+                                    <small class="text-muted">Repeat Rate</small>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="mb-0">@_avgVisitFrequency</h4>
+                                    <small class="text-muted">Avg. Visits/Mo</small>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Premium Members</span>
+                                <strong>@_premiumMembers</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Standard Members</span>
+                                <strong>@_standardMembers</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Walk-ins</span>
+                                <strong>@_walkIns</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* Product Sales *@
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent">
+                            <h6 class="mb-0">Top Product Sales</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                @foreach (var product in _topProducts)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                        <div>
+                                            <div class="small fw-medium">@product.Name</div>
+                                            <small class="text-muted">@product.UnitsSold units sold</small>
+                                        </div>
+                                        <span class="text-success fw-medium">@product.Revenue.ToString("C")</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Report Quick Links *@
+            <div class="row g-3 mt-4">
+                <div class="col-12">
+                    <h6 class="text-muted mb-3">Available Reports</h6>
+                </div>
+                @foreach (var report in _availableReports)
+                {
+                    <div class="col-md-3">
+                        <div class="card border-0 shadow-sm h-100" style="cursor: pointer;"
+                             @onclick="() => GenerateReport(report.Id)">
+                            <div class="card-body text-center py-4">
+                                <i class="bi @report.Icon display-6 text-primary mb-2"></i>
+                                <h6 class="mb-1">@report.Name</h6>
+                                <small class="text-muted">@report.Description</small>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Custom Report Modal *@
+    <Modal IsVisible="@_showCustomReportModal" Title="Custom Report Builder" Size="Modal.ModalSize.Default" Centered="true"
+           ShowCloseButton="true" OnClose="() => _showCustomReportModal = false">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Report Type</label>
+                <select class="form-select" @bind="_customReportType">
+                    <option value="sales">Revenue / Sales Report</option>
+                    <option value="appointment">Appointment Analytics</option>
+                    <option value="customer">Customer Analytics</option>
+                    <option value="inventory">Inventory Report</option>
+                    <option value="payroll">Payroll Summary</option>
+                    <option value="employee">Employee Performance</option>
+                    <option value="financial">Financial Summary</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Export Format</label>
+                <select class="form-select" @bind="_customReportFormat">
+                    <option value="PDF">PDF</option>
+                    <option value="Excel">Excel</option>
+                    <option value="CSV">CSV</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Date Range</label>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <input type="date" class="form-control" @bind="_customReportStart" />
+                    </div>
+                    <div class="col-6">
+                        <input type="date" class="form-control" @bind="_customReportEnd" />
+                    </div>
+                </div>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button class="btn btn-secondary" @onclick="() => _showCustomReportModal = false">Cancel</button>
+            <button class="btn btn-primary" @onclick="GenerateCustomReport" disabled="@_isExporting">
+                @if (_isExporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span> <text>Generating...</text>
+                }
+                else
+                {
+                    <i class="bi bi-download me-1"></i> <text>Generate Report</text>
+                }
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private bool _isLoading = true;
+    private string _selectedPeriod = "month";
+    private DateTime _customStart = DateTime.Today.AddMonths(-1);
+    private DateTime _customEnd = DateTime.Today;
+    private string _chartView = "daily";
+
+    private string _exportFormat = "PDF";
+    private string _exportReportType = "sales";
+    private bool _isExporting;
+
+    // KPIs
+    private decimal _totalRevenue;
+    private decimal _revenueChange;
+    private int _totalAppointments;
+    private decimal _appointmentChange;
+    private int _newCustomers;
+    private decimal _customerChange;
+    private decimal _avgTransaction;
+    private decimal _avgChange;
+
+    // Chart data
+    private List<DailyRevenue> _rawDailyTrend = new();
+    private List<ChartBar> _revenueData = new();
+    private List<TopServiceItem> _topServices = new();
+    private List<PaymentMethodItem> _paymentMethods = new();
+    private List<StaffPerformanceItem> _staffPerformance = new();
+    private List<AppointmentStatusItem> _appointmentStats = new();
+    private List<TopProductItem> _topProducts = new();
+
+    // Customer insights
+    private decimal _repeatRate;
+    private decimal _avgVisitFrequency;
+    private int _premiumMembers;
+    private int _standardMembers;
+    private int _walkIns;
+
+    // Available reports
+    private List<ReportItem> _availableReports = new();
+
+    // Custom report modal
+    private bool _showCustomReportModal;
+    private string _customReportType = "sales";
+    private string _customReportFormat = "PDF";
+    private DateTime _customReportStart = DateTime.Today.AddMonths(-1);
+    private DateTime _customReportEnd = DateTime.Today;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private bool _chartsRendered;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_isLoading && _revenueData.Any() && !_chartsRendered)
+        {
+            _chartsRendered = true;
+            await RenderAllCharts();
+        }
+    }
+
+    private async Task RenderAllCharts()
+    {
+        try
+        {
+            // Revenue Trend — bar chart
+            var revLabels = _revenueData.Select(r => r.Label).ToArray();
+            var revDatasets = new object[]
+            {
+                new { label = "Revenue", data = _revenueData.Select(r => (double)r.Value).ToArray(),
+                      backgroundColor = "rgba(46,125,111,0.7)", borderColor = "#2E7D6F", borderWidth = 2 }
+            };
+            await JSRuntime.InvokeVoidAsync("renderChart", "revenueChart", "bar", revLabels, revDatasets,
+                new { responsive = true, maintainAspectRatio = false,
+                      plugins = new { legend = new { display = false } },
+                      scales = new { y = new { beginAtZero = true,
+                          ticks = new { callback_currency = true } } } });
+
+            // Payment Methods — doughnut chart
+            if (_paymentMethods.Any())
+            {
+                var pmLabels = _paymentMethods.Select(p => string.IsNullOrEmpty(p.Method) ? p.Name : p.Method).ToArray();
+                var pmColors = new[] { "#2E7D6F", "#5CB8A7", "#8ED4C6", "#C0F0E5", "#1A5C50", "#3D9B8A" };
+                var pmDatasets = new object[]
+                {
+                    new { data = _paymentMethods.Select(p => (double)p.Percentage).ToArray(),
+                          backgroundColor = pmColors.Take(_paymentMethods.Count).ToArray(),
+                          borderWidth = 2, borderColor = "#fff" }
+                };
+                await JSRuntime.InvokeVoidAsync("renderChart", "paymentChart", "doughnut", pmLabels, pmDatasets,
+                    new { responsive = true, maintainAspectRatio = false,
+                          plugins = new { legend = new { position = "bottom", labels = new { padding = 12 } } } });
+            }
+
+            // Appointment Status — pie chart
+            if (_appointmentStats.Any())
+            {
+                var apLabels = _appointmentStats.Select(a => a.Name).ToArray();
+                var apColors = new[] { "#198754", "#dc3545", "#ffc107", "#0dcaf0" };
+                var apDatasets = new object[]
+                {
+                    new { data = _appointmentStats.Select(a => (double)a.Count).ToArray(),
+                          backgroundColor = apColors.Take(_appointmentStats.Count).ToArray(),
+                          borderWidth = 2, borderColor = "#fff" }
+                };
+                await JSRuntime.InvokeVoidAsync("renderChart", "appointmentChart", "pie", apLabels, apDatasets,
+                    new { responsive = true, maintainAspectRatio = false,
+                          plugins = new { legend = new { position = "bottom", labels = new { padding = 12 } } } });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Chart render error: {ex.Message}");
+        }
+    }
+
+    private List<ChartBar> BuildChartData(string view)
+    {
+        if (_rawDailyTrend == null || !_rawDailyTrend.Any())
+            return new List<ChartBar>();
+
+        IEnumerable<IGrouping<string, DailyRevenue>> grouped;
+
+        switch (view)
+        {
+            case "weekly":
+                grouped = _rawDailyTrend
+                    .GroupBy(d =>
+                    {
+                        var cal = System.Globalization.CultureInfo.CurrentCulture.Calendar;
+                        var week = cal.GetWeekOfYear(d.Date, System.Globalization.CalendarWeekRule.FirstDay, DayOfWeek.Monday);
+                        return $"Week {week}";
+                    });
+                break;
+            case "monthly":
+                grouped = _rawDailyTrend
+                    .GroupBy(d => d.Date.ToString("MMM yyyy"));
+                break;
+            default: // daily
+                grouped = _rawDailyTrend
+                    .GroupBy(d => d.Date.ToString("MMM dd"));
+                break;
+        }
+
+        var items = grouped.Select(g => new { Label = g.Key, Revenue = g.Sum(x => x.Revenue) }).ToList();
+        var maxRev = items.Max(x => x.Revenue);
+
+        return items.Select(item => new ChartBar
+        {
+            Label = item.Label,
+            Value = item.Revenue,
+            Height = maxRev > 0 ? (int)(item.Revenue / maxRev * 180) : 0
+        }).ToList();
+    }
+
+    private async Task ChangeChartView(string view)
+    {
+        _chartView = view;
+        _revenueData = BuildChartData(view);
+
+        // Re-render the revenue chart with new data
+        try
+        {
+            var revLabels = _revenueData.Select(r => r.Label).ToArray();
+            var revDatasets = new object[]
+            {
+                new { label = "Revenue", data = _revenueData.Select(r => (double)r.Value).ToArray(),
+                      backgroundColor = "rgba(46,125,111,0.7)", borderColor = "#2E7D6F", borderWidth = 2 }
+            };
+            await JSRuntime.InvokeVoidAsync("destroyChart", "revenueChart");
+            await JSRuntime.InvokeVoidAsync("renderChart", "revenueChart", "bar", revLabels, revDatasets,
+                new { responsive = true, maintainAspectRatio = false,
+                      plugins = new { legend = new { display = false } },
+                      scales = new { y = new { beginAtZero = true,
+                          ticks = new { callback_currency = true } } } });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Chart re-render error: {ex.Message}");
+        }
+
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("destroyChart", "revenueChart");
+            await JSRuntime.InvokeVoidAsync("destroyChart", "paymentChart");
+            await JSRuntime.InvokeVoidAsync("destroyChart", "appointmentChart");
+        }
+        catch { /* Component may be disposed during prerender */ }
+    }
+
+    private (DateTime startDate, DateTime endDate) GetDateRange()
+    {
+        var today = DateTime.Today;
+        return _selectedPeriod switch
+        {
+            "today" => (today, today),
+            "week" => (today.AddDays(-(int)today.DayOfWeek), today),
+            "month" => (new DateTime(today.Year, today.Month, 1), today),
+            "quarter" => (new DateTime(today.Year, ((today.Month - 1) / 3) * 3 + 1, 1), today),
+            "year" => (new DateTime(today.Year, 1, 1), today),
+            "custom" => (_customStart, _customEnd),
+            _ => (today.AddDays(-30), today)
+        };
+    }
+
+    private async Task LoadReportData()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var (startDate, endDate) = GetDateRange();
+
+            // Load dashboard data from API
+            var dashboard = await ReportsService.GetDashboardAsync(startDate, endDate);
+            if (dashboard != null)
+            {
+                _totalRevenue = dashboard.Kpis.TotalRevenue;
+                _revenueChange = dashboard.Kpis.RevenueChange;
+                _totalAppointments = dashboard.Kpis.TotalAppointments;
+                _appointmentChange = dashboard.Kpis.AppointmentChange;
+                _newCustomers = dashboard.Kpis.NewCustomers;
+                _customerChange = dashboard.Kpis.NewCustomerChange;
+                _avgTransaction = dashboard.Kpis.AverageTicket;
+                _avgChange = 0; // Not available in API - compute from historical data if needed
+
+                // Store raw daily trend and build chart data based on current view
+                _rawDailyTrend = dashboard.Revenue.DailyTrend;
+                _revenueData = BuildChartData(_chartView);
+
+                _topServices = dashboard.TopServices.Select(s => new TopServiceItem
+                {
+                    Name = s.ServiceName,
+                    Category = s.Category,
+                    Bookings = s.BookingCount,
+                    Revenue = s.TotalRevenue
+                }).ToList();
+
+                _repeatRate = dashboard.Kpis.CustomerRetentionRate;
+            }
+            else
+            {
+                // Fallback to defaults if API fails
+                _totalRevenue = 0;
+                _totalAppointments = 0;
+                _newCustomers = 0;
+                _avgTransaction = 0;
+            }
+
+            // Load sales report for payment methods breakdown
+            var salesReport = await ReportsService.GetSalesReportAsync(startDate, endDate, "day");
+            if (salesReport != null)
+            {
+                _paymentMethods = salesReport.ByCategory.Select(c => new PaymentMethodItem
+                {
+                    Method = c.Category,
+                    Amount = c.Revenue,
+                    Percentage = c.Percentage
+                }).ToList();
+            }
+
+            // Load employee performance
+            var employeePerf = await ReportsService.GetEmployeePerformanceAsync(startDate, endDate);
+            if (employeePerf != null)
+            {
+                _staffPerformance = employeePerf.Employees.Take(5).Select(e => new StaffPerformanceItem
+                {
+                    Name = e.EmployeeName,
+                    Position = e.Position,
+                    Initials = GetInitials(e.EmployeeName),
+                    Appointments = e.AppointmentsCompleted,
+                    Revenue = e.RevenueGenerated,
+                    Utilization = (int)e.UtilizationRate
+                }).ToList();
+            }
+
+            // Load customer report
+            var customerReport = await ReportsService.GetCustomerReportAsync(startDate, endDate);
+            if (customerReport != null)
+            {
+                _repeatRate = customerReport.RetentionRate;
+                _avgVisitFrequency = customerReport.AverageSpend > 0 ? (decimal)customerReport.ReturningCustomers / Math.Max(1,
+                customerReport.TotalCustomers) * 3 : 0;
+                _premiumMembers = customerReport.Segments.FirstOrDefault(s => s.SegmentName == "Premium")?.CustomerCount ?? 0;
+                _standardMembers = customerReport.Segments.FirstOrDefault(s => s.SegmentName == "Standard")?.CustomerCount ?? 0;
+                _walkIns = customerReport.Segments.FirstOrDefault(s => s.SegmentName == "Walk-in")?.CustomerCount ??
+                customerReport.NewCustomers;
+            }
+
+            _appointmentStats = GenerateAppointmentStats();
+            _topProducts = GenerateTopProducts();
+
+            _availableReports = new List<ReportItem>
+{
+new() { Id = "revenue", Name = "Revenue Report", Description = "Detailed revenue breakdown", Icon = "bi-graph-up" },
+new() { Id = "appointments", Name = "Appointment Report", Description = "Booking statistics", Icon = "bi-calendar-check" },
+new() { Id = "customers", Name = "Customer Report", Description = "Customer analytics", Icon = "bi-people" },
+new() { Id = "inventory", Name = "Inventory Report", Description = "Stock levels and usage", Icon = "bi-box-seam" },
+new() { Id = "payroll", Name = "Payroll Report", Description = "Staff compensation", Icon = "bi-wallet2" },
+new() { Id = "services", Name = "Service Analysis", Description = "Service performance", Icon = "bi-spa" },
+new() { Id = "marketing", Name = "Marketing Report", Description = "Campaign effectiveness", Icon = "bi-megaphone" },
+new() { Id = "custom", Name = "Custom Report", Description = "Build your own report", Icon = "bi-sliders" },
+};
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading report data: {ex.Message}");
+            ShowAlert("Failed to load report data. Please try again.", Alert.AlertType.Error);
+        }
+
+        _isLoading = false;
+        _chartsRendered = false;
+        StateHasChanged();
+    }
+
+    private string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+        return parts.Length > 0 ? parts[0][0].ToString().ToUpper() : "?";
+    }
+
+    private List<AppointmentStatusItem> GenerateAppointmentStats()
+    {
+        return new List<AppointmentStatusItem>
+{
+new() { Name = "Completed", Count = 289, Percentage = 84.5m, BadgeClass = "bg-success" },
+new() { Name = "Cancelled", Count = 28, Percentage = 8.2m, BadgeClass = "bg-danger" },
+new() { Name = "No Show", Count = 15, Percentage = 4.4m, BadgeClass = "bg-warning" },
+new() { Name = "Rescheduled", Count = 10, Percentage = 2.9m, BadgeClass = "bg-info" },
+};
+    }
+
+    private List<TopProductItem> GenerateTopProducts()
+    {
+        return new List<TopProductItem>
+{
+new() { Name = "Lavender Essential Oil", UnitsSold = 45, Revenue = 1125 },
+new() { Name = "Organic Face Cream", UnitsSold = 32, Revenue = 1600 },
+new() { Name = "Massage Candle Set", UnitsSold = 28, Revenue = 840 },
+new() { Name = "Bath Salt Collection", UnitsSold = 24, Revenue = 480 },
+};
+    }
+
+    private async Task GenerateReport(string reportId)
+    {
+        if (reportId == "custom")
+        {
+            var (startDate, endDate) = GetDateRange();
+            _customReportStart = startDate;
+            _customReportEnd = endDate;
+            _showCustomReportModal = true;
+            return;
+        }
+
+        _exportReportType = reportId switch
+        {
+            "revenue" => "sales",
+            "appointments" => "appointment",
+            "customers" => "customer",
+            "inventory" => "inventory",
+            "payroll" => "payroll",
+            "services" => "sales",
+            "marketing" => "sales",
+            _ => "financial"
+        };
+        await ExportReport();
+    }
+
+    private async Task GenerateCustomReport()
+    {
+        _showCustomReportModal = false;
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync(
+                _customReportType, _customReportFormat, _customReportStart, _customReportEnd);
+
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert($"{_customReportType} report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportReport()
+    {
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var (startDate, endDate) = GetDateRange();
+            var reportType = _exportReportType ?? "sales";
+
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync(reportType, _exportFormat, startDate, endDate);
+
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert($"{reportType} report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            _exportReportType = "sales";
+            StateHasChanged();
+        }
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+
+    // View Models
+    private class ChartBar
+    {
+        public string Label { get; set; } = string.Empty;
+        public decimal Value { get; set; }
+        public int Height { get; set; }
+    }
+
+    private class TopServiceItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public int Bookings { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private class PaymentMethodItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Method { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public decimal Percentage { get; set; }
+        public string Color { get; set; } = string.Empty;
+    }
+
+    private class StaffPerformanceItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public string Initials { get; set; } = string.Empty;
+        public int Appointments { get; set; }
+        public decimal Revenue { get; set; }
+        public int Utilization { get; set; }
+    }
+
+    private class AppointmentStatusItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public decimal Percentage { get; set; }
+        public string BadgeClass { get; set; } = string.Empty;
+    }
+
+    private class TopProductItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public int UnitsSold { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private class ReportItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
+    }
+}

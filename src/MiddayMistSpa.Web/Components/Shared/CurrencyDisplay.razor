@@ -1,0 +1,45 @@
+@* Reusable currency display component for showing amounts with optional dual-currency *@
+@if (!string.IsNullOrEmpty(Currency) && Currency != "PHP")
+{
+    <span class="currency-display" title="@GetTooltip()">
+        <span class="currency-primary">₱@Amount.ToString(Format)</span>
+        <span class="currency-converted text-muted">
+            ≈ @GetCurrencySymbol(Currency)@ConvertedAmount?.ToString(Format)
+            <small>@Currency</small>
+        </span>
+    </span>
+}
+else
+{
+    <span>₱@Amount.ToString(Format)</span>
+}
+
+@code {
+    [Parameter] public decimal Amount { get; set; }
+    [Parameter] public decimal? ConvertedAmount { get; set; }
+    [Parameter] public string? Currency { get; set; }
+    [Parameter] public decimal ExchangeRate { get; set; } = 1.0m;
+    [Parameter] public string Format { get; set; } = "N0";
+    [Parameter] public bool Compact { get; set; }
+
+    private string GetTooltip()
+    {
+        if (ConvertedAmount.HasValue)
+            return $"₱{Amount:N2} = {GetCurrencySymbol(Currency)}{ConvertedAmount:N2} {Currency} (rate: {ExchangeRate:N6})";
+        return $"₱{Amount:N2}";
+    }
+
+    public static string GetCurrencySymbol(string? code) => code switch
+    {
+        "USD" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "JPY" => "¥",
+        "CNY" => "¥",
+        "KRW" => "₩",
+        "SGD" => "S$",
+        "AUD" => "A$",
+        "PHP" => "₱",
+        _ => ""
+    };
+}

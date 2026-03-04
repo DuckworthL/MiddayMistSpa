@@ -1,0 +1,1521 @@
+@page "/appointments"
+@inject IAppointmentApiService AppointmentService
+@inject IServiceApiService ServiceApiService
+@inject IEmployeeApiService EmployeeService
+@inject ICustomerApiService CustomerService
+@inject ITransactionApiService TransactionService
+@inject IInventoryApiService InventoryService
+@inject ITimeAttendanceApiService TimeAttendanceService
+@inject IShiftApiService ShiftService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Appointments - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1" style="color: #2C2C2C;">Appointments</h1>
+                <p class="mb-0" style="color: #6B7280;">Schedule and manage spa appointments</p>
+            </div>
+            <div class="d-flex gap-2">
+                <div class="btn-group">
+                    <button class="btn @(_viewMode == "list" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => SetViewMode("list")'>
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <button class="btn @(_viewMode == "calendar" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => SetViewMode("calendar")'>
+                        <i class="bi bi-calendar3"></i>
+                    </button>
+                </div>
+                <button class="btn btn-primary" @onclick="ShowNewAppointmentModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Appointment
+                </button>
+            </div>
+        </div>
+
+        @* Date Navigation & Filters *@
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary" @onclick="PreviousDay">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="GoToToday">Today</button>
+                            <button class="btn btn-outline-secondary" @onclick="NextDay">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        @{
+                            var selectedDateValue = _selectedDate.ToString("yyyy-MM-dd");
+                        }
+                        <input type="date" class="form-control" value="@selectedDateValue" @onchange="OnDateChange" />
+                    </div>
+                    <div class="col">
+                        <input type="search" class="form-control" placeholder="Search customer or appointment…"
+                               value="@_searchTerm" @oninput="OnSearchChanged" />
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select" @onchange="OnStatusFilterChange">
+                            <option value="">All Statuses</option>
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="Confirmed">Confirmed</option>
+                            <option value="Checked In">Checked In</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="No Show">No Show</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button
+                            class="btn @(_showArchived ? "btn-secondary" : "btn-outline-secondary") d-flex align-items-center gap-1"
+                            @onclick="ToggleArchived"
+                            title="@(_showArchived ? "Hide archived appointments" : "Show archived appointments")">
+                            <i class="bi bi-archive"></i>
+                            @(_showArchived ? "Hide Archived" : "Archived")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading appointments..." />
+        }
+        else if (_viewMode == "list")
+        {
+            @* List View *@
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px;">Time</th>
+                                    <th>Customer</th>
+                                    <th>Service</th>
+                                    <th>Therapist</th>
+                                    <th>Room</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_appointments.Items.Any())
+                                {
+                                    @foreach (var appt in _appointments.Items.OrderBy(a => a.StartTime))
+                                    {
+                                        <tr class="@GetRowClass(appt)">
+                                            <td>
+                                                <div class="fw-medium">@(DateTime.Today.Add(appt.StartTime).ToString("h:mm tt"))
+                                                </div>
+                                                <small style="color: #6B7280;">@(DateTime.Today.Add(appt.EndTime).ToString("h:mm tt"))</small>
+                                            </td>
+                                            <td>
+                                                <div class="fw-medium">@appt.CustomerName</div>
+                                                <small class="text-muted">@appt.AppointmentCode</small>
+                                            </td>
+                                            <td>
+                                                @if (appt.ServiceItems.Any())
+                                                {
+                                                    @foreach (var si in appt.ServiceItems)
+                                                    {
+                                                        <div>@si.ServiceName</div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @appt.ServiceName
+                                                }
+                                            </td>
+                                            <td>@(appt.TherapistName ?? "Unassigned")</td>
+                                            <td>@(appt.RoomName ?? "—")</td>
+                                            <td>@appt.TotalDurationMinutes min</td>
+                                            <td>
+                                                <StatusBadge Status="@appt.Status" />
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    @if (appt.Status is "Scheduled" or "Confirmed")
+                                                    {
+                                                        <button class="btn btn-outline-success" @onclick="() => StartAppointment(appt)"
+                                                                title="Start Service">
+                                                            <i class="bi bi-play-fill"></i>
+                                                        </button>
+                                                    }
+                                                    @if (appt.Status == "In Progress")
+                                                    {
+                                                        <button class="btn btn-outline-info" @onclick="() => OpenProgressModal(appt)"
+                                                                title="View Progress / Checkout">
+                                                            <i class="bi bi-eye"></i>
+                                                        </button>
+                                                    }
+                                                    @if (appt.Status is "Scheduled" or "Confirmed")
+                                                    {
+                                                        <button class="btn btn-outline-primary" @onclick="() => EditAppointment(appt)"
+                                                                title="Edit">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                    }
+                                                    @if (appt.Status is "Scheduled" or "Confirmed" or "Checked In")
+                                                    {
+                                                        <button class="btn btn-outline-danger"
+                                                                @onclick="() => ShowCancelConfirmation(appt)" title="Cancel">
+                                                            <i class="bi bi-x-lg"></i>
+                                                        </button>
+                                                    }
+                                                    @if (!appt.IsArchived && appt.Status is "Completed" or "Cancelled" or "No Show")
+                                                    {
+                                                        <button class="btn btn-outline-secondary"
+                                                                @onclick="() => ArchiveAppointment(appt)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5">
+                                            <i class="bi bi-calendar-x display-4 text-muted"></i>
+                                            <p class="text-muted mt-2">No appointments for @_selectedDate.ToString("MMMM dd")
+                                            </p>
+                                            <button class="btn btn-primary btn-sm" @onclick="ShowNewAppointmentModal">
+                                                <i class="bi bi-plus me-1"></i> Schedule Appointment
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            @* Calendar/Timeline View *@
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row">
+                        @* Time slots *@
+                        <div class="col-auto pe-0">
+                            @for (var hour = 9; hour <= 21; hour++)
+                            {
+                                <div class="text-muted small text-end" style="height: 60px; line-height: 60px;">
+                                    @(DateTime.Today.Add(new TimeSpan(hour, 0, 0)).ToString("h:mm tt"))
+                                </div>
+                            }
+                        </div>
+                        @* Appointments *@
+                        <div class="col position-relative" style="min-height: 720px; border-left: 1px solid #dee2e6;">
+                            @* Hour grid lines *@
+                            @for (var hour = 9; hour <= 21; hour++)
+                            {
+                                <div class="position-absolute w-100"
+                                     style="top: @((hour - 9) * 60)px; border-top: 1px dashed #dee2e6;"></div>
+                            }
+
+                            @* Appointment blocks *@
+                            @foreach (var appt in _appointments.Items)
+                            {
+                                var top = (appt.StartTime.Hours - 9) * 60 + appt.StartTime.Minutes;
+                                var height = Math.Max(appt.DurationMinutes, 30);
+                                var appointmentStyle = $"top: {top}px; height: {height}px; left: 10px; right: 10px; cursor:                        pointer;";
+                                var appointmentClass = $"position-absolute rounded p-2 {GetAppointmentClass(appt)}";
+
+                                <div class="@appointmentClass" style="@appointmentStyle" @onclick="() => EditAppointment(appt)">
+                                    <div class="fw-medium small text-truncate">@appt.CustomerName</div>
+                                    <div class="small text-truncate opacity-75">@appt.ServiceName</div>
+                                    <div class="small opacity-75">@(DateTime.Today.Add(appt.StartTime).ToString("h:mm tt")) -
+                                        @(DateTime.Today.Add(appt.EndTime).ToString("h:mm tt"))</div>
+                                    </div>
+                                }
+
+                                @* Current time indicator *@
+                                @if (_selectedDate.Date == PhilippineTime.Today.Date)
+                                {
+                                    var now = PhilippineTime.Now.TimeOfDay;
+                                    if (now.Hours >= 9 && now.Hours <= 21)
+                                    {
+                                        var currentTop = (now.Hours - 9) * 60 + now.Minutes;
+                                        <div class="position-absolute bg-danger"
+                                             style="top: @(currentTop)px; left: 0; right: 0; height: 2px; z-index: 10;">
+                                            <div class="position-absolute rounded-circle bg-danger"
+                                                 style="width: 10px; height: 10px; left: -5px; top: -4px;"></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* New/Edit Appointment Modal *@
+        <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Appointment" : "New Appointment")"
+               Size="Modal.ModalSize.Large">
+            <ChildContent>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Customer *</label>
+                        <select class="form-select" @bind="_appointmentForm.CustomerId">
+                            <option value="0">Select Customer...</option>
+                            @foreach (var customer in _customerLookup)
+                            {
+                                <option value="@customer.Id">@customer.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Service *</label>
+                        <select class="form-select" @bind="_appointmentForm.ServiceId">
+                            <option value="0">Select Service...</option>
+                            @foreach (var service in _serviceLookup)
+                            {
+                                <option value="@service.Id">@service.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Therapist</label>
+                        <select class="form-select" value="@_appointmentForm.TherapistId" @onchange="OnTherapistChanged">
+                            <option value="">Any Available</option>
+                            @foreach (var therapist in _therapistLookup)
+                            {
+                                <option value="@therapist.Id">@therapist.Name</option>
+                            }
+                        </select>
+                        @if (!string.IsNullOrEmpty(_therapistScheduleHint))
+                        {
+                            <div class="alert alert-info py-1 px-2 mt-1 mb-0 small d-flex align-items-center">
+                                <i class="bi bi-calendar-week me-1"></i> @_therapistScheduleHint
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(_therapistAttendanceWarning))
+                        {
+                            <div
+                                class="alert @_therapistAttendanceAlertClass py-1 px-2 mt-1 mb-0 small d-flex align-items-center">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> @_therapistAttendanceWarning
+                            </div>
+                        }
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Room</label>
+                        <select class="form-select" @bind="_appointmentForm.RoomId">
+                            <option value="">Auto-assign</option>
+                            @foreach (var room in _roomLookup)
+                            {
+                                <option value="@room.RoomId">@room.RoomName (@room.RoomType)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Date *</label>
+                        @{
+                            var dateValue = _appointmentForm.AppointmentDate.ToString("yyyy-MM-dd");
+                        }
+                        <input type="date" class="form-control" value="@dateValue" @onchange="OnAppointmentDateChange" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Time *</label>
+                        <select class="form-select" @bind="_selectedTimeSlot">
+                            <option value="">Select Time...</option>
+                            @foreach (var slot in _availableSlots)
+                            {
+                                <option value="@slot.ToString()">@(DateTime.Today.Add(slot).ToString("h:mm tt"))</option>
+                            }
+                        </select>
+                        @if (_appointmentForm.ServiceId > 0 && !_availableSlots.Any())
+                        {
+                            <div class="alert alert-warning py-1 px-2 mt-1 mb-0 small">
+                                <i class="bi bi-info-circle me-1"></i>
+                                @if (_appointmentForm.TherapistId.HasValue && _appointmentForm.TherapistId > 0)
+                                {
+                                    var therapistName = _therapistLookup.FirstOrDefault(t => t.Id ==
+                                    _appointmentForm.TherapistId)?.Name ?? "This therapist";
+                                    <span>@therapistName has no available time slots on
+                                        @_appointmentForm.AppointmentDate.ToString("MMM dd, yyyy (dddd)"). Try selecting a different
+                                        date or therapist.</span>
+                                    }
+                        else
+                                    {
+                                        <span>No time slots are available on @_appointmentForm.AppointmentDate.ToString("MMM dd, yyyy (dddd)"). Try a different date.</span>
+                                    }
+                                </div>
+                            }
+                            @if (_unavailableTherapists.Any() && _appointmentForm.TherapistId is null or 0)
+                            {
+                                <div class="mt-1 small text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>Some therapists may be unavailable:
+                                    <ul class="mb-0 ps-3" style="font-size: 0.85em;">
+                                        @foreach (var ut in _unavailableTherapists.GroupBy(u => u.TherapistName).Take(5))
+                                        {
+                                            <li>@ut.Key — @ut.First().Reason</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" rows="2" @bind="_appointmentForm.Notes"
+                                      placeholder="Any special instructions..."></textarea>
+                        </div>
+                    </div>
+                </ChildContent>
+                <FooterContent>
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveAppointment" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @(_isEditing ? "Update" : "Book") Appointment
+                    </button>
+                </FooterContent>
+            </Modal>
+
+            @* Appointment Progress Modal *@
+            <Modal @bind-IsVisible="_showProgressModal" Title="Service In Progress" Size="Modal.ModalSize.Large">
+                <ChildContent>
+                    @if (_activeAppointment != null)
+                    {
+                        <div class="row g-4">
+                            @* Left Column - Service Info *@
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <i class="bi bi-clipboard-check me-2"></i>Service Details
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-2">
+                                            <i class="bi bi-person-fill text-muted me-2"></i>
+                                            <strong>Customer:</strong> @_activeAppointment.CustomerName
+                                        </div>
+                                        <div class="mb-2">
+                                            <i class="bi bi-person-badge text-muted me-2"></i>
+                                            <strong>Therapist:</strong> @(_activeAppointment.TherapistName ?? "Not Assigned")
+                                        </div>
+                                        <div class="mb-2">
+                                            <i class="bi bi-clock text-muted me-2"></i>
+                                            <strong>Scheduled:</strong>
+                                            @(DateTime.Today.Add(_activeAppointment.StartTime).ToString("h:mm tt")) -
+                                            @(DateTime.Today.Add(_activeAppointment.EndTime).ToString("h:mm tt"))
+                                        </div>
+                                        <div class="mb-3">
+                                            <i class="bi bi-hourglass-split text-muted me-2"></i>
+                                            <strong>Duration:</strong> @_activeAppointment.TotalDurationMinutes minutes
+                                        </div>
+
+                                        <hr />
+                                        <h6 class="mb-2"><i class="bi bi-gem me-1"></i>Services</h6>
+                                        @if (_activeAppointment.ServiceItems.Any())
+                                        {
+                                            @foreach (var si in _activeAppointment.ServiceItems)
+                                            {
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span>@si.ServiceName (@si.DurationMinutes min)</span>
+                                                    <span>₱@si.UnitPrice.ToString("N0")</span>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>@_activeAppointment.ServiceName (@_activeAppointment.DurationMinutes min)</span>
+                                                <span>₱@_servicePrice.ToString("N0")</span>
+                                            </div>
+                                        }
+
+                                        @* Add Service Section *@
+                                        <div class="mt-3">
+                                            <div class="row g-2">
+                                                <div class="col">
+                                                    <select class="form-select form-select-sm" @bind="_addServiceId">
+                                                        <option value="0">Add another service...</option>
+                                                        @foreach (var svc in _serviceLookup)
+                                                        {
+                                                            <option value="@svc.Id">@svc.Name</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-auto">
+                                                    <button class="btn btn-sm btn-primary" @onclick="AddServiceToAppointment"
+                                                            disabled="@(_addServiceId == 0 || _isAddingService)">
+                                                        @if (_isAddingService)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm"></span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-plus-lg"></i>
+                                                        }
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Right Column - Timer *@
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <i class="bi bi-stopwatch me-2"></i>Time Elapsed
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <div class="display-3 mb-3 font-monospace">
+                                            @_elapsedTime.ToString(@"hh\:mm\:ss")
+                                        </div>
+                                        <div class="progress mb-3" style="height: 20px;">
+                                            <div class="progress-bar @(_progressPercent > 100 ? "bg-warning" : "bg-success")"
+                                                 style="width: @Math.Min(_progressPercent, 100)%">
+                                                @_progressPercent.ToString("0")%
+                                            </div>
+                                        </div>
+                                        @if (_progressPercent > 100)
+                                        {
+                                            <div class="text-warning">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                Overtime: @((_elapsedTime.TotalMinutes -
+                                                                                _activeAppointment.TotalDurationMinutes).ToString("0")) min
+                                            </div>
+                                        }
+                                        <div class="text-muted">
+                                            Started at @_serviceStartTime?.ToString("h:mm tt")
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Add Products Section *@
+                            <div class="col-12">
+                                <div class="card">
+                                    <div
+                                        class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-bag-plus me-2"></i>Add Products (Optional)</span>
+                                        <button class="btn btn-sm btn-light" @onclick="ToggleProductSection">
+                                            <i class="bi bi-@(_showProductSection ? "chevron-up" : "chevron-down")"></i>
+                                        </button>
+                                    </div>
+                                    @if (_showProductSection)
+                                    {
+                                        <div class="card-body">
+                                            <div class="row g-2 mb-3">
+                                                <div class="col">
+                                                    <select class="form-select" @bind="_selectedProductId">
+                                                        <option value="0">Select a product...</option>
+                                                        @foreach (var product in _productLookup)
+                                                        {
+                                                            <option value="@product.Id">@product.Name - @((product.Price ??
+                                                                                                            0).ToString("C"))</option>
+                                                            }
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-auto">
+                                                        <button class="btn btn-primary" @onclick="AddProductToCheckout"
+                                                                disabled="@(_selectedProductId == 0)">
+                                                            <i class="bi bi-plus-lg"></i> Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                @if (_checkoutProducts.Any())
+                                                {
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Product</th>
+                                                                <th class="text-end">Price</th>
+                                                                <th class="text-center">Qty</th>
+                                                                <th></th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var item in _checkoutProducts)
+                                                            {
+                                                                <tr>
+                                                                    <td>@item.Name</td>
+                                                                    <td class="text-end">@item.Price.ToString("C")</td>
+                                                                    <td class="text-center">@item.Quantity</td>
+                                                                    <td class="text-end">
+                                                                        <button class="btn btn-sm btn-outline-danger"
+                                                                                @onclick="() => RemoveProduct(item)">
+                                                                            <i class="bi bi-x"></i>
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                @* Checkout Summary *@
+                                <div class="col-12">
+                                    <div class="card border-primary">
+                                        <div class="card-body">
+                                            <div class="row align-items-center">
+                                                <div class="col">
+                                                    @if (_activeAppointment.ServiceItems.Any())
+                                                    {
+                                                        @foreach (var si in _activeAppointment.ServiceItems)
+                                                        {
+                                                            <div class="d-flex justify-content-between mb-1">
+                                                                <span>@si.ServiceName x @si.Quantity:</span>
+                                                                <span>@((si.UnitPrice * si.Quantity).ToString("C"))</span>
+                                                            </div>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span>Service (@_activeAppointment.ServiceName):</span>
+                                                            <span>@_servicePrice.ToString("C")</span>
+                                                        </div>
+                                                    }
+                                                    @if (_checkoutProducts.Any())
+                                                    {
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span>Products:</span>
+                                                            <span>@_checkoutProducts.Sum(p => p.Price * p.Quantity).ToString("C")</span>
+                                                        </div>
+                                                    }
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>VAT (12%):</span>
+                                                        <span>@TaxAmount.ToString("C")</span>
+                                                    </div>
+                                                    <hr class="my-2" />
+                                                    <div class="d-flex justify-content-between fw-bold fs-5">
+                                                        <span>Total:</span>
+                                                        <span class="text-primary">@TotalAmount.ToString("C")</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-auto">
+                                                    <div class="mb-2">
+                                                        <label class="form-label mb-1">Payment Method</label>
+                                                        <select class="form-select" @bind="_paymentMethod">
+                                                            <option value="Cash">Cash</option>
+                                                            <option value="Card">Card</option>
+                                                            <option value="GCash">GCash</option>
+                                                            <option value="Maya">Maya</option>
+                                                            <option value="Bank Transfer">Bank Transfer</option>
+                                                            <option value="Split">Split</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </ChildContent>
+                    <FooterContent>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseProgressModal">
+                            <i class="bi bi-x-lg me-1"></i>Close
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" @onclick="CompleteAndPay"
+                                disabled="@_isProcessingPayment">
+                            @if (_isProcessingPayment)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-circle me-1"></i>Complete & Pay @TotalAmount.ToString("C")
+                        </button>
+                    </FooterContent>
+                </Modal>
+
+                @* Payment Success Modal *@
+                <Modal @bind-IsVisible="_showPaymentSuccessModal" Title="Payment Complete">
+                    <ChildContent>
+                        <div class="text-center py-4">
+                            <i class="bi bi-check-circle-fill text-success display-1 mb-3"></i>
+                            <h4>Payment Successful!</h4>
+                            <p class="text-muted mb-3">Transaction #@_lastTransactionNumber</p>
+                            <div class="fs-3 fw-bold text-primary mb-2">@_lastPaymentAmount.ToString("C")</div>
+                            <p class="text-muted">Paid via @_lastPaymentMethod</p>
+                        </div>
+                    </ChildContent>
+                    <FooterContent>
+                        <button type="button" class="btn btn-secondary"
+                                @onclick="() => _showPaymentSuccessModal = false">Close</button>
+                        <button type="button" class="btn btn-primary" @onclick="PrintServiceReceipt">
+                            <i class="bi bi-printer me-1"></i>Print Receipt
+                        </button>
+                    </FooterContent>
+                </Modal>
+
+                @* Cancel Confirmation *@
+                <ConfirmDialog @bind-IsVisible="_showCancelConfirm" Title="Cancel Appointment"
+                               Message="@($"Cancel appointment for {_appointmentToCancel?.CustomerName}?")" ConfirmText="Yes, Cancel"
+                               IsDanger="true" OnConfirm="CancelAppointment" />
+
+                @* Alert *@
+                @if (!string.IsNullOrEmpty(_alertMessage))
+                {
+                    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+                        <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+                    </div>
+                }
+            </AuthorizedPage>
+
+@code {
+    private PagedResponse<AppointmentResponse> _appointments = new();
+    private bool _isLoading = true;
+    private DateTime _selectedDate = PhilippineTime.Today;
+    private string? _statusFilter;
+    private string _searchTerm = string.Empty;
+    private bool _showArchived = false;
+    private string _viewMode = "list";
+
+    // Lookups
+    private List<LookupItem> _customerLookup = new();
+    private List<LookupItem> _serviceLookup = new();
+    private List<LookupItem> _therapistLookup = new();
+    private List<RoomResponse> _roomLookup = new();
+    private List<TimeSpan> _availableSlots = new();
+
+    // Modal state
+    private bool _showModal;
+    private bool _isEditing;
+    private bool _isSaving;
+    private CreateAppointmentRequest _appointmentForm = new();
+    private int? _editingAppointmentId;
+    private string _selectedTimeSlot = string.Empty;
+
+    // Therapist attendance warning
+    private string _therapistAttendanceWarning = string.Empty;
+    private string _therapistAttendanceAlertClass = string.Empty;
+    private List<LiveAttendanceStatus> _therapistAttendanceCache = new();
+    private string _therapistScheduleHint = string.Empty;
+    private List<UnavailableTherapistResponse> _unavailableTherapists = new();
+
+    // Cancel confirmation
+    private bool _showCancelConfirm;
+    private AppointmentResponse? _appointmentToCancel;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    // Progress Modal State
+    private bool _showProgressModal;
+    private AppointmentResponse? _activeAppointment;
+    private DateTime? _serviceStartTime;
+    private TimeSpan _elapsedTime = TimeSpan.Zero;
+    private double _progressPercent;
+    private System.Threading.Timer? _timer;
+    private bool _showProductSection;
+    private List<LookupItem> _productLookup = new();
+    private int _selectedProductId;
+    private List<CheckoutProduct> _checkoutProducts = new();
+    private decimal _servicePrice;
+    private string _paymentMethod = "Cash";
+    private bool _isProcessingPayment;
+
+    // Pending Transaction (created when service starts)
+    private TransactionResponse? _pendingTransaction;
+
+    // Add Service
+    private int _addServiceId;
+    private bool _isAddingService;
+
+    // Payment Success
+    private bool _showPaymentSuccessModal;
+    private string _lastTransactionNumber = string.Empty;
+    private decimal _lastPaymentAmount;
+    private string _lastPaymentMethod = string.Empty;
+
+    private const decimal TaxRate = 0.12m;
+    private decimal SubtotalAmount
+    {
+        get
+        {
+            decimal serviceTotal;
+            if (_activeAppointment?.ServiceItems.Any() == true)
+                serviceTotal = _activeAppointment.ServiceItems.Sum(s => s.UnitPrice * s.Quantity);
+            else
+                serviceTotal = _servicePrice;
+            return serviceTotal + _checkoutProducts.Sum(p => p.Price * p.Quantity);
+        }
+    }
+    private decimal TaxAmount => SubtotalAmount * TaxRate;
+    private decimal TotalAmount => SubtotalAmount + TaxAmount;
+
+    // Helper class for checkout products
+    private class CheckoutProduct
+    {
+        public int ProductId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadData()
+    {
+        await LoadLookups();
+        await LoadAppointments();
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            Console.WriteLine("LoadLookups: Starting to load lookups...");
+
+            var customersTask = CustomerService.GetCustomerLookupAsync();
+            var servicesTask = ServiceApiService.GetServiceLookupAsync();
+            var therapistsTask = EmployeeService.GetTherapistsAsync();
+            var roomsTask = AppointmentService.GetRoomsAsync();
+
+            await Task.WhenAll(customersTask, servicesTask, therapistsTask, roomsTask);
+
+            _customerLookup = await customersTask;
+            _serviceLookup = await servicesTask;
+            _therapistLookup = await therapistsTask;
+            _roomLookup = await roomsTask;
+
+            Console.WriteLine($"LoadLookups: Loaded {_customerLookup.Count} customers, {_serviceLookup.Count} services, {_therapistLookup.Count} therapists, {_roomLookup.Count} rooms");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"LoadLookups Error: {ex.Message}");
+            _alertMessage = $"Error loading data: {ex.Message}";
+            _alertType = Alert.AlertType.Error;
+        }
+    }
+
+    private async Task LoadAppointments()
+    {
+        _isLoading = true;
+        _appointments = await AppointmentService.GetAppointmentsAsync(
+        date: _selectedDate, status: _statusFilter,
+        searchTerm: _searchTerm, includeArchived: _showArchived);
+        _isLoading = false;
+    }
+
+    private async Task ToggleArchived()
+    {
+        _showArchived = !_showArchived;
+        await LoadAppointments();
+    }
+
+    private async Task OnSearchChanged(ChangeEventArgs e)
+    {
+        _searchTerm = e.Value?.ToString() ?? string.Empty;
+        await LoadAppointments();
+    }
+
+    private void SetViewMode(string mode)
+    {
+        _viewMode = mode;
+    }
+
+    private async Task PreviousDay()
+    {
+        _selectedDate = _selectedDate.AddDays(-1);
+        await LoadAppointments();
+    }
+
+    private async Task NextDay()
+    {
+        _selectedDate = _selectedDate.AddDays(1);
+        await LoadAppointments();
+    }
+
+    private async Task GoToToday()
+    {
+        _selectedDate = PhilippineTime.Today;
+        await LoadAppointments();
+    }
+
+    private async Task OnDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            _selectedDate = date;
+            await LoadAppointments();
+        }
+    }
+
+    private async Task OnStatusFilterChange(ChangeEventArgs e)
+    {
+        _statusFilter = e.Value?.ToString();
+        await LoadAppointments();
+    }
+
+    private async Task ShowNewAppointmentModal()
+    {
+        _isEditing = false;
+        _editingAppointmentId = null;
+        _appointmentForm = new CreateAppointmentRequest
+        {
+            AppointmentDate = _selectedDate
+        };
+        _selectedTimeSlot = string.Empty;
+        _therapistAttendanceWarning = string.Empty;
+        _therapistAttendanceAlertClass = string.Empty;
+        _therapistScheduleHint = string.Empty;
+        _unavailableTherapists = new();
+        await LoadTherapistAttendanceCache();
+        await LoadAvailableSlots();
+        _showModal = true;
+    }
+
+    private async Task EditAppointment(AppointmentResponse appt)
+    {
+        _isEditing = true;
+        _editingAppointmentId = appt.AppointmentId;
+        _appointmentForm = new CreateAppointmentRequest
+        {
+            CustomerId = appt.CustomerId,
+            ServiceId = appt.ServiceId,
+            TherapistId = appt.TherapistId,
+            RoomId = appt.RoomId,
+            AppointmentDate = appt.AppointmentDate,
+            StartTime = appt.StartTime,
+            Notes = appt.Notes
+        };
+        _selectedTimeSlot = appt.StartTime.ToString();
+        _therapistAttendanceWarning = string.Empty;
+        _therapistAttendanceAlertClass = string.Empty;
+        _therapistScheduleHint = string.Empty;
+        _unavailableTherapists = new();
+        await LoadTherapistAttendanceCache();
+        await LoadTherapistScheduleHint();
+        await LoadAvailableSlots();
+        CheckTherapistAttendance();
+        _showModal = true;
+    }
+
+    private async Task OnAppointmentDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            _appointmentForm.AppointmentDate = date;
+            await LoadAvailableSlots();
+            CheckTherapistAttendance();
+        }
+    }
+
+    private async Task OnTherapistChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        _appointmentForm.TherapistId = int.TryParse(val, out var id) ? id : null;
+        await LoadTherapistScheduleHint();
+        await LoadAvailableSlots();
+        CheckTherapistAttendance();
+    }
+
+    private async Task LoadTherapistScheduleHint()
+    {
+        _therapistScheduleHint = string.Empty;
+
+        if (!_appointmentForm.TherapistId.HasValue || _appointmentForm.TherapistId == 0)
+            return;
+
+        try
+        {
+            var shifts = await ShiftService.GetEmployeeShiftsAsync(_appointmentForm.TherapistId.Value);
+            if (shifts.Any())
+            {
+                var dayNames = shifts
+                .Where(s => s.IsActive)
+                .OrderBy(s => s.DayOfWeek)
+                .Select(s => s.DayName)
+                .Distinct()
+                .ToList();
+
+                var therapistName = _therapistLookup.FirstOrDefault(t => t.Id == _appointmentForm.TherapistId)?.Name ?? "This therapist";
+                _therapistScheduleHint = dayNames.Any()
+                ? $"{therapistName} works on {string.Join(", ", dayNames)}."
+                : $"{therapistName} has no active schedule configured.";
+            }
+        }
+        catch
+        {
+            // Silently skip — schedule hint is non-critical
+        }
+    }
+
+    private void CheckTherapistAttendance()
+    {
+        _therapistAttendanceWarning = string.Empty;
+        _therapistAttendanceAlertClass = string.Empty;
+
+        if (!_appointmentForm.TherapistId.HasValue || _appointmentForm.TherapistId == 0)
+            return;
+
+        // Only check for today's appointments
+        if (_appointmentForm.AppointmentDate.Date != PhilippineTime.Today)
+            return;
+
+        var status = _therapistAttendanceCache
+        .FirstOrDefault(s => s.EmployeeId == _appointmentForm.TherapistId.Value);
+
+        if (status == null)
+            return;
+
+        switch (status.Status)
+        {
+            case "NotYetIn":
+                _therapistAttendanceWarning = $"{status.EmployeeName} has not clocked in today. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-warning";
+                break;
+            case "OnBreak":
+                _therapistAttendanceWarning = $"{status.EmployeeName} is currently on break. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-warning";
+                break;
+            case "ClockedOut":
+                _therapistAttendanceWarning = $"{status.EmployeeName} has already clocked out for today. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-info";
+                break;
+            case "ClockedIn":
+                // All good — no warning
+                break;
+        }
+    }
+
+    private async Task LoadTherapistAttendanceCache()
+    {
+        try
+        {
+            _therapistAttendanceCache = await TimeAttendanceService.GetLiveStatusAsync();
+        }
+        catch
+        {
+            _therapistAttendanceCache = new();
+        }
+    }
+
+    private async Task LoadAvailableSlots()
+    {
+        _unavailableTherapists = new();
+
+        if (_appointmentForm.ServiceId > 0)
+        {
+            var detailedSlots = await AppointmentService.GetAvailableSlotsDetailedAsync(
+            _appointmentForm.ServiceId,
+            _appointmentForm.AppointmentDate,
+            _appointmentForm.TherapistId);
+
+            _availableSlots = detailedSlots
+            .Where(s => s.AvailableTherapists.Any())
+            .Select(s => s.StartTime)
+            .ToList();
+
+            // Collect unique unavailable therapist reasons for display
+            _unavailableTherapists = detailedSlots
+            .SelectMany(s => s.UnavailableTherapists)
+            .GroupBy(u => new { u.TherapistId, u.Reason })
+            .Select(g => g.First())
+            .ToList();
+        }
+        else
+        {
+            // Default slots (9 AM – 9 PM, matching API business hours)
+            _availableSlots = new List<TimeSpan>();
+            for (var hour = 9; hour < 21; hour++)
+            {
+                _availableSlots.Add(new TimeSpan(hour, 0, 0));
+                _availableSlots.Add(new TimeSpan(hour, 30, 0));
+            }
+        }
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task SaveAppointment()
+    {
+        if (_appointmentForm.CustomerId == 0 || _appointmentForm.ServiceId == 0)
+        {
+            ShowAlert("Please select a customer and service.", Alert.AlertType.Warning);
+            return;
+        }
+
+        if (TimeSpan.TryParse(_selectedTimeSlot, out var startTime))
+        {
+            _appointmentForm.StartTime = startTime;
+        }
+        else
+        {
+            ShowAlert("Please select a time slot.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            AppointmentResponse? result;
+            string? errorMessage = null;
+
+            if (_isEditing && _editingAppointmentId.HasValue)
+            {
+                var updateRequest = new UpdateAppointmentRequest
+                {
+                    ServiceId = _appointmentForm.ServiceId,
+                    TherapistId = _appointmentForm.TherapistId,
+                    RoomId = _appointmentForm.RoomId,
+                    AppointmentDate = _appointmentForm.AppointmentDate,
+                    StartTime = _appointmentForm.StartTime,
+                    Notes = _appointmentForm.Notes
+                };
+                var (updateResult, updateError) = await AppointmentService.UpdateAppointmentWithErrorAsync(_editingAppointmentId.Value,
+                updateRequest);
+                result = updateResult;
+                errorMessage = updateError;
+            }
+            else
+            {
+                var (createResult, error) = await AppointmentService.CreateAppointmentWithErrorAsync(_appointmentForm);
+                result = createResult;
+                errorMessage = error;
+            }
+
+            if (result != null)
+            {
+                ShowAlert($"Appointment {(_isEditing ? "updated" : "booked")} successfully!", Alert.AlertType.Success);
+                _showModal = false;
+                await LoadAppointments();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to save appointment. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveAppointment error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the appointment.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private async Task UpdateStatus(AppointmentResponse appt, string newStatus)
+    {
+        var updateRequest = new UpdateAppointmentRequest { Status = newStatus };
+        var result = await AppointmentService.UpdateAppointmentAsync(appt.AppointmentId, updateRequest);
+
+        if (result != null)
+        {
+            ShowAlert($"Appointment marked as {newStatus}!", Alert.AlertType.Success);
+            await LoadAppointments();
+        }
+    }
+
+    private void ShowCancelConfirmation(AppointmentResponse appt)
+    {
+        _appointmentToCancel = appt;
+        _showCancelConfirm = true;
+    }
+
+    private async Task CancelAppointment()
+    {
+        if (_appointmentToCancel != null)
+        {
+            var success = await AppointmentService.CancelAppointmentAsync(_appointmentToCancel.AppointmentId);
+            if (success)
+            {
+                ShowAlert("Appointment cancelled.", Alert.AlertType.Success);
+                await LoadAppointments();
+            }
+        }
+        _appointmentToCancel = null;
+    }
+
+    private async Task ArchiveAppointment(AppointmentResponse appt)
+    {
+        var success = await AppointmentService.ArchiveAppointmentAsync(appt.AppointmentId);
+        if (success)
+        {
+            ShowAlert($"Appointment for {appt.CustomerName} has been archived.", Alert.AlertType.Success);
+            await LoadAppointments();
+        }
+        else
+        {
+            ShowAlert("Failed to archive appointment.", Alert.AlertType.Error);
+        }
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+
+    private string GetRowClass(AppointmentResponse appt) => appt.Status switch
+    {
+        "Completed" => "table-success",
+        "Cancelled" or "No Show" => "table-secondary text-muted",
+        "Checked In" => "table-warning",
+        "In Progress" => "table-info",
+        _ => ""
+    };
+
+    private string GetAppointmentClass(AppointmentResponse appt) => appt.Status switch
+    {
+        "Completed" => "bg-success text-white",
+        "Cancelled" or "No Show" => "bg-secondary text-white opacity-50",
+        "Checked In" => "bg-warning text-dark",
+        "In Progress" => "bg-info text-white",
+        "Confirmed" => "bg-primary text-white",
+        _ => "bg-primary bg-opacity-75 text-white"
+    };
+
+    // ========================================================================
+    // Appointment Progress Methods
+    // ========================================================================
+
+    private async Task StartAppointment(AppointmentResponse appt)
+    {
+        try
+        {
+            // First check-in if needed (Scheduled/Confirmed → Checked-In)
+            if (appt.Status is "Scheduled" or "Confirmed")
+            {
+                var checkedIn = await AppointmentService.CheckInAppointmentAsync(appt.AppointmentId);
+                if (checkedIn == null)
+                {
+                    ShowAlert("Failed to check in appointment.", Alert.AlertType.Error);
+                    return;
+                }
+            }
+
+            // Then start service (Checked-In → In Progress)
+            var result = await AppointmentService.StartServiceAsync(appt.AppointmentId);
+
+            if (result != null)
+            {
+                // Create a Pending transaction so it shows up in the Transactions list
+                try
+                {
+                    _pendingTransaction = await TransactionService.CreatePendingTransactionAsync(appt.AppointmentId);
+                }
+                catch (Exception ex)
+                {
+                    // Non-critical — log but don't block the service start
+                    Console.WriteLine($"Warning: Could not create pending transaction: {ex.Message}");
+                }
+
+                ShowAlert("Service started!", Alert.AlertType.Success);
+                await LoadAppointments();
+
+                // Open progress modal with the full appointment data from the start response
+                await OpenProgressModal(result);
+            }
+            else
+            {
+                ShowAlert("Failed to start service.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error starting service: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private async Task OpenProgressModal(AppointmentResponse appt)
+    {
+        // Fetch full appointment details by ID to get all fields (ServiceId, DurationMinutes, CustomerId, etc.)
+        // The list endpoint returns AppointmentListResponse which is missing these fields
+        var fullAppt = await AppointmentService.GetAppointmentByIdAsync(appt.AppointmentId);
+        _activeAppointment = fullAppt ?? appt;
+
+        // ServiceStartedAt is stored in UTC — convert to PHT for display and elapsed calculation
+        _serviceStartTime = _activeAppointment.ServiceStartedAt.HasValue
+        ? PhilippineTime.FromUtc(_activeAppointment.ServiceStartedAt.Value)
+        : PhilippineTime.Now.Date.Add(_activeAppointment.StartTime);
+        _checkoutProducts = new();
+        _selectedProductId = 0;
+        _paymentMethod = "Cash";
+        _showProductSection = false;
+
+        // Get service price using the correct ServiceId from full appointment data
+        _servicePrice = 0;
+        if (_activeAppointment.ServiceId > 0)
+        {
+            var services = await ServiceApiService.GetServicesAsync();
+            var service = services.Items.FirstOrDefault(s => s.ServiceId == _activeAppointment.ServiceId);
+            _servicePrice = service?.RegularPrice ?? 0;
+        }
+
+        // Also use ServicePrice from the appointment if available and price lookup failed
+        if (_servicePrice == 0 && _activeAppointment.ServicePrice > 0)
+        {
+            _servicePrice = _activeAppointment.ServicePrice;
+        }
+
+        // Load products for add-ons
+        _productLookup = await InventoryService.GetProductLookupAsync();
+
+        // Try to find an existing pending transaction for this appointment
+        if (_pendingTransaction == null)
+        {
+            try
+            {
+                _pendingTransaction = await
+                TransactionService.GetPendingTransactionByAppointmentAsync(_activeAppointment.AppointmentId);
+            }
+            catch { /* non-critical */ }
+        }
+
+        // Start the timer
+        StartTimer();
+
+        _showProgressModal = true;
+    }
+
+    private void StartTimer()
+    {
+        _timer?.Dispose();
+        _timer = new System.Threading.Timer(UpdateTimer, null, 0, 1000);
+    }
+
+    private void UpdateTimer(object? state)
+    {
+        if (_serviceStartTime.HasValue && _activeAppointment != null)
+        {
+            _elapsedTime = PhilippineTime.Now - _serviceStartTime.Value;
+            _progressPercent = (_elapsedTime.TotalMinutes / _activeAppointment.TotalDurationMinutes) * 100;
+
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void CloseProgressModal()
+    {
+        _timer?.Dispose();
+        _timer = null;
+        _showProgressModal = false;
+        _activeAppointment = null;
+    }
+
+    private void ToggleProductSection()
+    {
+        _showProductSection = !_showProductSection;
+    }
+
+    private void AddProductToCheckout()
+    {
+        if (_selectedProductId == 0) return;
+
+        var product = _productLookup.FirstOrDefault(p => p.Id == _selectedProductId);
+        if (product == null) return;
+
+        var existing = _checkoutProducts.FirstOrDefault(p => p.ProductId == _selectedProductId);
+        if (existing != null)
+        {
+            existing.Quantity++;
+        }
+        else
+        {
+            _checkoutProducts.Add(new CheckoutProduct
+            {
+                ProductId = product.Id,
+                Name = product.Name,
+                Price = product.Price ?? 0,
+                Quantity = 1
+            });
+        }
+
+        _selectedProductId = 0;
+    }
+
+    private void RemoveProduct(CheckoutProduct product)
+    {
+        _checkoutProducts.Remove(product);
+    }
+
+    private async Task AddServiceToAppointment()
+    {
+        if (_activeAppointment == null || _addServiceId == 0) return;
+
+        _isAddingService = true;
+        try
+        {
+            var request = new AddServiceToAppointmentRequest { ServiceId = _addServiceId, Quantity = 1 };
+            var updated = await AppointmentService.AddServiceToAppointmentAsync(_activeAppointment.AppointmentId, request);
+            if (updated != null)
+            {
+                _activeAppointment = updated;
+                _servicePrice = updated.TotalPrice;
+                ShowAlert("Service added to appointment!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Failed to add service.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error adding service: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _addServiceId = 0;
+            _isAddingService = false;
+        }
+    }
+
+    private async Task CompleteAndPay()
+    {
+        if (_activeAppointment == null) return;
+
+        _isProcessingPayment = true;
+
+        try
+        {
+            // Complete the appointment via the proper API endpoint (In Progress → Completed)
+            // If already completed (e.g. retry after payment failure), skip this step
+            if (_activeAppointment.Status != "Completed")
+            {
+                var completedAppt = await AppointmentService.CompleteServiceAsync(_activeAppointment.AppointmentId);
+                if (completedAppt == null)
+                {
+                    ShowAlert("Failed to complete appointment. Please try again.", Alert.AlertType.Error);
+                    return;
+                }
+            }
+
+            TransactionResponse? result = null;
+
+            // Look up pending transaction if not already set (e.g. page refresh or state lost)
+            if (_pendingTransaction == null)
+            {
+                try
+                {
+                    _pendingTransaction = await
+                    TransactionService.GetPendingTransactionByAppointmentAsync(_activeAppointment.AppointmentId);
+                }
+                catch { /* will fall back to creating new txn */ }
+            }
+
+            // If a pending transaction exists, finalize it (Pending → Paid)
+            if (_pendingTransaction != null)
+            {
+                var finalizeRequest = new FinalizePendingTransactionRequest
+                {
+                    PaymentMethod = _paymentMethod,
+                    DiscountAmount = 0,
+                    ProductItems = _checkoutProducts.Select(p => new CreateTransactionProductItemRequest
+                    {
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+                        UnitPrice = p.Price
+                    }).ToList()
+                };
+
+                result = await TransactionService.FinalizePendingTransactionAsync(_pendingTransaction.TransactionId, finalizeRequest);
+            }
+            else
+            {
+                // Fallback: create a new transaction directly (e.g., pending creation failed earlier)
+                List<CreateTransactionServiceItemRequest> serviceItems;
+                if (_activeAppointment.ServiceItems.Any())
+                {
+                    serviceItems = _activeAppointment.ServiceItems.Select(si => new CreateTransactionServiceItemRequest
+                    {
+                        ServiceId = si.ServiceId,
+                        Quantity = si.Quantity,
+                        UnitPrice = si.UnitPrice
+                    }).ToList();
+                }
+                else
+                {
+                    serviceItems = new List<CreateTransactionServiceItemRequest>
+{
+new() { ServiceId = _activeAppointment.ServiceId, Quantity = 1, UnitPrice = _servicePrice }
+};
+                }
+
+                var productItems = _checkoutProducts.Select(p => new CreateTransactionProductItemRequest
+                {
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+                    UnitPrice = p.Price
+                }).ToList();
+
+                var transaction = new CreateTransactionRequest
+                {
+                    CustomerId = _activeAppointment.CustomerId,
+                    AppointmentId = _activeAppointment.AppointmentId,
+                    PaymentMethod = _paymentMethod,
+                    DiscountAmount = 0,
+                    ServiceItems = serviceItems,
+                    ProductItems = productItems
+                };
+
+                result = await TransactionService.CreateTransactionAsync(transaction);
+            }
+
+            if (result != null)
+            {
+                // Store for success modal
+                _lastTransactionNumber = result.TransactionNumber;
+                _lastPaymentAmount = TotalAmount;
+                _lastPaymentMethod = _paymentMethod;
+
+                // Close progress modal and show success
+                CloseProgressModal();
+                _showPaymentSuccessModal = true;
+                _pendingTransaction = null;
+
+                await LoadAppointments();
+            }
+            else
+            {
+                ShowAlert("Failed to process payment. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isProcessingPayment = false;
+        }
+    }
+
+    private void PrintServiceReceipt()
+    {
+        // For now, just close the modal - receipt printing can be enhanced later
+        _showPaymentSuccessModal = false;
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

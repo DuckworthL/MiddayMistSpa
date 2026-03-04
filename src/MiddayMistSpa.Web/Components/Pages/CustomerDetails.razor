@@ -1,0 +1,371 @@
+@page "/customers/{CustomerId:int}"
+@inject ICustomerApiService CustomerService
+@inject IAppointmentApiService AppointmentService
+@inject ITransactionApiService TransactionService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Customer Details - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/customers" class="text-decoration-none">Customers</a></li>
+                        <li class="breadcrumb-item active">@(_customer?.FirstName ?? "Loading...")</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 mb-0" style="color: #2C2C2C;">Customer Profile</h1>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/appointments/new?customerId=@CustomerId" class="btn btn-primary">
+                    <i class="bi bi-calendar-plus me-1"></i> Book Appointment
+                </a>
+                <a href="/customers" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back
+                </a>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading customer details..." />
+        }
+        else if (_customer == null)
+        {
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Customer not found.
+            </div>
+        }
+        else
+        {
+            <div class="row g-4">
+                @* Customer Info Card *@
+                <div class="col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <div class="avatar-lg mx-auto mb-3"
+                                 style="width: 80px; height: 80px; background: linear-gradient(135deg, #6B8E7B, #8BA889); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                <span class="text-white fs-2 fw-bold">@GetInitials(_customer.FirstName,
+                                                                                                        _customer.LastName)</span>
+                                </div>
+                                <h4 class="mb-1">@_customer.FirstName @_customer.LastName</h4>
+                                <span
+                                class="badge @GetMembershipBadge(_customer.MembershipType)">@_customer.MembershipType</span>
+
+                                <hr class="my-3" />
+
+                                <div class="text-start">
+                                    <div class="mb-2">
+                                        <i class="bi bi-envelope me-2 text-muted"></i>
+                                        <a href="mailto:@_customer.Email">@_customer.Email</a>
+                                    </div>
+                                    <div class="mb-2">
+                                        <i class="bi bi-phone me-2 text-muted"></i>
+                                        <a href="tel:@_customer.PhoneNumber">@_customer.PhoneNumber</a>
+                                    </div>
+                                    @if (_customer.DateOfBirth.HasValue)
+                                    {
+                                        <div class="mb-2">
+                                            <i class="bi bi-calendar-heart me-2 text-muted"></i>
+                                            @_customer.DateOfBirth.Value.ToString("MMMM dd, yyyy")
+                                        </div>
+                                    }
+                                </div>
+
+                                @* Emergency Contact *@
+                                @if (!string.IsNullOrEmpty(_customer.EmergencyContactName))
+                                {
+                                    <hr class="my-3" />
+                                    <h6 class="text-muted mb-2"><i class="bi bi-person-lines-fill me-1"></i> Emergency Contact</h6>
+                                    <div class="text-start">
+                                        <div class="mb-1">
+                                            <strong>@_customer.EmergencyContactName</strong>
+                                            @if (!string.IsNullOrEmpty(_customer.EmergencyContactRelationship))
+                                            {
+                                                <span class="text-muted"> (@_customer.EmergencyContactRelationship)</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(_customer.EmergencyContactPhone))
+                                        {
+                                            <div class="mb-1">
+                                                <i class="bi bi-phone me-2 text-muted"></i>
+                                                <a href="tel:@_customer.EmergencyContactPhone">@_customer.EmergencyContactPhone</a>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+
+                                @* Communication Preferences *@
+                                <hr class="my-3" />
+                                <h6 class="text-muted mb-2"><i class="bi bi-chat-dots me-1"></i> Communication</h6>
+                                <div class="text-start">
+                                    <div class="mb-1">
+                                        <i class="bi bi-send me-2 text-muted"></i>
+                                        Preferred: <strong>@(_customer.PreferredCommunicationChannel ?? "Email")</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-light">
+                                <small class="text-muted">Last visit: @(_customer.LastVisitDate?.ToString("MMMM dd, yyyy") ??
+                                                                                                                                                                            "Never")</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Stats & Details *@
+                        <div class="col-lg-8">
+                            @* Stats Row *@
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4">
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <h3 class="text-primary mb-0">@_customer.TotalVisits</h3>
+                                            <small class="text-muted">Total Visits</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <h3 class="text-success mb-0">₱@_customer.TotalSpent.ToString("N0")</h3>
+                                            <small class="text-muted">Total Spent</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <h3 class="text-warning mb-0">@_customer.LoyaltyPoints</h3>
+                                            <small class="text-muted">Loyalty Points</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Tabs *@
+                            <div class="card">
+                                <div class="card-header">
+                                    <ul class="nav nav-tabs card-header-tabs">
+                                        <li class="nav-item">
+                                            <button class="nav-link @(_activeTab == "appointments" ? "active" : "")"
+                                                    @onclick='() => _activeTab = "appointments"'>
+                                                <i class="bi bi-calendar3 me-1"></i> Appointments
+                                            </button>
+                                        </li>
+                                        <li class="nav-item">
+                                            <button class="nav-link @(_activeTab == "transactions" ? "active" : "")"
+                                                    @onclick='() => _activeTab = "transactions"'>
+                                                <i class="bi bi-receipt me-1"></i> Transactions
+                                            </button>
+                                        </li>
+                                        <li class="nav-item">
+                                            <button class="nav-link @(_activeTab == "notes" ? "active" : "")"
+                                                    @onclick='() => _activeTab = "notes"'>
+                                                <i class="bi bi-sticky me-1"></i> Notes
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="card-body">
+                                    @if (_activeTab == "appointments")
+                                    {
+                                        @if (_appointments.Any())
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Date</th>
+                                                            <th>Service</th>
+                                                            <th>Therapist</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var apt in _appointments.Take(10))
+                                                        {
+                                                            <tr>
+                                                                <td>
+                                                                    @apt.AppointmentDate.ToString("MMM dd, yyyy")
+                                                                    <small class="text-muted d-block">@apt.StartTime.ToString(@"hh\:mm") -
+                                                                        @apt.EndTime.ToString(@"hh\:mm")</small>
+                                                                    </td>
+                                                                    <td>@apt.ServiceName</td>
+                                                                    <td>@(apt.TherapistName ?? "TBA")</td>
+                                                                    <td><span class="badge @GetStatusBadge(apt.Status)">@apt.Status</span></td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                        else
+                                            {
+                                                <div class="text-center py-4 text-muted">
+                                                    <i class="bi bi-calendar-x display-4"></i>
+                                                    <p class="mt-2">No appointments yet</p>
+                                                    <a href="/appointments/new?customerId=@CustomerId" class="btn btn-primary btn-sm">
+                                                        <i class="bi bi-plus-lg me-1"></i> Book First Appointment
+                                                    </a>
+                                                </div>
+                                            }
+                                        }
+                                        else if (_activeTab == "transactions")
+                                        {
+                                            @if (_transactions.Any())
+                                            {
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Date</th>
+                                                                <th>Transaction #</th>
+                                                                <th class="text-end">Amount</th>
+                                                                <th>Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var txn in _transactions.Take(10))
+                                                            {
+                                                                <tr>
+                                                                    <td>@txn.TransactionDate.ToString("MMM dd, yyyy")</td>
+                                                                    <td><code>@txn.TransactionNumber</code></td>
+                                                                    <td class="text-end">₱@txn.TotalAmount.ToString("N2")</td>
+                                                                    <td><span
+                                                                        class="badge @GetPaymentStatusBadge(txn.PaymentStatus)">@txn.PaymentStatus</span>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-center py-4 text-muted">
+                                                    <i class="bi bi-receipt display-4"></i>
+                                                    <p class="mt-2">No transactions yet</p>
+                                                </div>
+                                            }
+                                        }
+                                        else if (_activeTab == "notes")
+                                        {
+                                            @if (!string.IsNullOrEmpty(_customer.Allergies))
+                                            {
+                                                <div class="alert alert-warning">
+                                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                                    <strong>Allergies:</strong> @_customer.Allergies
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(_customer.SpecialRequests))
+                                            {
+                                                <div class="alert alert-info">
+                                                    <i class="bi bi-heart me-2"></i>
+                                                    <strong>Special Requests:</strong> @_customer.SpecialRequests
+                                                </div>
+                                            }
+                                            @if (string.IsNullOrEmpty(_customer.Allergies) &&
+                                                                                                                                                                                                        string.IsNullOrEmpty(_customer.SpecialRequests))
+                                            {
+                                                <div class="text-center py-4 text-muted">
+                                                    <i class="bi bi-sticky display-4"></i>
+                                                    <p class="mt-2">No notes or special requests</p>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </AuthorizedPage>
+
+@code {
+    [Parameter]
+    public int CustomerId { get; set; }
+
+    private CustomerResponse? _customer;
+    private List<AppointmentResponse> _appointments = new();
+    private List<TransactionResponse> _transactions = new();
+    private bool _isLoading = true;
+    private string _activeTab = "appointments";
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            _customer = await CustomerService.GetCustomerByIdAsync(CustomerId);
+
+            if (_customer != null)
+            {
+                // Load appointments and transactions for this customer
+                var appointmentsResult = await AppointmentService.GetAppointmentsAsync(1, 100, null, null);
+                _appointments = appointmentsResult.Items?.Where(a => a.CustomerId == CustomerId).OrderByDescending(a =>
+                a.AppointmentDate).ToList() ?? new();
+
+                var transactionsResult = await TransactionService.GetCustomerTransactionsAsync(CustomerId);
+                _transactions = transactionsResult.Items?.OrderByDescending(t =>
+                t.TransactionDate).ToList() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading customer: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetInitials(string? firstName, string? lastName)
+    {
+        var first = !string.IsNullOrEmpty(firstName) ? firstName[0].ToString().ToUpper() : "?";
+        var last = !string.IsNullOrEmpty(lastName) ? lastName[0].ToString().ToUpper() : "";
+        return first + last;
+    }
+
+    private string GetMembershipBadge(string? type) => type switch
+    {
+        "Platinum" => "bg-warning text-dark",
+        "Gold" => "bg-success",
+        "Silver" => "bg-info",
+        "Bronze" => "bg-primary",
+        "Regular" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusBadge(string status) => status switch
+    {
+        "Completed" => "bg-success",
+        "Scheduled" => "bg-primary",
+        "Confirmed" => "bg-info",
+        "Checked In" => "bg-warning text-dark",
+        "In Progress" => "bg-warning text-dark",
+        "Cancelled" => "bg-danger",
+        "No Show" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetPaymentStatusBadge(string status) => status switch
+    {
+        "Paid" => "bg-success",
+        "Pending" => "bg-warning text-dark",
+        "Refunded" => "bg-info",
+        "Voided" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

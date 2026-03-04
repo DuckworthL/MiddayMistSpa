@@ -1,0 +1,854 @@
+@page "/payroll"
+@inject IEmployeeApiService EmployeeService
+@inject IPayrollApiService PayrollService
+@inject IReportsApiService ReportsService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Payroll - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="InitializeData">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Payroll Management</h1>
+                <p class="text-muted mb-0">Process payroll and manage compensation</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" @onclick="ShowBonusModal">
+                    <i class="bi bi-gift me-1"></i> Add Bonus
+                </button>
+                <button class="btn btn-primary" @onclick="ShowRunPayrollModal">
+                    <i class="bi bi-play-fill me-1"></i> Run Payroll
+                </button>
+            </div>
+        </div>
+
+        @* Pay Period Selector *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary" @onclick="PreviousPeriod">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="CurrentPeriod">Current</button>
+                            <button class="btn btn-outline-secondary" @onclick="NextPeriod"
+                                    disabled="@(_periodEnd >= DateTime.Today)">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <h5 class="mb-0">
+                            @_periodStart.ToString("MMM dd") - @_periodEnd.ToString("MMM dd, yyyy")
+                            @if (_periodEnd >= DateTime.Today)
+                            {
+                                <span class="badge bg-primary ms-2">Current Period</span>
+                            }
+                        </h5>
+                    </div>
+                    <div class="col-auto">
+                        <span class="badge bg-@(_payrollStatus == "Processed" ? "success" : "warning") fs-6">
+                            @_payrollStatus
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Summary Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <StatCard Title="Total Payroll" Value="@_totalPayroll.ToString("C")" Icon="bi-wallet2"
+                          Color="StatCard.CardColor.Primary" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Employees" Value="@_employeeCount.ToString()" Icon="bi-people"
+                          Color="StatCard.CardColor.Info" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Total Hours" Value="@_totalHours.ToString("N0")" Icon="bi-clock-history"
+                          Color="StatCard.CardColor.Success" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Bonuses/Deductions" Value="@_totalAdjustments.ToString("C")" Icon="bi-plus-slash-minus"
+                          Color="StatCard.CardColor.Warning" />
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading payroll data..." />
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <span>Employee Payroll</span>
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
+                            <option value="PDF">PDF</option>
+                            <option value="Excel">Excel</option>
+                            <option value="CSV">CSV</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPayroll" disabled="@_isExporting">
+                            @if (_isExporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-download me-1"></i>
+                            }
+                            Export
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Position</th>
+                                    <th class="text-center">Hours Worked</th>
+                                    <th class="text-end">Hourly Rate</th>
+                                    <th class="text-end">Regular Pay</th>
+                                    <th class="text-end">Bonus/Comm</th>
+                                    <th class="text-end">Deductions</th>
+                                    <th class="text-end">Employer Cost</th>
+                                    <th class="text-end">Net Pay</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_payrollItems.Any())
+                                {
+                                    @foreach (var item in _payrollItems)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                         style="width: 35px; height: 35px; font-size: 0.8rem;">
+                                                        @item.Initials
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">@item.EmployeeName</div>
+                                                        <small class="text-muted">@item.EmployeeCode</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@item.Position</td>
+                                            <td class="text-center">
+                                                @item.RegularHours
+                                                @if (item.OvertimeHours > 0)
+                                                {
+                                                    <span class="text-warning small"> +@item.OvertimeHours OT</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">@item.HourlyRate.ToString("C")</td>
+                                            <td class="text-end">@item.RegularPay.ToString("C")</td>
+                                            <td class="text-end">
+                                                @if (item.Bonus > 0 || item.Commission > 0)
+                                                {
+                                                    <span class="text-success">+@((item.Bonus + item.Commission).ToString("C"))</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-end"
+                                                title="SSS: @item.SSSContribution.ToString("N2") | PhilHealth: @item.PhilHealthContribution.ToString("N2") | Pag-IBIG: @item.PagIBIGContribution.ToString("N2") | Tax: @item.WithholdingTax.ToString("N2")">
+                                                @if (item.Deductions > 0)
+                                                {
+                                                    <span class="text-danger">-@item.Deductions.ToString("C")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-end"
+                                                title="SSS ER: @item.SSSEmployerContribution.ToString("N2") | PhilHealth ER: @item.PhilHealthEmployerContribution.ToString("N2") | Pag-IBIG ER: @item.PagIBIGEmployerContribution.ToString("N2") | EC: @item.ECContribution.ToString("N2")">
+                                                @if (item.TotalEmployerContributions > 0)
+                                                {
+                                                    <span class="text-info">@item.TotalEmployerContributions.ToString("C")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold">@item.NetPay.ToString("C")</td>
+                                            <td class="text-center">
+                                                @if (item.IsPaid)
+                                                {
+                                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Paid</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-warning">Pending</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                    <tr class="table-light fw-bold">
+                                        <td colspan="4">Total</td>
+                                        <td class="text-end">@_payrollItems.Sum(p => p.RegularPay).ToString("C")</td>
+                                        <td class="text-end text-success">+@_payrollItems.Sum(p => p.Bonus +
+                                                                                p.Commission).ToString("C")</td>
+                                            <td class="text-end text-danger">-@_payrollItems.Sum(p => p.Deductions).ToString("C")
+                                            </td>
+                                            <td class="text-end text-info">@_payrollItems.Sum(p =>
+                                                                                    p.TotalEmployerContributions).ToString("C")
+                                            </td>
+                                            <td class="text-end">@_payrollItems.Sum(p => p.NetPay).ToString("C")</td>
+                                            <td></td>
+                                        </tr>
+                                    }
+                            else
+                                    {
+                                        <tr>
+                                            <td colspan="10" class="text-center py-5">
+                                                <i class="bi bi-wallet display-4 text-muted"></i>
+                                                <p class="text-muted mt-2">No payroll data for this period</p>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                @* Payroll History *@
+                <div class="card border-0 shadow-sm mt-4">
+                    <div class="card-header bg-transparent">
+                        <h6 class="mb-0">Recent Payroll History</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pay Period</th>
+                                        <th>Employees</th>
+                                        <th class="text-end">Total Paid</th>
+                                        <th>Processed By</th>
+                                        <th>Date Processed</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var history in _payrollHistory)
+                                    {
+                                        <tr>
+                                            <td>@history.PeriodStart.ToString("MMM dd") - @history.PeriodEnd.ToString("MMM dd,         yyyy")
+                                            </td>
+                                            <td>@history.EmployeeCount</td>
+                                            <td class="text-end fw-medium">@history.TotalPaid.ToString("C")</td>
+                                            <td>@history.ProcessedBy</td>
+                                            <td>@history.ProcessedDate.ToString("MMM dd, yyyy")</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => ViewPayrollDetails(history)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Run Payroll Modal *@
+        <Modal @bind-IsVisible="_showRunPayrollModal" Title="Run Payroll">
+            <ChildContent>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    You are about to process payroll for:
+                    <strong>@_periodStart.ToString("MMM dd") - @_periodEnd.ToString("MMM dd, yyyy")</strong>
+                </div>
+
+                <div class="mb-4">
+                    <h6>Payroll Summary</h6>
+                    <div class="row text-center">
+                        <div class="col">
+                            <div class="h4 mb-0">@_employeeCount</div>
+                            <small class="text-muted">Employees</small>
+                        </div>
+                        <div class="col">
+                            <div class="h4 mb-0">@_totalHours.ToString("N0")</div>
+                            <small class="text-muted">Total Hours</small>
+                        </div>
+                        <div class="col">
+                            <div class="h4 mb-0 text-primary">@_totalPayroll.ToString("C")</div>
+                            <small class="text-muted">Total Payroll</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Payment Method</label>
+                    <select class="form-select" @bind="_paymentMethod">
+                        <option value="Direct Deposit">Direct Deposit</option>
+                        <option value="Check">Check</option>
+                        <option value="Cash">Cash</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" rows="2" @bind="_payrollNotes"
+                              placeholder="Optional notes..."></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Payroll Scope</label>
+                    <div class="btn-group w-100">
+                        <button class="btn @(_payrollMode == "all" ? "btn-primary" : "btn-outline-primary")"
+                                @onclick='() => _payrollMode = "all"'>
+                            <i class="bi bi-people me-1"></i> All Employees
+                        </button>
+                        <button class="btn @(_payrollMode == "selected" ? "btn-primary" : "btn-outline-primary")"
+                                @onclick='() => _payrollMode = "selected"'>
+                            <i class="bi bi-person-check me-1"></i> Selected Employees
+                        </button>
+                    </div>
+                </div>
+
+                @if (_payrollMode == "selected")
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Select Employees</label>
+                        <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                            @foreach (var emp in _employeeLookup)
+                            {
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="emp-@emp.Id"
+                                           checked="@_selectedEmployeeIds.Contains(emp.Id)"
+                                           @onchange="(e) => ToggleEmployeeSelection(emp.Id, (bool)(e.Value ?? false))" />
+                                    <label class="form-check-label" for="emp-@emp.Id">@emp.Name</label>
+                                </div>
+                            }
+                        </div>
+                        @if (_payrollMode == "selected" && !_selectedEmployeeIds.Any())
+                        {
+                            <small class="text-danger">Please select at least one employee.</small>
+                        }
+                    </div>
+                }
+
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="confirmPayroll" @bind="_payrollConfirmed" />
+                    <label class="form-check-label" for="confirmPayroll">
+                        I confirm that all payroll information is accurate and ready to process
+                    </label>
+                </div>
+            </ChildContent>
+            <FooterContent>
+                <button type="button" class="btn btn-secondary"
+                        @onclick="() => _showRunPayrollModal = false">Cancel</button>
+                <button type="button" class="btn btn-success" @onclick="ProcessPayroll"
+                        disabled="@(!_payrollConfirmed || _isProcessing || (_payrollMode == "selected" && !_selectedEmployeeIds.Any()))">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-check-lg me-1"></i> Process Payroll
+                </button>
+            </FooterContent>
+        </Modal>
+
+        @* Add Bonus Modal *@
+        <Modal @bind-IsVisible="_showBonusModal" Title="Add Bonus/Deduction">
+            <ChildContent>
+                <div class="mb-3">
+                    <label class="form-label">Employee *</label>
+                    <select class="form-select" @bind="_bonusForm.EmployeeId">
+                        <option value="0">Select Employee...</option>
+                        @foreach (var emp in _employeeLookup)
+                        {
+                            <option value="@emp.Id">@emp.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Type *</label>
+                    <div class="btn-group w-100">
+                        <button class="btn @(_bonusForm.IsBonus ? "btn-success" : "btn-outline-success")"
+                                @onclick="() => _bonusForm.IsBonus = true">
+                            <i class="bi bi-plus me-1"></i> Bonus
+                        </button>
+                        <button class="btn @(!_bonusForm.IsBonus ? "btn-danger" : "btn-outline-danger")"
+                                @onclick="() => _bonusForm.IsBonus = false">
+                            <i class="bi bi-dash me-1"></i> Deduction
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Amount *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">₱</span>
+                        <input type="number" class="form-control" @bind="_bonusForm.Amount" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Reason *</label>
+                    <input type="text" class="form-control" @bind="_bonusForm.Reason"
+                           placeholder="e.g., Performance bonus, Holiday pay..." />
+                </div>
+            </ChildContent>
+            <FooterContent>
+                <button type="button" class="btn btn-secondary" @onclick="() => _showBonusModal = false">Cancel</button>
+                <button type="button" class="btn btn-primary" @onclick="SaveBonus" disabled="@_isSaving">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Save
+                </button>
+            </FooterContent>
+        </Modal>
+
+        @* Alert *@
+        @if (!string.IsNullOrEmpty(_alertMessage))
+        {
+            <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+                <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+            </div>
+        }
+    </AuthorizedPage>
+
+@code {
+    private bool _isLoading = true;
+    private DateTime _periodStart;
+    private DateTime _periodEnd;
+    private string _payrollStatus = "Pending";
+    private int? _currentPeriodId;
+
+    // Stats
+    private decimal _totalPayroll;
+    private int _employeeCount;
+    private decimal _totalHours;
+    private decimal _totalAdjustments;
+
+    // Payroll data
+    private List<PayrollItemViewModel> _payrollItems = new();
+    private List<PayrollHistoryViewModel> _payrollHistory = new();
+    private List<LookupItem> _employeeLookup = new();
+
+    // Run Payroll modal
+    private bool _showRunPayrollModal;
+    private bool _isProcessing;
+    private string _paymentMethod = "Direct Deposit";
+    private string _payrollNotes = string.Empty;
+    private bool _payrollConfirmed;
+    private string _payrollMode = "all"; // "all" or "selected"
+    private List<int> _selectedEmployeeIds = new();
+
+    // Bonus modal
+    private bool _showBonusModal;
+    private bool _isSaving;
+    private BonusFormModel _bonusForm = new();
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data loading moved to InitializeData, triggered by AuthorizedPage.OnAuthReady
+        SetCurrentPeriod();
+    }
+
+    private async Task InitializeData()
+    {
+        await LoadEmployees();
+        await LoadPayrollData();
+    }
+
+    private void SetCurrentPeriod()
+    {
+        var today = PhilippineTime.Today;
+        // Bi-weekly periods starting on Monday
+        var daysSinceMonday = (int)today.DayOfWeek - 1;
+        if (daysSinceMonday < 0) daysSinceMonday = 6;
+
+        var weekNumber = ((today.Day - 1) / 14) * 14 + 1;
+        _periodStart = new DateTime(today.Year, today.Month, Math.Min(weekNumber, 28));
+        _periodEnd = _periodStart.AddDays(13);
+
+        if (_periodEnd > today)
+            _periodEnd = today;
+    }
+
+    private async Task PreviousPeriod()
+    {
+        _periodStart = _periodStart.AddDays(-14);
+        _periodEnd = _periodStart.AddDays(13);
+        await LoadPayrollData();
+    }
+
+    private async Task NextPeriod()
+    {
+        _periodStart = _periodStart.AddDays(14);
+        _periodEnd = _periodStart.AddDays(13);
+        if (_periodEnd > PhilippineTime.Today)
+            _periodEnd = PhilippineTime.Today;
+        await LoadPayrollData();
+    }
+
+    private async Task CurrentPeriod()
+    {
+        SetCurrentPeriod();
+        await LoadPayrollData();
+    }
+
+    private async Task LoadEmployees()
+    {
+        var employees = await EmployeeService.GetEmployeesAsync();
+        _employeeLookup = employees.Items.Select(e => new LookupItem
+        {
+            Id = e.EmployeeId,
+            Name = e.FullName
+        }).ToList();
+    }
+
+    private async Task LoadPayrollData()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // Try to get payroll period for current date range
+            var period = await PayrollService.GetPayrollPeriodByDateAsync(_periodStart, _periodEnd);
+            _currentPeriodId = period?.PayrollPeriodId;
+
+            if (period != null)
+            {
+                // Load payroll records for this period
+                var records = await PayrollService.GetPayrollRecordsAsync(period.PayrollPeriodId, 1, 100);
+                _payrollItems = records.Items.Select(r => new PayrollItemViewModel
+                {
+                    EmployeeId = r.EmployeeId,
+                    EmployeeName = r.EmployeeName,
+                    EmployeeCode = r.EmployeeCode,
+                    Initials = GetInitials(r.EmployeeName),
+                    Position = r.Position,
+                    RegularHours = r.HoursWorked,
+                    OvertimeHours = r.OvertimeHours,
+                    HourlyRate = r.HoursWorked > 0 ? r.BasicSalary / r.HoursWorked : 0,
+                    Bonus = r.Tips,
+                    Commission = r.Commissions,
+                    Deductions = r.TotalDeductions,
+                    GrossPay = r.GrossPay,
+                    NetPay = r.NetPay,
+                    SSSContribution = r.SSSContribution,
+                    PhilHealthContribution = r.PhilHealthContribution,
+                    PagIBIGContribution = r.PagIBIGContribution,
+                    WithholdingTax = r.WithholdingTax,
+                    SSSEmployerContribution = r.SSSEmployerContribution,
+                    PhilHealthEmployerContribution = r.PhilHealthEmployerContribution,
+                    PagIBIGEmployerContribution = r.PagIBIGEmployerContribution,
+                    ECContribution = r.ECContribution,
+                    IsPaid = period.Status == "Finalized"
+                }).ToList();
+
+                _payrollStatus = period.Status == "Finalized" ? "Processed" : "Pending";
+            }
+            else
+            {
+                // No payroll period exists for this date range - show empty state
+                _payrollItems = new List<PayrollItemViewModel>();
+                _payrollStatus = "Not Created";
+            }
+
+            // Load payroll history (recent finalized periods)
+            var historyPeriods = await PayrollService.GetPayrollPeriodsAsync(1, 5, "Finalized");
+            _payrollHistory = historyPeriods.Items.Select(p => new PayrollHistoryViewModel
+            {
+                PeriodId = p.PayrollPeriodId,
+                PeriodStart = p.StartDate,
+                PeriodEnd = p.EndDate,
+                EmployeeCount = p.RecordCount,
+                TotalPaid = p.TotalNetPay,
+                ProcessedBy = p.FinalizedByName ?? "System",
+                ProcessedDate = p.FinalizedAt ?? (p.CreatedAt == default ? PhilippineTime.Now : p.CreatedAt)
+            }).ToList();
+
+            // Update summary stats
+            _employeeCount = _payrollItems.Count;
+            _totalHours = _payrollItems.Sum(p => p.RegularHours + p.OvertimeHours);
+            _totalPayroll = _payrollItems.Sum(p => p.NetPay);
+            _totalAdjustments = _payrollItems.Sum(p => p.Bonus + p.Commission - p.Deductions);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading payroll data: {ex.Message}");
+            ShowAlert("Failed to load payroll data. Please try again.", Alert.AlertType.Error);
+        }
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+        return parts.Length > 0 ? parts[0][0].ToString().ToUpper() : "?";
+    }
+
+    private void ShowRunPayrollModal()
+    {
+        _payrollConfirmed = false;
+        _payrollNotes = string.Empty;
+        _payrollMode = "all";
+        _selectedEmployeeIds.Clear();
+        _showRunPayrollModal = true;
+    }
+
+    private void ToggleEmployeeSelection(int employeeId, bool isChecked)
+    {
+        if (isChecked && !_selectedEmployeeIds.Contains(employeeId))
+            _selectedEmployeeIds.Add(employeeId);
+        else if (!isChecked)
+            _selectedEmployeeIds.Remove(employeeId);
+    }
+
+    private async Task ProcessPayroll()
+    {
+        _isProcessing = true;
+
+        try
+        {
+            if (_currentPeriodId.HasValue)
+            {
+                if (_payrollStatus == "Processed" || _payrollStatus == "Paid")
+                {
+                    ShowAlert("This period has already been processed. Use the navigation arrows to select a different period.",
+                    Alert.AlertType.Warning);
+                    _showRunPayrollModal = false;
+                    _isProcessing = false;
+                    return;
+                }
+            }
+
+            if (!_currentPeriodId.HasValue)
+            {
+                // Create a new payroll period first
+                var periodRequest = new CreatePayrollPeriodRequest
+                {
+                    PeriodName = $"Payroll {_periodStart:MMM dd} - {_periodEnd:MMM dd, yyyy}",
+                    StartDate = _periodStart,
+                    EndDate = _periodEnd,
+                    PayrollType = "Semi-Monthly",
+                    CutoffDate = _periodEnd,
+                    PaymentDate = _periodEnd.AddDays(5)
+                };
+
+                var period = await PayrollService.CreatePayrollPeriodAsync(periodRequest);
+                if (period != null)
+                {
+                    _currentPeriodId = period.PayrollPeriodId;
+                    // Generate payroll records for all employees
+                    var employeeIds = _payrollMode == "selected" && _selectedEmployeeIds.Any() ? _selectedEmployeeIds : null;
+                    var (generated, genError) = await PayrollService.GeneratePayrollRecordsWithErrorAsync(period.PayrollPeriodId, employeeIds);
+                    if (!generated)
+                    {
+                        ShowAlert(genError ?? "Failed to generate payroll records. Please try again.", Alert.AlertType.Error);
+                        _isProcessing = false;
+                        return;
+                    }
+                }
+            }
+
+            if (_currentPeriodId.HasValue)
+            {
+                // Finalize the payroll period
+                var (result, finalizeError) = await PayrollService.FinalizePayrollPeriodWithErrorAsync(_currentPeriodId.Value);
+                if (result != null)
+                {
+                    _payrollStatus = "Processed";
+                    ShowAlert("Payroll processed successfully!", Alert.AlertType.Success);
+                    _showRunPayrollModal = false;
+                    await LoadPayrollData();
+                }
+                else
+                {
+                    ShowAlert(finalizeError ?? "Failed to finalize payroll. Please try again.", Alert.AlertType.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ProcessPayroll error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while processing payroll.", Alert.AlertType.Error);
+        }
+
+        _isProcessing = false;
+    }
+
+    private void ShowBonusModal()
+    {
+        _bonusForm = new BonusFormModel { IsBonus = true };
+        _showBonusModal = true;
+    }
+
+    private async Task SaveBonus()
+    {
+        if (_bonusForm.EmployeeId == 0 || _bonusForm.Amount <= 0 || string.IsNullOrWhiteSpace(_bonusForm.Reason))
+        {
+            ShowAlert("Please fill in all required fields.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var bonusRequest = new CreateBonusRequest
+            {
+                EmployeeId = _bonusForm.EmployeeId,
+                BonusType = _bonusForm.IsBonus ? "Bonus" : "Deduction",
+                Amount = _bonusForm.IsBonus ? _bonusForm.Amount : -_bonusForm.Amount,
+                Reason = _bonusForm.Reason,
+                EffectiveDate = PhilippineTime.Today
+            };
+
+            var (result, bonusError) = await PayrollService.AddBonusWithErrorAsync(bonusRequest);
+            if (result != null)
+            {
+                ShowAlert($"{(_bonusForm.IsBonus ? "Bonus" : "Deduction")} added successfully!", Alert.AlertType.Success);
+                _showBonusModal = false;
+                await LoadPayrollData();
+            }
+            else
+            {
+                ShowAlert(bonusError ?? "Failed to add bonus/deduction. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveBonus error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the bonus/deduction.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private async Task ViewPayrollDetails(PayrollHistoryViewModel history)
+    {
+        // Navigate to the period and load its records
+        _periodStart = history.PeriodStart;
+        _periodEnd = history.PeriodEnd;
+        await LoadPayrollData();
+    }
+
+    private string _exportFormat = "PDF";
+    private bool _isExporting;
+
+    private async Task ExportPayroll()
+    {
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("payroll",
+            _exportFormat, _periodStart, _periodEnd);
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert("Payroll report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+
+    // View Models
+    private class PayrollItemViewModel
+    {
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string Initials { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public decimal RegularHours { get; set; }
+        public decimal OvertimeHours { get; set; }
+        public decimal HourlyRate { get; set; }
+        public decimal Bonus { get; set; }
+        public decimal Commission { get; set; }
+        public decimal Deductions { get; set; }
+        public decimal GrossPay { get; set; }
+        public decimal NetPay { get; set; }
+        public bool IsPaid { get; set; }
+
+        // Individual Deduction Breakdown
+        public decimal SSSContribution { get; set; }
+        public decimal PhilHealthContribution { get; set; }
+        public decimal PagIBIGContribution { get; set; }
+        public decimal WithholdingTax { get; set; }
+
+        // Employer Contributions
+        public decimal SSSEmployerContribution { get; set; }
+        public decimal PhilHealthEmployerContribution { get; set; }
+        public decimal PagIBIGEmployerContribution { get; set; }
+        public decimal ECContribution { get; set; }
+        public decimal TotalEmployerContributions => SSSEmployerContribution + PhilHealthEmployerContribution +
+        PagIBIGEmployerContribution + ECContribution;
+
+        public decimal RegularPay => GrossPay > 0 ? GrossPay : (RegularHours * HourlyRate + (OvertimeHours * HourlyRate *
+        1.5m));
+    }
+
+    private class PayrollHistoryViewModel
+    {
+        public int PeriodId { get; set; }
+        public DateTime PeriodStart { get; set; }
+        public DateTime PeriodEnd { get; set; }
+        public int EmployeeCount { get; set; }
+        public decimal TotalPaid { get; set; }
+        public string ProcessedBy { get; set; } = string.Empty;
+        public DateTime ProcessedDate { get; set; }
+    }
+
+    private class BonusFormModel
+    {
+        public int EmployeeId { get; set; }
+        public bool IsBonus { get; set; }
+        public decimal Amount { get; set; }
+        public string Reason { get; set; } = string.Empty;
+    }
+}

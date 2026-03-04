@@ -1,0 +1,222 @@
+@* Notification Settings Component - In-App Notifications Only *@
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bell me-2"></i>Notification Settings</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-4">Configure which events generate in-app notifications (bell icon). Notifications
+            appear in real-time for logged-in users.</p>
+
+            <div class="row g-4">
+                @* Notification Preferences *@
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-bell me-2"></i>In-App Notifications</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-check form-switch mb-3">
+                                <input type="checkbox" class="form-check-input" id="notificationsEnabled"
+                                       @bind="_notificationSettings.Enabled" />
+                                <label class="form-check-label" for="notificationsEnabled">Enable In-App
+                                    Notifications</label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Auto-Refresh Interval</label>
+                                    <select class="form-select" @bind="_notificationSettings.RefreshIntervalSeconds"
+                                            disabled="@(!_notificationSettings.Enabled)">
+                                        <option value="15">Every 15 seconds</option>
+                                        <option value="30">Every 30 seconds</option>
+                                        <option value="60">Every 1 minute</option>
+                                        <option value="120">Every 2 minutes</option>
+                                        <option value="300">Every 5 minutes</option>
+                                    </select>
+                                    <small class="text-muted">How often the notification bell checks for new
+                                        notifications</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Auto-Dismiss After</label>
+                                        <select class="form-select" @bind="_notificationSettings.AutoDismissDays"
+                                                disabled="@(!_notificationSettings.Enabled)">
+                                            <option value="7">7 days</option>
+                                            <option value="14">14 days</option>
+                                            <option value="30">30 days</option>
+                                            <option value="0">Never</option>
+                                        </select>
+                                        <small class="text-muted">Read notifications are automatically removed after this
+                                            period</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Sound & Display *@
+                            <div class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="bi bi-display me-2"></i>Display Settings</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" id="showBadge"
+                                                   @bind="_notificationSettings.ShowBadgeCount" />
+                                            <label class="form-check-label" for="showBadge">Show unread badge count</label>
+                                        </div>
+
+                                        <div class="form-check form-switch mb-3">
+                                            <input type="checkbox" class="form-check-input" id="showPopup"
+                                                   @bind="_notificationSettings.ShowPopupAlert" />
+                                            <label class="form-check-label" for="showPopup">Show popup for urgent notifications</label>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Max Notifications in Dropdown</label>
+                                            <select class="form-select" @bind="_notificationSettings.MaxInDropdown">
+                                                <option value="5">5</option>
+                                                <option value="10">10</option>
+                                                <option value="15">15</option>
+                                                <option value="20">20</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @* Notification Triggers *@
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Notification Triggers</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="text-muted small mb-3">Choose which events generate in-app notifications.</p>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Event</th>
+                                                        <th class="text-center" style="width: 100px;">Enabled</th>
+                                                        <th style="width: 200px;">Priority</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var trigger in _triggers)
+                                                    {
+                                                        <tr>
+                                                            <td>
+                                                                <div class="fw-medium">
+                                                                    <i class="bi @trigger.Icon me-1 @trigger.IconColor"></i>
+                                                                    @trigger.Name
+                                                                </div>
+                                                                <small class="text-muted">@trigger.Description</small>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <input type="checkbox" class="form-check-input" @bind="trigger.Enabled" />
+                                                            </td>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" @bind="trigger.Priority">
+                                                                    <option value="Low">Low</option>
+                                                                    <option value="Normal">Normal</option>
+                                                                    <option value="High">High</option>
+                                                                    <option value="Urgent">Urgent</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button class="btn btn-primary" @onclick="SaveSettings">
+                                <i class="bi bi-check-lg me-1"></i> Save All Settings
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="ResetToDefaults">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to Defaults
+                            </button>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_statusMessage))
+                        {
+                            <div class="alert @_statusAlertClass mt-3 alert-dismissible fade show" role="alert">
+                                @_statusMessage
+                                <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+@code {
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
+
+    private NotificationPreferences _notificationSettings = new();
+
+    private List<NotificationTrigger> _triggers = new()
+    {
+        new() { Name = "Appointment Booked", Description = "When a new appointment is booked", Enabled = true, Priority =
+"Normal", Icon = "bi-calendar-plus", IconColor = "text-primary" },
+        new() { Name = "Appointment Reminder", Description = "Before a scheduled appointment", Enabled = true, Priority =
+"High", Icon = "bi-alarm", IconColor = "text-warning" },
+        new() { Name = "Appointment Cancelled", Description = "When an appointment is cancelled", Enabled = true, Priority =
+"Normal", Icon = "bi-calendar-x", IconColor = "text-danger" },
+        new() { Name = "Appointment Rescheduled", Description = "When appointment time is changed", Enabled = true, Priority =
+"Normal", Icon = "bi-calendar-event", IconColor = "text-info" },
+        new() { Name = "Payment Received", Description = "After successful payment/transaction", Enabled = true, Priority =
+"Normal", Icon = "bi-cash-coin", IconColor = "text-success" },
+        new() { Name = "Low Stock Alert", Description = "When inventory item falls below threshold", Enabled = true, Priority =
+"Urgent", Icon = "bi-exclamation-triangle", IconColor = "text-danger" },
+        new() { Name = "New Customer", Description = "When a new customer is registered", Enabled = true, Priority = "Low", Icon
+= "bi-person-plus", IconColor = "text-primary" },
+        new() { Name = "Shift Reminder", Description = "Before an employee's shift starts", Enabled = true, Priority = "High",
+Icon = "bi-clock", IconColor = "text-warning" },
+        new() { Name = "Payroll Generated", Description = "When payroll is generated or finalized", Enabled = true, Priority =
+"Normal", Icon = "bi-wallet2", IconColor = "text-success" },
+        new() { Name = "Exchange Rate Update", Description = "When currency rates are refreshed", Enabled = false, Priority =
+"Low", Icon = "bi-currency-exchange", IconColor = "text-info" }
+    };
+
+    private void SaveSettings()
+    {
+        _statusMessage = "Notification settings saved successfully.";
+        _statusAlertClass = "alert-success";
+    }
+
+    private void ResetToDefaults()
+    {
+        _notificationSettings = new();
+        foreach (var trigger in _triggers)
+        {
+            trigger.Enabled = true;
+            trigger.Priority = "Normal";
+        }
+        _statusMessage = "Settings reset to defaults.";
+        _statusAlertClass = "alert-info";
+    }
+
+    private class NotificationPreferences
+    {
+        public bool Enabled { get; set; } = true;
+        public int RefreshIntervalSeconds { get; set; } = 30;
+        public int AutoDismissDays { get; set; } = 30;
+        public bool ShowBadgeCount { get; set; } = true;
+        public bool ShowPopupAlert { get; set; } = false;
+        public int MaxInDropdown { get; set; } = 10;
+    }
+
+    private class NotificationTrigger
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public bool Enabled { get; set; }
+        public string Priority { get; set; } = "Normal";
+        public string Icon { get; set; } = "bi-bell";
+        public string IconColor { get; set; } = "text-muted";
+    }
+}

@@ -1,0 +1,503 @@
+@page "/appointments/new"
+@inject IAppointmentApiService AppointmentService
+@inject IServiceApiService ServiceApiService
+@inject IEmployeeApiService EmployeeService
+@inject ICustomerApiService CustomerService
+@inject ITimeAttendanceApiService TimeAttendanceService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>New Appointment - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="InitializeData">
+    <div class="container-fluid fade-in">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/appointments"
+                                class="text-decoration-none">Appointments</a></li>
+                        <li class="breadcrumb-item active">New Appointment</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 mb-0" style="color: #2C2C2C;">Book New Appointment</h1>
+            </div>
+            <a href="/appointments" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Back to Appointments
+            </a>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading..." />
+        }
+        else
+        {
+            <div class="row justify-content-center">
+                <div class="col-lg-8 col-xl-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-calendar-plus me-2"></i>Appointment Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Customer <span class="text-danger">*</span></label>
+                                    <select
+                                        class="form-select @(string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("CustomerId")) ? "" : "is-invalid")"
+                                        @bind="_form.CustomerId">
+                                        <option value="0">Select Customer...</option>
+                                        @foreach (var customer in _customerLookup)
+                                        {
+                                            <option value="@customer.Id">@customer.Name</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("CustomerId")))
+                                    {
+                                        <div class="invalid-feedback">@_validationErrors["CustomerId"]</div>
+                                    }
+                                    <div class="form-text">
+                                        <a href="/customers?action=new" class="text-decoration-none"><i
+                                                class="bi bi-plus-circle me-1"></i>Add new customer</a>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Service <span class="text-danger">*</span></label>
+                                    <select
+                                        class="form-select @(string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("ServiceId")) ? "" : "is-invalid")"
+                                        @bind="_form.ServiceId" @bind:after="OnServiceChanged">
+                                        <option value="0">Select Service...</option>
+                                        @foreach (var service in _serviceLookup)
+                                        {
+                                            <option value="@service.Id">@service.Name</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("ServiceId")))
+                                    {
+                                        <div class="invalid-feedback">@_validationErrors["ServiceId"]</div>
+                                    }
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Therapist</label>
+                                    <select class="form-select" value="@_form.TherapistId" @onchange="OnTherapistChanged">
+                                        <option value="">Any Available</option>
+                                        @foreach (var therapist in _therapistLookup)
+                                        {
+                                            <option value="@therapist.Id">@therapist.Name</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrEmpty(_therapistAttendanceWarning))
+                                    {
+                                        <div class="alert @_therapistAttendanceAlertClass py-1 px-2 mt-1 mb-0 small d-flex align-items-center">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> @_therapistAttendanceWarning
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="form-text">Leave empty for auto-assignment</div>
+                                    }
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Room</label>
+                                    <select class="form-select" @bind="_form.RoomId">
+                                        <option value="">Auto-assign</option>
+                                        @foreach (var room in _roomLookup)
+                                        {
+                                            <option value="@room.RoomId">@room.RoomName (@room.RoomType)</option>
+                                        }
+                                    </select>
+                                    <div class="form-text">Leave empty for auto-assignment</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Date <span class="text-danger">*</span></label>
+                                    @{
+                                        var dateValue = _form.AppointmentDate.ToString("yyyy-MM-dd");
+                                        var minDate = PhilippineTime.Today.ToString("yyyy-MM-dd");
+                                    }
+                                    <input type="date"
+                                        class="form-control @(string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("Date")) ? "" : "is-invalid")"
+                                        value="@dateValue" min="@minDate" @onchange="OnDateChange" />
+                                    @if (!string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("Date")))
+                                    {
+                                        <div class="invalid-feedback">@_validationErrors["Date"]</div>
+                                    }
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Time <span class="text-danger">*</span></label>
+                                    <select
+                                        class="form-select @(string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("Time")) ? "" : "is-invalid")"
+                                        @bind="_selectedTimeSlot">
+                                        <option value="">Select Time...</option>
+                                        @foreach (var slot in _availableSlots)
+                                        {
+                                            <option value="@slot.ToString()">@(DateTime.Today.Add(slot).ToString("h:mm tt"))</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrEmpty(_validationErrors.GetValueOrDefault("Time")))
+                                    {
+                                        <div class="invalid-feedback">@_validationErrors["Time"]</div>
+                                    }
+                                    @if (_form.ServiceId == 0)
+                                    {
+                                        <div class="form-text text-info"><i class="bi bi-info-circle me-1"></i>Select a service first to see available time slots</div>
+                                    }
+                                    else if (_availableSlots.Count == 0)
+                                    {
+                                        <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>No available slots for selected date</div>
+                                    }
+                                </div>
+
+                                @if (_selectedService != null)
+                                {
+                                    <div class="col-12">
+                                        <div class="alert alert-info mb-0">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <i class="bi bi-info-circle me-2"></i>
+                                                    <strong>@_selectedService.Name</strong>
+                                                </div>
+                                                <div class="text-end">
+                                                    <div class="fw-bold">₱@_selectedService.Price.ToString("N2")</div>
+                                                    <small>@_selectedService.DurationMinutes minutes</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="col-12">
+                                    <label class="form-label">Notes</label>
+                                    <textarea class="form-control" rows="3" @bind="_form.Notes"
+                                        placeholder="Any special instructions or requests..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between">
+                            <a href="/appointments" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-1"></i> Cancel
+                            </a>
+                            <button type="button" class="btn btn-primary" @onclick="SaveAppointment" disabled="@_isSaving">
+                                @if (_isSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    <span>Booking...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-calendar-check me-1"></i>
+                                    <span>Book Appointment</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Success Modal *@
+    <Modal @bind-IsVisible="_showSuccessModal" Title="Appointment Booked!" Size="Modal.ModalSize.Small">
+        <ChildContent>
+            <div class="text-center py-3">
+                <i class="bi bi-check-circle-fill text-success display-3"></i>
+                <h5 class="mt-3">Success!</h5>
+                <p class="text-muted">The appointment has been booked successfully.</p>
+                @if (_createdAppointmentCode != null)
+                {
+                    <p class="mb-0">Appointment Code: <strong>@_createdAppointmentCode</strong></p>
+                }
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <a href="/appointments" class="btn btn-primary">
+                <i class="bi bi-calendar3 me-1"></i> View Appointments
+            </a>
+            <button class="btn btn-outline-primary" @onclick="BookAnother">
+                <i class="bi bi-plus-lg me-1"></i> Book Another
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    [SupplyParameterFromQuery]
+    public int? CustomerId { get; set; }
+
+    private bool _isLoading = true;
+    private bool _isSaving;
+
+    // Lookups
+    private List<LookupItem> _customerLookup = new();
+    private List<LookupItem> _serviceLookup = new();
+    private List<LookupItem> _therapistLookup = new();
+    private List<RoomResponse> _roomLookup = new();
+    private List<TimeSpan> _availableSlots = new();
+    private ServiceResponse? _selectedService;
+
+    // Form
+    private CreateAppointmentRequest _form = new() { AppointmentDate = PhilippineTime.Today };
+    private string _selectedTimeSlot = string.Empty;
+    private Dictionary<string, string> _validationErrors = new();
+
+    // Success modal
+    private bool _showSuccessModal;
+    private string? _createdAppointmentCode;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    // Therapist attendance warning
+    private string _therapistAttendanceWarning = string.Empty;
+    private string _therapistAttendanceAlertClass = string.Empty;
+    private List<LiveAttendanceStatus> _therapistAttendanceCache = new();
+
+    protected override void OnInitialized()
+    {
+        // Data loading moved to InitializeData, triggered by AuthorizedPage.OnAuthReady
+    }
+
+    private async Task InitializeData()
+    {
+        await LoadLookups();
+        await LoadTherapistAttendanceCache();
+        await LoadAvailableSlots();
+
+        // Pre-select customer if provided in query string
+        if (CustomerId.HasValue && CustomerId.Value > 0)
+        {
+            _form.CustomerId = CustomerId.Value;
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadLookups()
+    {
+        try
+        {
+            var customersTask = CustomerService.GetCustomerLookupAsync();
+            var servicesTask = ServiceApiService.GetServiceLookupAsync();
+            var therapistsTask = EmployeeService.GetTherapistsAsync();
+            var roomsTask = AppointmentService.GetRoomsAsync();
+
+            await Task.WhenAll(customersTask, servicesTask, therapistsTask, roomsTask);
+
+            _customerLookup = await customersTask;
+            _serviceLookup = await servicesTask;
+            _therapistLookup = await therapistsTask;
+            _roomLookup = await roomsTask;
+        }
+        catch (Exception ex)
+        {
+            _alertMessage = $"Error loading data: {ex.Message}";
+            _alertType = Alert.AlertType.Error;
+        }
+    }
+
+    private async Task LoadAvailableSlots()
+    {
+        _availableSlots.Clear();
+
+        if (_form.ServiceId > 0)
+        {
+            _availableSlots = await AppointmentService.GetAvailableSlotsAsync(
+                _form.ServiceId,
+                _form.AppointmentDate,
+                _form.TherapistId);
+        }
+        else
+        {
+            // Default slots (9 AM – 9 PM, matching API business hours)
+            _availableSlots = new List<TimeSpan>();
+            for (var hour = 9; hour < 21; hour++)
+            {
+                _availableSlots.Add(new TimeSpan(hour, 0, 0));
+                _availableSlots.Add(new TimeSpan(hour, 30, 0));
+            }
+        }
+    }
+
+    private async Task OnServiceChanged()
+    {
+        if (_form.ServiceId > 0)
+        {
+            try
+            {
+                _selectedService = await ServiceApiService.GetServiceByIdAsync(_form.ServiceId);
+            }
+            catch
+            {
+                _selectedService = null;
+            }
+        }
+        else
+        {
+            _selectedService = null;
+        }
+
+        _selectedTimeSlot = string.Empty;
+        await LoadAvailableSlots();
+    }
+
+    private async Task OnDateChange(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var date))
+        {
+            _form.AppointmentDate = date;
+            _selectedTimeSlot = string.Empty;
+            await LoadAvailableSlots();
+            CheckTherapistAttendance();
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnTherapistChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        _form.TherapistId = int.TryParse(val, out var id) ? id : null;
+        _selectedTimeSlot = string.Empty;
+        await LoadAvailableSlots();
+        CheckTherapistAttendance();
+        StateHasChanged();
+    }
+
+    private void CheckTherapistAttendance()
+    {
+        _therapistAttendanceWarning = string.Empty;
+        _therapistAttendanceAlertClass = string.Empty;
+
+        if (!_form.TherapistId.HasValue || _form.TherapistId == 0)
+            return;
+
+        // Only check for today's appointments
+        if (_form.AppointmentDate.Date != PhilippineTime.Today)
+            return;
+
+        var status = _therapistAttendanceCache
+            .FirstOrDefault(s => s.EmployeeId == _form.TherapistId.Value);
+
+        if (status == null)
+            return;
+
+        switch (status.Status)
+        {
+            case "NotYetIn":
+                _therapistAttendanceWarning = $"{status.EmployeeName} has not clocked in today. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-warning";
+                break;
+            case "OnBreak":
+                _therapistAttendanceWarning = $"{status.EmployeeName} is currently on break. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-warning";
+                break;
+            case "ClockedOut":
+                _therapistAttendanceWarning = $"{status.EmployeeName} has already clocked out for today. Booking will be blocked.";
+                _therapistAttendanceAlertClass = "alert-info";
+                break;
+            case "ClockedIn":
+                // All good — no warning
+                break;
+        }
+    }
+
+    private async Task LoadTherapistAttendanceCache()
+    {
+        try
+        {
+            _therapistAttendanceCache = await TimeAttendanceService.GetLiveStatusAsync();
+        }
+        catch
+        {
+            _therapistAttendanceCache = new();
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        _validationErrors.Clear();
+
+        if (_form.CustomerId <= 0)
+            _validationErrors["CustomerId"] = "Please select a customer";
+
+        if (_form.ServiceId <= 0)
+            _validationErrors["ServiceId"] = "Please select a service";
+
+        if (_form.AppointmentDate < PhilippineTime.Today)
+            _validationErrors["Date"] = "Date cannot be in the past";
+
+        if (string.IsNullOrEmpty(_selectedTimeSlot))
+            _validationErrors["Time"] = "Please select a time slot";
+
+        return _validationErrors.Count == 0;
+    }
+
+    private async Task SaveAppointment()
+    {
+        if (!ValidateForm())
+        {
+            StateHasChanged();
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            if (TimeSpan.TryParse(_selectedTimeSlot, out var time))
+            {
+                _form.StartTime = time;
+            }
+
+            Console.WriteLine($"Creating appointment: CustomerId={_form.CustomerId}, ServiceId={_form.ServiceId}, Date={_form.AppointmentDate}, Time={_form.StartTime}");
+
+            var (result, errorMessage) = await AppointmentService.CreateAppointmentWithErrorAsync(_form);
+
+            if (result != null)
+            {
+                _createdAppointmentCode = result.AppointmentNumber;
+                _showSuccessModal = true;
+            }
+            else
+            {
+                _alertMessage = errorMessage ?? "Failed to create appointment. Please try again.";
+                _alertType = Alert.AlertType.Error;
+            }
+        }
+        catch (Exception ex)
+        {
+            _alertMessage = $"Error booking appointment: {ex.Message}";
+            _alertType = Alert.AlertType.Error;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void BookAnother()
+    {
+        _showSuccessModal = false;
+        _form = new CreateAppointmentRequest { AppointmentDate = PhilippineTime.Today };
+        _selectedTimeSlot = string.Empty;
+        _selectedService = null;
+        _validationErrors.Clear();
+        _createdAppointmentCode = null;
+        _therapistAttendanceWarning = string.Empty;
+        _therapistAttendanceAlertClass = string.Empty;
+    }
+}

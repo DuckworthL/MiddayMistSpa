@@ -1,0 +1,1175 @@
+@page "/customers/segmentation"
+@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject ICustomerSegmentationService SegmentationService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Customer Segmentation - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/customers">Customers</a></li>
+                        <li class="breadcrumb-item active">Segmentation</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 mb-1" style="color: #2C2C2C;">Customer Segmentation</h1>
+                <p class="mb-0" style="color: #6B7280;">AI-powered customer clustering using DBSCAN algorithm</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" @onclick="RecalculateStats" disabled="@_isRecalculating">
+                    @if (_isRecalculating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-arrow-clockwise me-1"></i>
+                    }
+                    <span>Recalculate</span>
+                </button>
+                <button class="btn btn-primary" @onclick="RunAnalysis" disabled="@_isAnalyzing">
+                    @if (_isAnalyzing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Analyzing...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-cpu me-1"></i>
+                        <span>Run Analysis</span>
+                    }
+                </button>
+                @if (_segments?.Any() == true)
+                {
+                    <div class="dropdown">
+                        <button class="btn btn-outline-success dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                disabled="@_isExporting">
+                            @if (_isExporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Exporting...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-download me-1"></i>
+                                <span>Export Report</span>
+                            }
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="min-width: 220px;">
+                            <li><h6 class="dropdown-header small text-muted">Export All Segments</h6></li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center gap-2" href="#"
+                                   @onclick:preventDefault @onclick="ExportAllPdf">
+                                    <span class="badge bg-danger" style="width:34px; font-size:0.65rem;">PDF</span>
+                                    <span>Export as PDF</span>
+                                    <i class="bi bi-file-earmark-pdf ms-auto text-danger"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center gap-2" href="#"
+                                   @onclick:preventDefault @onclick="ExportAllExcel">
+                                    <span class="badge bg-success" style="width:34px; font-size:0.65rem;">XLS</span>
+                                    <span>Export as Excel</span>
+                                    <i class="bi bi-file-earmark-spreadsheet ms-auto text-success"></i>
+                                </a>
+                            </li>
+                            @if (_segments.Count > 1)
+                            {
+                                <li><hr class="dropdown-divider" /></li>
+                                <li><h6 class="dropdown-header small text-muted">Export by Segment</h6></li>
+                                @foreach (var seg in _segments)
+                                {
+                                    var segName = seg.SegmentName;
+                                    var segCode = seg.SegmentCode;
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center gap-2 small" href="#"
+                                           @onclick:preventDefault @onclick="() => ExportSegPdf(segName)">
+                                            <span style="color: @GetSegmentColor(segCode);">@GetSegmentIcon(segCode)</span>
+                                            <span class="text-truncate" style="max-width: 130px;">@segName</span>
+                                            <span class="ms-auto badge bg-secondary" style="font-size:0.6rem;">PDF</span>
+                                        </a>
+                                    </li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>@_errorMessage
+                <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>@_successMessage
+                <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+            </div>
+        }
+
+        @* Parameter Guide Card *@
+        <div class="card mb-4" style="border-left: 4px solid #2E7D6F;">
+            <div class="card-header d-flex justify-content-between align-items-center py-2" style="cursor: pointer;" @onclick="() => _showGuide = !_showGuide">
+                <h6 class="mb-0"><i class="bi bi-book me-2 text-primary"></i>How It Works — RFM & DBSCAN Parameter Guide</h6>
+                <i class="bi @(_showGuide ? "bi-chevron-up" : "bi-chevron-down") text-muted"></i>
+            </div>
+            @if (_showGuide)
+            {
+                <div class="card-body pt-2">
+                    <div class="row g-4">
+                        @* RFM Explanation *@
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold mb-2" style="color: #2E7D6F;"><i class="bi bi-bar-chart me-1"></i>RFM Metrics</h6>
+                            <p class="text-muted small mb-2">Each customer is scored on three behavioral dimensions:</p>
+                            <div class="mb-2 p-2 rounded" style="background: #F0FDF4;">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge bg-success me-2">R</span>
+                                    <strong class="small">Recency</strong>
+                                </div>
+                                <p class="small text-muted mb-0 ms-4">Days since the customer's last visit. Lower is better — recent visitors are more engaged.</p>
+                            </div>
+                            <div class="mb-2 p-2 rounded" style="background: #EFF6FF;">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge bg-primary me-2">F</span>
+                                    <strong class="small">Frequency</strong>
+                                </div>
+                                <p class="small text-muted mb-0 ms-4">Average visits per month. Higher means more loyal and engaged customers.</p>
+                            </div>
+                            <div class="mb-2 p-2 rounded" style="background: #FFFBEB;">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge bg-warning text-dark me-2">M</span>
+                                    <strong class="small">Monetary</strong>
+                                </div>
+                                <p class="small text-muted mb-0 ms-4">Total amount spent (₱). Higher value customers contribute the most revenue.</p>
+                            </div>
+                        </div>
+
+                        @* Weights & Parameters Explanation *@
+                        <div class="col-md-6">
+                            <h6 class="fw-semibold mb-2" style="color: #2E7D6F;"><i class="bi bi-sliders me-1"></i>Parameter Guide</h6>
+                            <table class="table table-sm small mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-semibold" style="width: 140px;">RFM Weights</td>
+                                        <td class="text-muted">
+                                            Controls how much each metric influences clustering. A weight of <strong>1.0</strong> is balanced.
+                                            Increase to &gt;1 to prioritize that metric, decrease to &lt;1 to reduce its influence.
+                                            E.g., set Monetary to 1.5 to emphasize high-spending customers.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Epsilon (ε)</td>
+                                        <td class="text-muted">
+                                            Maximum distance between two points to be considered neighbors. <strong>Smaller ε</strong> = tighter, more granular clusters.
+                                            <strong>Larger ε</strong> = looser clusters that merge more points together. Default <strong>0.15</strong> works well for 100 customers.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">MinPts</td>
+                                        <td class="text-muted">
+                                            Minimum number of customers needed within ε distance to form a cluster core.
+                                            <strong>Lower</strong> = more small clusters detected. <strong>Higher</strong> = only dense groups qualify as clusters. Default <strong>2</strong>.
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-semibold">Normalize Data</td>
+                                        <td class="text-muted">
+                                            Scales all RFM values to a 0–1 range so no single metric dominates due to different units.
+                                            <strong>Recommended: ON</strong>. Turn off only if you want raw values to influence distance directly.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Model Training Pipeline Card *@
+        <div class="card mb-4" style="border-left: 4px solid #8B5CF6;">
+            <div class="card-header d-flex justify-content-between align-items-center py-2" style="cursor: pointer;" @onclick="() => _showPipeline = !_showPipeline">
+                <h6 class="mb-0"><i class="bi bi-diagram-2 me-2" style="color: #8B5CF6;"></i>Model Training Pipeline</h6>
+                <i class="bi @(_showPipeline ? "bi-chevron-up" : "bi-chevron-down") text-muted"></i>
+            </div>
+            @if (_showPipeline)
+            {
+                <div class="card-body pt-3 pb-3">
+                    @* Step arrows — horizontal on desktop, vertical on mobile *@
+                    <div class="d-flex flex-column flex-md-row align-items-stretch gap-0 justify-content-between">
+
+                        @* Step 1 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#EDE9FE;border:2px solid #8B5CF6;">
+                                <i class="bi bi-database fs-5" style="color:#8B5CF6;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">1. Data Collection</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Pulls active customers with <strong>LastVisitDate</strong>,
+                                    <strong>TotalVisits</strong>, and <strong>TotalSpent</strong>
+                                    from the database.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 2 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#DBEAFE;border:2px solid #3B82F6;">
+                                <i class="bi bi-calculator fs-5" style="color:#3B82F6;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">2. RFM Computation</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Computes raw RFM scores: <strong>Recency</strong> (days since last visit),
+                                    <strong>Frequency</strong> (visits/month), <strong>Monetary</strong> (₱ total spent).
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 3 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#D1FAE5;border:2px solid #10B981;">
+                                <i class="bi bi-arrows-angle-contract fs-5" style="color:#10B981;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">3. Normalization</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Scales each dimension to <strong>0–1</strong> using min-max so no single metric
+                                    dominates. Recency is <strong>inverted</strong> (lower days = higher score).
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 4 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#FEF3C7;border:2px solid #F59E0B;">
+                                <i class="bi bi-cpu fs-5" style="color:#F59E0B;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">4. DBSCAN Clustering</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Runs DBSCAN with weighted Euclidean distance in 3D RFM space. Finds
+                                    core points, expands density-connected clusters, marks outliers as noise.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 5 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#FEE2E2;border:2px solid #EF4444;">
+                                <i class="bi bi-tags fs-5" style="color:#EF4444;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">5. Segment Labeling</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Each customer is individually mapped to one of 7 business segments
+                                    (VIP Platinum → Lost) using their own RFM thresholds.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 6 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#F3F4F6;border:2px solid #6B7280;">
+                                <i class="bi bi-bar-chart-line fs-5" style="color:#6B7280;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">6. Quality Evaluation</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Computes Silhouette Score, Davies-Bouldin Index, intra/inter-cluster
+                                    distances, and an overall quality score (0–100).
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-none d-md-flex align-items-center px-1 text-muted" style="font-size:1.2rem;">›</div>
+
+                        @* Step 7 *@
+                        <div class="d-flex flex-md-column flex-row align-items-md-center align-items-start gap-2 flex-fill">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width:48px;height:48px;background:#ECFDF5;border:2px solid #2E7D6F;">
+                                <i class="bi bi-cloud-arrow-up fs-5" style="color:#2E7D6F;"></i>
+                            </div>
+                            <div class="text-md-center">
+                                <div class="small fw-semibold">7. Persist Results</div>
+                                <div class="text-muted" style="font-size:0.72rem;">
+                                    Segment assignments are saved to the database per customer and
+                                    summary stats (averages, counts) are stored in CustomerSegments.
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    @* RFM Thresholds Reference Table *@
+                    <div class="mt-4">
+                        <h6 class="small fw-semibold text-muted mb-2"><i class="bi bi-table me-1"></i>Segment Assignment Thresholds</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered small mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start">Segment</th>
+                                        <th>Recency</th>
+                                        <th>Frequency</th>
+                                        <th>Monetary</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-start">💎 VIP Platinum</td>
+                                        <td><span class="badge bg-success">Recent (&lt;30 days)</span></td>
+                                        <td><span class="badge bg-primary">High (&gt;2/mo)</span></td>
+                                        <td><span class="badge bg-warning text-dark">High (&gt;₱10,000)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">🌟 Loyal Regulars</td>
+                                        <td><span class="badge bg-success">Recent/Med (&lt;90d)</span></td>
+                                        <td><span class="badge bg-primary">Med-High (≥0.5/mo)</span></td>
+                                        <td><span class="badge bg-warning text-dark">High (&gt;₱10,000)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">🌱 New Customers</td>
+                                        <td><span class="badge bg-success">Recent (&lt;30 days)</span></td>
+                                        <td><span class="badge bg-secondary">Low (&lt;0.5/mo)</span></td>
+                                        <td><span class="badge bg-light text-dark border">Any</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">📈 Promising</td>
+                                        <td><span class="badge bg-success">Recent (&lt;30 days)</span></td>
+                                        <td><span class="badge bg-primary">Med (0.5–2/mo)</span></td>
+                                        <td><span class="badge bg-warning text-dark">Medium (₱3k–₱10k)</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">⚠️ At-Risk</td>
+                                        <td><span class="badge bg-warning text-dark">Medium (30–90d)</span></td>
+                                        <td><span class="badge bg-light text-dark border">Any</span></td>
+                                        <td><span class="badge bg-light text-dark border">Any</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">😴 Hibernating</td>
+                                        <td><span class="badge bg-danger">Old (&gt;90 days)</span></td>
+                                        <td><span class="badge bg-primary">Med-High (≥0.5/mo)</span></td>
+                                        <td><span class="badge bg-light text-dark border">Any</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-start">👋 Lost</td>
+                                        <td><span class="badge bg-danger">Old (&gt;90 days)</span></td>
+                                        <td><span class="badge bg-secondary">Low (&lt;0.5/mo)</span></td>
+                                        <td><span class="badge bg-secondary">Low (&lt;₱3,000)</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* DBSCAN Performance Summary Card — only shown after analysis *@
+        @if (_segments != null && _segments.Any())
+        {
+            <div class="card mb-4" style="border-left: 4px solid #3B82F6;">
+                <div class="card-header py-2">
+                    <h6 class="mb-0"><i class="bi bi-speedometer2 me-2 text-info"></i>DBSCAN Performance Summary</h6>
+                </div>
+                <div class="card-body pt-2 pb-3">
+                    <div class="row g-3">
+                        @* Performance Scores *@
+                        <div class="col-md-4">
+                            <div class="p-3 rounded h-100" style="background: #F8FAFC;">
+                                <h6 class="small fw-semibold text-muted mb-2"><i class="bi bi-trophy me-1"></i>Clustering Quality</h6>
+
+                                @if (_analysisResult?.PerformanceMetrics != null)
+                                {
+                                    var m = _analysisResult.PerformanceMetrics;
+                                    @* Overall Score Gauge *@
+                                    <div class="text-center mb-2">
+                                        <div class="d-inline-block position-relative" style="width: 80px; height: 80px;">
+                                            <svg viewBox="0 0 36 36" style="width: 80px; height: 80px; transform: rotate(-90deg);">
+                                                <circle cx="18" cy="18" r="15.5" fill="none" stroke="#E5E7EB" stroke-width="3"></circle>
+                                                <circle cx="18" cy="18" r="15.5" fill="none" stroke="@GetScoreColor(m.OverallScore)"
+                                                        stroke-width="3" stroke-dasharray="@((m.OverallScore * 97.4 / 100).ToString("F1")) 97.4"
+                                                        stroke-linecap="round"></circle>
+                                            </svg>
+                                            <div class="position-absolute top-50 start-50 translate-middle text-center">
+                                                <span class="fw-bold" style="font-size: 1rem; color: @GetScoreColor(m.OverallScore);">@m.OverallScore.ToString("F0")</span>
+                                            </div>
+                                        </div>
+                                        <div class="small mt-1">
+                                            <span class="badge" style="background: @GetScoreColor(m.OverallScore);">@m.QualityRating</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Silhouette Score</span>
+                                        <span class="fw-semibold" style="color: @GetSilhouetteColor(m.SilhouetteScore);">
+                                            @m.SilhouetteScore.ToString("F3")
+                                        </span>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 4px;">
+                                        <div class="progress-bar" style="width: @(((m.SilhouetteScore + 1) / 2 * 100).ToString("F1"))%; background: @GetSilhouetteColor(m.SilhouetteScore);"></div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Davies-Bouldin Index</span>
+                                        <span class="fw-semibold" style="color: @GetDbiColor(m.DaviesBouldinIndex);">
+                                            @m.DaviesBouldinIndex.ToString("F3")
+                                        </span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Avg Intra-Cluster Dist.</span>
+                                        <span class="fw-semibold">@m.AvgIntraClusterDistance.ToString("F4")</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Avg Inter-Cluster Dist.</span>
+                                        <span class="fw-semibold">@m.AvgInterClusterDistance.ToString("F4")</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="text-muted small mb-0">Run a new analysis to see performance scores.</p>
+                                }
+                            </div>
+                        </div>
+
+                        @* Parameters Used *@
+                        <div class="col-md-4">
+                            <div class="p-3 rounded h-100" style="background: #F8FAFC;">
+                                <h6 class="small fw-semibold text-muted mb-2"><i class="bi bi-gear me-1"></i>Parameters Used</h6>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Epsilon (ε)</span>
+                                    <span class="fw-semibold">@_parameters.Epsilon</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">MinPts</span>
+                                    <span class="fw-semibold">@_parameters.MinSamples</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Weights (R / F / M)</span>
+                                    <span class="fw-semibold">@_parameters.RecencyWeight / @_parameters.FrequencyWeight / @_parameters.MonetaryWeight</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Normalized</span>
+                                    <span class="fw-semibold">@(_parameters.NormalizeData ? "Yes" : "No")</span>
+                                </div>
+                                <hr class="my-2" />
+                                <h6 class="small fw-semibold text-muted mb-2"><i class="bi bi-graph-up me-1"></i>Clustering Results</h6>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Segments Found</span>
+                                    <span class="fw-semibold">@_segments.Count</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Total Customers</span>
+                                    <span class="fw-semibold">@(_segments.Sum(s => s.CustomerCount))</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Noise / Outliers</span>
+                                    <span class="fw-semibold">@(_clusteringStatus?.UnassignedCustomers ?? _analysisResult?.NoisePoints ?? 0)</span>
+                                </div>
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-muted">Coverage Rate</span>
+                                    <span class="fw-semibold text-success">
+                                        @{ var totalCust = _clusteringStatus?.TotalCustomers ?? _analysisResult?.TotalCustomersAnalyzed ?? 1;
+                                           var segmented = _segments.Sum(s => s.CustomerCount);
+                                           var coverage = totalCust > 0 ? (segmented * 100.0 / totalCust) : 0; }
+                                        @coverage.ToString("F1")%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Segment Distribution *@
+                        <div class="col-md-4">
+                            <div class="p-3 rounded h-100" style="background: #F8FAFC;">
+                                <h6 class="small fw-semibold text-muted mb-2"><i class="bi bi-pie-chart me-1"></i>Segment Distribution</h6>
+                                @foreach (var seg in _segments.OrderByDescending(s => s.CustomerCount))
+                                {
+                                    var pct = totalCust > 0 ? (seg.CustomerCount * 100.0 / totalCust) : 0;
+                                    <div class="mb-1">
+                                        <div class="d-flex justify-content-between small mb-0">
+                                            <span style="color: @GetSegmentColor(seg.SegmentCode);">@GetSegmentIcon(seg.SegmentCode) @seg.SegmentName</span>
+                                            <span class="text-muted">@seg.CustomerCount <span class="text-muted">(@pct.ToString("F0")%)</span></span>
+                                        </div>
+                                        <div class="progress" style="height: 4px;">
+                                            <div class="progress-bar" role="progressbar" style="width: @pct.ToString("F1")%; background: @GetSegmentColor(seg.SegmentCode);"></div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (_clusteringStatus?.LastAnalysisDate != null)
+                    {
+                        <div class="mt-2 small text-muted text-end">
+                            <i class="bi bi-clock me-1"></i>Last analyzed: @_clusteringStatus.LastAnalysisDate.Value.ToString("MMMM d, yyyy h:mm tt")
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Export Report Card — shown when segments are loaded *@
+        @if (_segments?.Any() == true)
+        {
+            <div class="card mb-4" style="border-left: 4px solid #10B981;">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                        <div>
+                            <h6 class="mb-1 fw-semibold" style="color: #10B981;">
+                                <i class="bi bi-download me-2"></i>Export Segmentation Report
+                            </h6>
+                            <p class="text-muted small mb-0">
+                                Download a detailed report of all segments or a specific segment, including RFM metrics and customer lists.
+                            </p>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            @* Format + scope selection via 4 quick buttons *@
+                            <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                                    @onclick="ExportAllPdf" disabled="@_isExporting">
+                                @if (_isExporting)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                }
+                                <span>All Segments PDF</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
+                                    @onclick="ExportAllExcel" disabled="@_isExporting">
+                                @if (_isExporting)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                                }
+                                <span>All Segments Excel</span>
+                            </button>
+                            @if (_segments.Count > 0)
+                            {
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                            data-bs-toggle="dropdown" aria-expanded="false" disabled="@_isExporting">
+                                        <i class="bi bi-funnel me-1"></i>By Segment
+                                    </button>
+                                    <ul class="dropdown-menu shadow-lg" style="min-width: 230px; max-height: 340px; overflow-y: auto;">
+                                        <li><h6 class="dropdown-header small">Choose a segment to export</h6></li>
+                                        @foreach (var seg in _segments)
+                                        {
+                                            var sn = seg.SegmentName;
+                                            var sc = seg.SegmentCode;
+                                            <li>
+                                                <span class="dropdown-item-text d-flex align-items-center gap-2 py-1">
+                                                    <span style="width:22px; text-align:center;">@GetSegmentIcon(sc)</span>
+                                                    <span class="flex-grow-1 small fw-semibold">@sn</span>
+                                                    <span class="text-muted small">@seg.CustomerCount cux</span>
+                                                </span>
+                                            </li>
+                                            <li>
+                                                <div class="d-flex gap-1 px-3 pb-2">
+                                                    <button class="btn btn-xs btn-outline-danger flex-fill"
+                                                            style="font-size: 0.72rem; padding: 2px 6px;"
+                                                            @onclick="() => ExportSegPdf(sn)">
+                                                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                                                    </button>
+                                                    <button class="btn btn-xs btn-outline-success flex-fill"
+                                                            style="font-size: 0.72rem; padding: 2px 6px;"
+                                                            @onclick="() => ExportSegExcel(sn)">
+                                                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+                                                    </button>
+                                                </div>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* Parameters *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Analysis Parameters</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-3">
+                        <label class="form-label">RFM Weights</label>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted mb-1">Recency Weight</label>
+                            <input type="range" class="form-range" min="0.1" max="2" step="0.1"
+                                   @bind="_parameters.RecencyWeight" />
+                            <div class="text-center text-muted small">@_parameters.RecencyWeight</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted mb-1">Frequency Weight</label>
+                            <input type="range" class="form-range" min="0.1" max="2" step="0.1"
+                                   @bind="_parameters.FrequencyWeight" />
+                            <div class="text-center text-muted small">@_parameters.FrequencyWeight</div>
+                        </div>
+                        <div>
+                            <label class="form-label small text-muted mb-1">Monetary Weight</label>
+                            <input type="range" class="form-range" min="0.1" max="2" step="0.1"
+                                   @bind="_parameters.MonetaryWeight" />
+                            <div class="text-center text-muted small">@_parameters.MonetaryWeight</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">
+                            Epsilon (ε) - Neighborhood Radius
+                            <i class="bi bi-info-circle text-muted"
+                               title="Maximum distance between points to be considered neighbors"></i>
+                        </label>
+                        <input type="range" class="form-range" min="0.1" max="2" step="0.1"
+                               @bind="_parameters.Epsilon" />
+                        <div class="text-center text-muted">@_parameters.Epsilon</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">
+                            MinPts - Minimum Points
+                            <i class="bi bi-info-circle text-muted"
+                               title="Minimum customers required to form a cluster"></i>
+                        </label>
+                        <input type="range" class="form-range" min="2" max="10" step="1"
+                               @bind="_parameters.MinSamples" />
+                        <div class="text-center text-muted">@_parameters.MinSamples</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Options</label>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="normalize"
+                                   @bind="_parameters.NormalizeData" />
+                            <label class="form-check-label" for="normalize">Normalize Data (Recommended)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading segmentation data...</p>
+            </div>
+        }
+        else if (_clusteringStatus != null || _analysisResult != null)
+        {
+            @* Results Summary *@
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <h2 class="text-primary mb-1">@(_segments?.Count ?? 0)</h2>
+                            <p class="text-muted mb-0">Segments</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <h2 class="text-success mb-1">@(_clusteringStatus?.TotalCustomers ??
+                                                                                            _analysisResult?.TotalCustomersAnalyzed ?? 0)</h2>
+                                <p class="text-muted mb-0">Total Customers</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <h2 class="text-info mb-1">@(_clusteringStatus?.SegmentedCustomers ?? 0)</h2>
+                                <p class="text-muted mb-0">Segmented</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <h2 class="text-warning mb-1">@(_clusteringStatus?.UnassignedCustomers ??
+                                                                                                _analysisResult?.NoisePoints ?? 0)</h2>
+                                    <p class="text-muted mb-0">Unassigned / Noise</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* Segments *@
+                    <div class="row g-4">
+                        @if (_segments != null)
+                        {
+                            @foreach (var segment in _segments)
+                            {
+                                <div class="col-md-4">
+                                    <div class="card h-100" style="border-left: 4px solid @GetSegmentColor(segment.SegmentCode);">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h5 class="mb-0" style="color: @GetSegmentColor(segment.SegmentCode);">
+                                                @GetSegmentIcon(segment.SegmentCode) @segment.SegmentName
+                                            </h5>
+                                            <span class="badge" style="background: @GetSegmentColor(segment.SegmentCode);">
+                                                @segment.CustomerCount customers
+                                            </span>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-muted small">@segment.Description</p>
+
+                                            <div class="mb-3">
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span>Avg Recency (days)</span>
+                                                    <span class="fw-medium">@((segment.AverageRecency ?? 0).ToString("F1"))</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span>Avg Frequency (visits/mo)</span>
+                                                    <span class="fw-medium">@((segment.AverageFrequency ?? 0).ToString("F2"))</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between small text-muted">
+                                                    <span>Avg Monetary Value</span>
+                                                    <span class="fw-medium">₱@((segment.AverageMonetaryValue ?? 0).ToString("N0"))</span>
+                                                </div>
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(segment.RecommendedAction))
+                                            {
+                                                <h6 class="small text-muted mb-2">Recommended Action</h6>
+                                                <p class="small mb-0 text-primary">
+                                                    <i class="bi bi-lightbulb me-1"></i>@segment.RecommendedAction
+                                                </p>
+                                            }
+                                        </div>
+                                        <div class="card-footer bg-transparent">
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-sm btn-outline-primary flex-grow-1"
+                                                        @onclick="() => ViewSegmentCustomers(segment)">
+                                                    <i class="bi bi-people me-1"></i> View Customers
+                                                </button>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" type="button"
+                                                            data-bs-toggle="dropdown" aria-expanded="false"
+                                                            title="Export this segment" disabled="@_isExporting">
+                                                        <i class="bi bi-download"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 160px;">
+                                                        @{ var exportSegName = segment.SegmentName; }
+                                                        <li>
+                                                            <a class="dropdown-item small d-flex align-items-center gap-2" href="#"
+                                                               @onclick:preventDefault @onclick="() => ExportSegPdf(exportSegName)">
+                                                                <i class="bi bi-file-earmark-pdf text-danger"></i> Export PDF
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item small d-flex align-items-center gap-2" href="#"
+                                                               @onclick:preventDefault @onclick="() => ExportSegExcel(exportSegName)">
+                                                                <i class="bi bi-file-earmark-spreadsheet text-success"></i> Export Excel
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+        else
+                {
+                    @* Initial State *@
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="bi bi-diagram-3 display-1 text-muted"></i>
+                            <h4 class="mt-3">No Segmentation Data</h4>
+                            <p class="text-muted">
+                                Click "Run Analysis" to discover customer segments using DBSCAN clustering.
+                            </p>
+                            <button class="btn btn-primary" @onclick="RunAnalysis">
+                                <i class="bi bi-cpu me-1"></i> Run Analysis
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </AuthorizedPage>
+
+@* Segment Customers Modal *@
+@if (_showSegmentModal && _selectedSegment != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header" style="border-left: 5px solid @GetSegmentColor(_selectedSegment.SegmentCode);">
+                    <h5 class="modal-title">
+                        @GetSegmentIcon(_selectedSegment.SegmentCode) @_selectedSegment.SegmentName
+                        <span class="badge ms-2" style="background: @GetSegmentColor(_selectedSegment.SegmentCode);">
+                            @_segmentCustomers.Count customers
+                        </span>
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseSegmentModal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    @if (_isLoadingSegmentCustomers)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Loading customers...</p>
+                        </div>
+                    }
+                    else if (_segmentCustomers.Any())
+                    {
+                        @* Segment summary row *@
+                        <div class="px-3 py-2 bg-light border-bottom">
+                            <div class="row text-center small text-muted">
+                                <div class="col-4">
+                                    <div class="fw-semibold text-dark">@((_selectedSegment.AverageRecency ?? 0).ToString("F1"))</div>
+                                    Avg Recency (days)
+                                </div>
+                                <div class="col-4">
+                                    <div class="fw-semibold text-dark">@((_selectedSegment.AverageFrequency ?? 0).ToString("F2"))</div>
+                                    Avg Frequency (visits/mo)
+                                </div>
+                                <div class="col-4">
+                                    <div class="fw-semibold text-dark">₱@((_selectedSegment.AverageMonetaryValue ?? 0).ToString("N0"))</div>
+                                    Avg Monetary Value
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Membership</th>
+                                        <th class="text-center">Visits</th>
+                                        <th>Last Visit</th>
+                                        <th class="text-end">Points</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var customer in _segmentCustomers)
+                                    {
+                                        <tr>
+                                            <td><code>@customer.CustomerCode</code></td>
+                                            <td>@customer.FullName</td>
+                                            <td>@customer.PhoneNumber</td>
+                                            <td>
+                                                <span class="badge @GetMembershipBadge(customer.MembershipType)">
+                                                    @customer.MembershipType
+                                                </span>
+                                            </td>
+                                            <td class="text-center">@customer.TotalVisits</td>
+                                            <td>@(customer.LastVisitDate?.ToString("MMM d, yyyy") ?? "—")</td>
+                                            <td class="text-end">@customer.LoyaltyPoints.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-people display-4"></i>
+                            <p class="mt-2">No customers found in this segment.</p>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    @if (!string.IsNullOrEmpty(_selectedSegment.RecommendedAction))
+                    {
+                        <div class="me-auto small text-muted">
+                            <i class="bi bi-lightbulb text-primary me-1"></i>
+                            @_selectedSegment.RecommendedAction
+                        </div>
+                    }
+                    <button type="button" class="btn btn-secondary" @onclick="CloseSegmentModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isAnalyzing = false;
+    private bool _isRecalculating = false;
+    private bool _showGuide = true;
+    private bool _showPipeline = true;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    // Export state
+    private bool _isExporting = false;
+
+    // Segment modal state
+    private bool _showSegmentModal = false;
+    private bool _isLoadingSegmentCustomers = false;
+    private CustomerSegmentResponse? _selectedSegment;
+    private List<CustomerListItem> _segmentCustomers = new();
+
+    // Parameters
+    private DbscanParametersRequest _parameters = new()
+    {
+        Epsilon = 0.15,
+        MinSamples = 2,
+        NormalizeData = true,
+        RecencyWeight = 1.0,
+        FrequencyWeight = 1.0,
+        MonetaryWeight = 1.0
+    };
+
+    // Results
+    private ClusteringStatusResponse? _clusteringStatus;
+    private ClusteringResultResponse? _analysisResult;
+    private List<CustomerSegmentResponse>? _segments;
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Load current status and segments
+            var statusTask = SegmentationService.GetClusteringStatusAsync();
+            var segmentsTask = SegmentationService.GetAllSegmentsAsync();
+
+            await Task.WhenAll(statusTask, segmentsTask);
+
+            _clusteringStatus = await statusTask;
+            _segments = await segmentsTask;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading segmentation data: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RunAnalysis()
+    {
+        _isAnalyzing = true;
+        _errorMessage = null;
+        _successMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            _analysisResult = await SegmentationService.RunDbscanAnalysisAsync(_parameters);
+
+            if (_analysisResult?.Success == true)
+            {
+                _successMessage = $"Analysis complete! Found {_analysisResult.ClustersFound} clusters from {_analysisResult.TotalCustomersAnalyzed} customers.";
+                // Reload the data to get updated segments
+                await LoadData();
+            }
+            else
+            {
+                _errorMessage = _analysisResult?.Message ?? "Analysis failed";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error running analysis: {ex.Message}";
+        }
+        finally
+        {
+            _isAnalyzing = false;
+        }
+    }
+
+    private async Task RecalculateStats()
+    {
+        _isRecalculating = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await SegmentationService.RecalculateSegmentStatsAsync();
+            _successMessage = "Segment statistics recalculated successfully";
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error recalculating: {ex.Message}";
+        }
+        finally
+        {
+            _isRecalculating = false;
+        }
+    }
+
+    private async Task ViewSegmentCustomers(CustomerSegmentResponse segment)
+    {
+        _selectedSegment = segment;
+        _showSegmentModal = true;
+        _isLoadingSegmentCustomers = true;
+        _segmentCustomers = new();
+        StateHasChanged();
+
+        try
+        {
+            _segmentCustomers = await SegmentationService.GetCustomersBySegmentAsync(segment.SegmentName);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading segment customers: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingSegmentCustomers = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExportAllPdf() => await ExportSegmentation("PDF", null);
+    private async Task ExportAllExcel() => await ExportSegmentation("Excel", null);
+    private async Task ExportSegPdf(string segName) => await ExportSegmentation("PDF", segName);
+    private async Task ExportSegExcel(string segName) => await ExportSegmentation("Excel", segName);
+
+    private void CloseSegmentModal()
+    {
+        _showSegmentModal = false;
+        _selectedSegment = null;
+        _segmentCustomers = new();
+    }
+
+    private async Task ExportSegmentation(string format, string? segmentName)
+    {
+        if (_isExporting) return;
+        _isExporting = true;
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var (fileContent, fileName, contentType, error) = await SegmentationService.ExportSegmentationAsync(format, segmentName);
+
+            if (fileContent == null || error != null)
+            {
+                _errorMessage = error ?? "Export failed. Please try again.";
+                return;
+            }
+
+            var base64 = Convert.ToBase64String(fileContent);
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+
+            var scope = string.IsNullOrEmpty(segmentName) ? "All Segments" : segmentName;
+            _successMessage = $"✔ {format} report exported for {scope}.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Export error: {ex.Message}";
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private string GetMembershipBadge(string type) => type switch
+    {
+        "Platinum" => "bg-dark text-white",
+        "Gold" => "bg-warning text-dark",
+        "Silver" => "bg-secondary text-white",
+        _ => "bg-light text-dark border"
+    };
+
+    private string GetSegmentColor(string segmentCode) => segmentCode switch
+    {
+        "VIP" => "#8B5CF6", // Purple
+        "LYL" => "#10B981", // Green
+        "PRM" => "#3B82F6", // Blue
+        "NEW" => "#06B6D4", // Cyan
+        "RSK" => "#F59E0B", // Amber
+        "HIB" => "#EF4444", // Red
+        "LST" => "#6B7280", // Gray
+        "OUT" => "#94A3B8", // Slate
+        _ => "#6B7280"
+    };
+
+    private string GetSegmentIcon(string segmentCode) => segmentCode switch
+    {
+        "VIP" => "💎",
+        "LYL" => "🌟",
+        "PRM" => "📈",
+        "NEW" => "🌱",
+        "RSK" => "⚠️",
+        "HIB" => "😴",
+        "LST" => "👋",
+        "OUT" => "❓",
+        _ => "👤"
+    };
+
+    private string GetScoreColor(double score) => score switch
+    {
+        >= 80 => "#10B981", // Green
+        >= 60 => "#3B82F6", // Blue
+        >= 40 => "#F59E0B", // Amber
+        _ => "#EF4444"      // Red
+    };
+
+    private string GetSilhouetteColor(double score) => score switch
+    {
+        >= 0.5 => "#10B981",  // Strong structure
+        >= 0.25 => "#3B82F6", // Reasonable structure
+        >= 0 => "#F59E0B",    // Weak structure
+        _ => "#EF4444"        // Misclassified
+    };
+
+    private string GetDbiColor(double dbi) => dbi switch
+    {
+        <= 0.5 => "#10B981",
+        <= 1.0 => "#3B82F6",
+        <= 2.0 => "#F59E0B",
+        _ => "#EF4444"
+    };
+}

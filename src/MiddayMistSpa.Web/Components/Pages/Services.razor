@@ -1,0 +1,634 @@
+@page "/services"
+@inject IServiceApiService ServiceApiService
+@inject IRolePermissionService RolePermissionService
+@inject IAuthStateService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Services & Treatments - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid">
+        @* Page Header *@
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">Services & Treatments</h1>
+                <p class="text-muted mb-0">Manage spa service catalog and pricing</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" @onclick="ShowCategoryModal">
+                    <i class="bi bi-folder-plus me-1"></i> New Category
+                </button>
+                <button class="btn btn-primary" @onclick="ShowNewServiceModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Service
+                </button>
+            </div>
+        </div>
+
+        @* Stats Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <StatCard Title="Total Services" Value="@_services.Items.Count().ToString()" Icon="bi-spa"
+                          Color="StatCard.CardColor.Primary" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Categories" Value="@_categories.Count.ToString()" Icon="bi-collection"
+                          Color="StatCard.CardColor.Info" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Active Services" Value="@_services.Items.Count(s => s.IsActive).ToString()"
+                          Icon="bi-check-circle" Color="StatCard.CardColor.Success" />
+            </div>
+            <div class="col-md-3">
+                <StatCard Title="Avg. Duration" Value="@($"{GetAverageDuration()} min")" Icon="bi-clock"
+                          Color="StatCard.CardColor.Warning" />
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <SearchInput @bind-Value="_searchTerm" OnSearch="LoadServices"
+                                     Placeholder="Search services..." />
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" @onchange="OnCategoryFilterChange">
+                            <option value="">All Categories</option>
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category.CategoryId">@category.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @onchange="OnStatusFilterChange">
+                            <option value="">All Status</option>
+                            <option value="true">Active</option>
+                            <option value="false">Archived</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading services..." />
+        }
+        else
+        {
+            @* Services by Category *@
+            @foreach (var category in _categories.Where(c => GetServicesByCategory(c.CategoryId).Any()))
+            {
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-folder me-2 text-primary"></i>@category.Name
+                            <span class="badge bg-secondary ms-2">@GetServicesByCategory(category.CategoryId).Count()</span>
+                        </h5>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => EditCategory(category)">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Service Name</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Duration</th>
+                                        <th class="text-end">Price</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var service in GetServicesByCategory(category.CategoryId))
+                                    {
+                                        <tr class="@(!service.IsActive ? "text-muted" : "")">
+                                            <td>
+                                                <div class="fw-medium">@service.Name</div>
+                                                <small class="text-muted">@service.ServiceCode</small>
+                                            </td>
+                                            <td>
+                                                <span class="text-truncate d-inline-block" style="max-width: 300px;">
+                                                    @service.Description
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="bi bi-clock me-1"></i>@service.DurationMinutes min
+                                                </span>
+                                            </td>
+                                            <td class="text-end fw-medium">
+                                                @service.Price.ToString("C")
+                                            </td>
+                                            <td class="text-center">
+                                                @if (service.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Archived</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" @onclick="() => EditService(service)"
+                                                            title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    @if (service.IsActive)
+                                                    {
+                                                        <button class="btn btn-outline-warning"
+                                                                @onclick="() => ShowArchiveConfirmation(service)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-outline-success" @onclick="() => RestoreService(service)"
+                                                                title="Restore">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* Uncategorized Services *@
+            @if (GetServicesByCategory(null).Any())
+            {
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-transparent">
+                        <h5 class="mb-0">
+                            <i class="bi bi-folder me-2 text-secondary"></i>Uncategorized
+                            <span class="badge bg-secondary ms-2">@GetServicesByCategory(null).Count()</span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Service Name</th>
+                                        <th>Description</th>
+                                        <th class="text-center">Duration</th>
+                                        <th class="text-end">Price</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var service in GetServicesByCategory(null))
+                                    {
+                                        <tr>
+                                            <td class="fw-medium">@service.Name</td>
+                                            <td>@service.Description</td>
+                                            <td class="text-center">@service.DurationMinutes min</td>
+                                            <td class="text-end">@service.Price.ToString("C")</td>
+                                            <td class="text-center">
+                                                <span class="badge @(service.IsActive ? "bg-success" : "bg-secondary")">
+                                                    @(service.IsActive ? "Active" : "Inactive")
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" @onclick="() => EditService(service)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    @if (service.IsActive)
+                                                    {
+                                                        <button class="btn btn-outline-warning"
+                                                                @onclick="() => ShowArchiveConfirmation(service)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="btn btn-outline-success" @onclick="() => RestoreService(service)"
+                                                                title="Restore">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (!_services.Items.Any())
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-spa display-1 text-muted"></i>
+                    <h5 class="mt-3">No services found</h5>
+                    <p class="text-muted">Get started by adding your first service</p>
+                    <button class="btn btn-primary" @onclick="ShowNewServiceModal">
+                        <i class="bi bi-plus me-1"></i> Add Service
+                    </button>
+                </div>
+            }
+        }
+    </div>
+
+    @* Service Modal *@
+    <Modal @bind-IsVisible="_showServiceModal" Title="@(_isEditing ? "Edit Service" : "New Service")"
+           Size="Modal.ModalSize.Large">
+        <ChildContent>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Service Name *</label>
+                    <input type="text" class="form-control" @bind="_serviceForm.Name"
+                           placeholder="e.g., Swedish Massage" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Service Code</label>
+                    <input type="text" class="form-control" @bind="_serviceForm.ServiceCode"
+                           placeholder="e.g., SWM-001" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="3" @bind="_serviceForm.Description"
+                              placeholder="Describe the service..."></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" @bind="_serviceForm.CategoryId">
+                        <option value="">Select Category...</option>
+                        @foreach (var category in _categories)
+                        {
+                            <option value="@category.CategoryId">@category.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Duration (minutes) *</label>
+                    <input type="number" class="form-control" @bind="_serviceForm.DurationMinutes" min="15" step="15" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Price *</label>
+                    <div class="input-group">
+                        <span class="input-group-text">₱</span>
+                        <input type="number" class="form-control" @bind="_serviceForm.Price" min="0" step="0.01" />
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="isActive" @bind="_serviceForm.IsActive" />
+                        <label class="form-check-label" for="isActive">Service is active and bookable</label>
+                    </div>
+                </div>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseServiceModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveService" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Service
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Category Modal *@
+    <Modal @bind-IsVisible="_showCategoryModal" Title="@(_isEditingCategory ? "Edit Category" : "New Category")">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Category Name *</label>
+                <input type="text" class="form-control" @bind="_categoryForm.Name"
+                       placeholder="e.g., Massage Therapy" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="2" @bind="_categoryForm.Description"></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseCategoryModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SaveCategory" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Category
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Archive Confirmation *@
+    <ConfirmDialog @bind-IsVisible="_showDeleteConfirm" Title="Archive Service"
+                   Message="@($"Are you sure you want to archive '{_serviceToDelete?.Name}'? It can be restored later from the Archived filter.")"
+                   ConfirmText="Archive" IsDanger="true" OnConfirm="ArchiveService" />
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private PagedResponse<ServiceResponse> _services = new();
+    private List<ServiceCategoryResponse> _categories = new();
+    private bool _isLoading = true;
+    private string _searchTerm = string.Empty;
+    private int? _categoryFilter;
+    private bool? _statusFilter;
+
+    // Service modal
+    private bool _showServiceModal;
+    private bool _isEditing;
+    private bool _isSaving;
+    private CreateServiceRequest _serviceForm = new() { IsActive = true, DurationMinutes = 60 };
+    private int? _editingServiceId;
+
+    // Category modal
+    private bool _showCategoryModal;
+    private bool _isEditingCategory;
+    private CreateCategoryRequest _categoryForm = new();
+    private int? _editingCategoryId;
+
+    // Delete confirmation
+    private bool _showDeleteConfirm;
+    private ServiceResponse? _serviceToDelete;
+
+    // Alert
+    private string _alertMessage = string.Empty;
+    private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    protected override void OnInitialized()
+    {
+        // Data will be loaded via OnAuthReady callback
+    }
+
+    private async Task LoadData()
+    {
+        await LoadCategories();
+        await LoadServices();
+    }
+
+    private async Task LoadCategories()
+    {
+        _categories = await ServiceApiService.GetCategoriesAsync();
+    }
+
+    private async Task LoadServices()
+    {
+        _isLoading = true;
+        _services = await ServiceApiService.GetServicesAsync(
+        page: 1,
+        pageSize: 100,
+        search: _searchTerm,
+        categoryId: _categoryFilter,
+        isActive: _statusFilter);
+        _isLoading = false;
+    }
+
+    private List<ServiceResponse> GetServicesByCategory(int? categoryId)
+    {
+        return _services.Items
+        .Where(s => s.CategoryId == categoryId)
+        .OrderBy(s => s.Name)
+        .ToList();
+    }
+
+    private string GetAverageDuration()
+    {
+        if (!_services.Items.Any()) return "0";
+        return Math.Round(_services.Items.Average(s => s.DurationMinutes)).ToString();
+    }
+
+    private async Task OnCategoryFilterChange(ChangeEventArgs e)
+    {
+        _categoryFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadServices();
+    }
+
+    private async Task OnStatusFilterChange(ChangeEventArgs e)
+    {
+        _statusFilter = bool.TryParse(e.Value?.ToString(), out var status) ? status : null;
+        await LoadServices();
+    }
+
+    private void ShowNewServiceModal()
+    {
+        _isEditing = false;
+        _editingServiceId = null;
+        _serviceForm = new CreateServiceRequest { IsActive = true, DurationMinutes = 60 };
+        _showServiceModal = true;
+    }
+
+    private void EditService(ServiceResponse service)
+    {
+        _isEditing = true;
+        _editingServiceId = service.ServiceId;
+        _serviceForm = new CreateServiceRequest
+        {
+            Name = service.Name,
+            ServiceCode = service.ServiceCode,
+            Description = service.Description,
+            CategoryId = service.CategoryId,
+            DurationMinutes = service.DurationMinutes,
+            Price = service.Price,
+            IsActive = service.IsActive
+        };
+        _showServiceModal = true;
+    }
+
+    private void CloseServiceModal() => _showServiceModal = false;
+
+    private async Task SaveService()
+    {
+        if (string.IsNullOrWhiteSpace(_serviceForm.Name))
+        {
+            ShowAlert("Service name is required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            ServiceResponse? result;
+            string? errorMessage = null;
+            if (_isEditing && _editingServiceId.HasValue)
+            {
+                var updateRequest = new UpdateServiceRequest
+                {
+                    Name = _serviceForm.Name,
+                    ServiceCode = _serviceForm.ServiceCode,
+                    Description = _serviceForm.Description,
+                    CategoryId = _serviceForm.CategoryId,
+                    DurationMinutes = _serviceForm.DurationMinutes,
+                    Price = _serviceForm.Price,
+                    IsActive = _serviceForm.IsActive
+                };
+                (result, errorMessage) = await ServiceApiService.UpdateServiceWithErrorAsync(_editingServiceId.Value, updateRequest);
+            }
+            else
+            {
+                (result, errorMessage) = await ServiceApiService.CreateServiceWithErrorAsync(_serviceForm);
+            }
+
+            if (result != null)
+            {
+                ShowAlert($"Service {(_isEditing ? "updated" : "created")} successfully!", Alert.AlertType.Success);
+                _showServiceModal = false;
+                await LoadServices();
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Failed to save service. Please try again.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveService error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the service.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private async Task ToggleServiceStatus(ServiceResponse service)
+    {
+        if (service.IsActive)
+        {
+            var success = await ServiceApiService.ArchiveServiceAsync(service.ServiceId);
+            if (success)
+            {
+                ShowAlert("Service archived.", Alert.AlertType.Success);
+                await LoadServices();
+            }
+        }
+        else
+        {
+            var success = await ServiceApiService.ReactivateServiceAsync(service.ServiceId);
+            if (success)
+            {
+                ShowAlert("Service restored.", Alert.AlertType.Success);
+                await LoadServices();
+            }
+        }
+    }
+
+    private void ShowArchiveConfirmation(ServiceResponse service)
+    {
+        _serviceToDelete = service;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ArchiveService()
+    {
+        if (_serviceToDelete != null)
+        {
+            var success = await ServiceApiService.ArchiveServiceAsync(_serviceToDelete.ServiceId);
+            if (success)
+            {
+                ShowAlert("Service archived successfully.", Alert.AlertType.Success);
+                await LoadServices();
+            }
+            else
+            {
+                ShowAlert("Failed to archive service. It may be associated with active appointments.", Alert.AlertType.Error);
+            }
+        }
+        _serviceToDelete = null;
+    }
+
+    private async Task RestoreService(ServiceResponse service)
+    {
+        var success = await ServiceApiService.ReactivateServiceAsync(service.ServiceId);
+        if (success)
+        {
+            ShowAlert("Service restored successfully!", Alert.AlertType.Success);
+            await LoadServices();
+        }
+        else
+        {
+            ShowAlert("Failed to restore service. Please try again.", Alert.AlertType.Error);
+        }
+    }
+
+    // Category methods
+    private void ShowCategoryModal()
+    {
+        _isEditingCategory = false;
+        _editingCategoryId = null;
+        _categoryForm = new CreateCategoryRequest();
+        _showCategoryModal = true;
+    }
+
+    private void EditCategory(ServiceCategoryResponse category)
+    {
+        _isEditingCategory = true;
+        _editingCategoryId = category.CategoryId;
+        _categoryForm = new CreateCategoryRequest
+        {
+            Name = category.Name,
+            Description = category.Description,
+            IsActive = category.IsActive
+        };
+        _showCategoryModal = true;
+    }
+
+    private void CloseCategoryModal() => _showCategoryModal = false;
+
+    private async Task SaveCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_categoryForm.Name))
+        {
+            ShowAlert("Category name is required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var success = await ServiceApiService.SaveCategoryAsync(_categoryForm, _editingCategoryId);
+            if (success)
+            {
+                ShowAlert($"Category {(_isEditingCategory ? "updated" : "created")}!", Alert.AlertType.Success);
+                _showCategoryModal = false;
+                await LoadCategories();
+            }
+            else
+            {
+                ShowAlert("Failed to save category. The name may already be in use.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SaveCategory error: {ex.Message}");
+            ShowAlert("An unexpected error occurred while saving the category.", Alert.AlertType.Error);
+        }
+
+        _isSaving = false;
+    }
+
+    private void ShowAlert(string message, Alert.AlertType type)
+    {
+        _alertMessage = message;
+        _alertType = type;
+    }
+}

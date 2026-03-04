@@ -1,0 +1,411 @@
+@* Security Settings Component - Two-Factor Authentication *@
+@inject ITwoFactorApiService TwoFactorApi
+@inject IAuthStateService AuthService
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Two-Factor Authentication</h5>
+    </div>
+    <div class="card-body">
+        @if (_isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading security settings...</p>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-lg-8">
+                    @* Status Card *@
+                    <div class="d-flex align-items-center p-3 rounded-3 mb-4" style="background: @(_isEnabled ? "#E8F5E9" : "#FFF3E0");">
+                        <div class="me-3">
+                            <i class="bi @(_isEnabled ? "bi-shield-fill-check" : "bi-shield-fill-exclamation") fs-2"
+                               style="color: @(_isEnabled ? "#2E7D32" : "#E65100");"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1" style="color: @(_isEnabled ? "#2E7D32" : "#E65100");">
+                                @(_isEnabled ? "Two-Factor Authentication is Enabled" : "Two-Factor Authentication is Disabled")
+                            </h6>
+                            <p class="mb-0 small text-muted">
+                                @if (_isEnabled && _enabledAt.HasValue)
+                                {
+                                    <span>Enabled on @_enabledAt.Value.ToString("MMM dd, yyyy 'at' hh:mm tt")</span>
+                                }
+                                else
+                                {
+                                    <span>Add an extra layer of security to your account by enabling 2FA</span>
+                                }
+                            </p>
+                        </div>
+                        <div>
+                            @if (_isEnabled)
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="ShowDisableModal">
+                                    <i class="bi bi-x-circle me-1"></i> Disable
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-primary btn-sm" @onclick="StartSetup">
+                                    <i class="bi bi-plus-circle me-1"></i> Enable 2FA
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @* How it works *@
+                    <div class="mb-4">
+                        <h6 class="fw-semibold mb-3">How it works</h6>
+                        <div class="d-flex gap-3 flex-wrap">
+                            <div class="text-center p-3 rounded-3 flex-fill" style="background: #F8F9FA; min-width: 140px;">
+                                <i class="bi bi-key-fill fs-4 d-block mb-2" style="color: #6A9C89;"></i>
+                                <small class="text-muted">Enter your password as usual</small>
+                            </div>
+                            <div class="text-center p-3 rounded-3 flex-fill" style="background: #F8F9FA; min-width: 140px;">
+                                <i class="bi bi-phone fs-4 d-block mb-2" style="color: #6A9C89;"></i>
+                                <small class="text-muted">Open your authenticator app</small>
+                            </div>
+                            <div class="text-center p-3 rounded-3 flex-fill" style="background: #F8F9FA; min-width: 140px;">
+                                <i class="bi bi-input-cursor-text fs-4 d-block mb-2" style="color: #6A9C89;"></i>
+                                <small class="text-muted">Enter the 6-digit code</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@* ===== SETUP MODAL ===== *@
+@if (_showSetupModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-shield-lock me-2"></i>
+                        @switch (_setupStep)
+                        {
+                            case 1:
+                                <span>Scan QR Code</span>
+                                break;
+                            case 2:
+                                <span>Verify Code</span>
+                                break;
+                            case 3:
+                                <span>Recovery Codes</span>
+                                break;
+                        }
+                    </h5>
+                    @if (_setupStep < 3)
+                    {
+                        <button type="button" class="btn-close" @onclick="CloseSetupModal"></button>
+                    }
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_setupError))
+                    {
+                        <div class="alert alert-danger d-flex align-items-center py-2">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <span>@_setupError</span>
+                        </div>
+                    }
+
+                    @switch (_setupStep)
+                    {
+                        case 1:
+                            @* Step 1: QR Code *@
+                            <div class="text-center">
+                                <p class="text-muted mb-3">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                                @if (!string.IsNullOrEmpty(_qrCodeBase64))
+                                {
+                                    <div class="mb-3">
+                                        <img src="@_qrCodeBase64" alt="QR Code" class="img-fluid" style="max-width: 220px; image-rendering: pixelated;" />
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(_manualEntryKey))
+                                {
+                                    <div class="mb-3">
+                                        <p class="small text-muted mb-1">Or enter this key manually:</p>
+                                        <code class="d-inline-block px-3 py-2 rounded" style="background: #F3F4F6; font-size: 0.95rem; letter-spacing: 2px;">@_manualEntryKey</code>
+                                    </div>
+                                }
+                            </div>
+                            break;
+
+                        case 2:
+                            @* Step 2: Verify *@
+                            <div class="text-center">
+                                <p class="text-muted mb-3">Enter the 6-digit code from your authenticator app to confirm setup</p>
+                                <div class="mx-auto" style="max-width: 200px;">
+                                    <input type="text" class="form-control form-control-lg text-center"
+                                           maxlength="6" placeholder="000000"
+                                           @bind="_verifyCode" @bind:event="oninput"
+                                           style="letter-spacing: 8px; font-size: 1.5rem; font-weight: 600;" />
+                                </div>
+                            </div>
+                            break;
+
+                        case 3:
+                            @* Step 3: Recovery Codes *@
+                            <div>
+                                <div class="alert alert-warning d-flex align-items-start py-2 mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                                    <div>
+                                        <strong>Save these recovery codes!</strong><br />
+                                        <small>Each code can only be used once. Store them in a safe place. You will need these if you lose access to your authenticator app.</small>
+                                    </div>
+                                </div>
+                                <div class="p-3 rounded-3" style="background: #F8F9FA;">
+                                    <div class="row g-2">
+                                        @foreach (var recoveryCode in _recoveryCodes)
+                                        {
+                                            <div class="col-6">
+                                                <span class="d-block text-center py-1 font-monospace" style="font-size: 0.95rem;">@recoveryCode</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="form-check mt-3">
+                                    <input class="form-check-input" type="checkbox" id="savedCodes" @bind="_savedCodesConfirmed" />
+                                    <label class="form-check-label small" for="savedCodes">
+                                        I have saved my recovery codes in a safe place
+                                    </label>
+                                </div>
+                            </div>
+                            break;
+                    }
+                </div>
+                <div class="modal-footer">
+                    @switch (_setupStep)
+                    {
+                        case 1:
+                            <button class="btn btn-secondary" @onclick="CloseSetupModal">Cancel</button>
+                            <button class="btn btn-primary" @onclick="() => _setupStep = 2">
+                                Next <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                            break;
+                        case 2:
+                            <button class="btn btn-secondary" @onclick="() => _setupStep = 1">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </button>
+                            <button class="btn btn-primary" @onclick="VerifySetupCode" disabled="@(_verifyCode?.Length != 6 || _isVerifying)">
+                                @if (_isVerifying)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    <span>Verifying...</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span>Verify & Enable</span>
+                                }
+                            </button>
+                            break;
+                        case 3:
+                            <button class="btn btn-primary" disabled="@(!_savedCodesConfirmed)" @onclick="CloseSetupModal">
+                                <i class="bi bi-check-lg me-1"></i> Done
+                            </button>
+                            break;
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ===== DISABLE MODAL ===== *@
+@if (_showDisableModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-shield-x me-2"></i>Disable 2FA</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showDisableModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_disableError))
+                    {
+                        <div class="alert alert-danger py-2 small">@_disableError</div>
+                    }
+                    <p class="text-muted small">Enter a code from your authenticator app to confirm disabling 2FA.</p>
+                    <input type="text" class="form-control text-center" maxlength="6" placeholder="000000"
+                           @bind="_disableCode" @bind:event="oninput"
+                           style="letter-spacing: 6px; font-size: 1.2rem; font-weight: 600;" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-sm" @onclick="() => _showDisableModal = false">Cancel</button>
+                    <button class="btn btn-danger btn-sm" @onclick="DisableTwoFactor" disabled="@(_disableCode?.Length != 6 || _isDisabling)">
+                        @if (_isDisabling)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Disable 2FA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // Status
+    private bool _isLoading = true;
+    private bool _isEnabled;
+    private DateTime? _enabledAt;
+
+    // Setup flow
+    private bool _showSetupModal;
+    private int _setupStep = 1;
+    private string? _qrCodeBase64;
+    private string? _manualEntryKey;
+    private string? _verifyCode;
+    private string? _setupError;
+    private bool _isVerifying;
+    private List<string> _recoveryCodes = new();
+    private bool _savedCodesConfirmed;
+
+    // Disable flow
+    private bool _showDisableModal;
+    private string? _disableCode;
+    private string? _disableError;
+    private bool _isDisabling;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatus();
+    }
+
+    private async Task LoadStatus()
+    {
+        _isLoading = true;
+        try
+        {
+            var status = await TwoFactorApi.GetStatusAsync();
+            if (status != null)
+            {
+                _isEnabled = status.IsEnabled;
+                _enabledAt = status.EnabledAt;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading 2FA status: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task StartSetup()
+    {
+        _setupStep = 1;
+        _setupError = null;
+        _verifyCode = null;
+        _recoveryCodes.Clear();
+        _savedCodesConfirmed = false;
+        _showSetupModal = true;
+
+        try
+        {
+            var result = await TwoFactorApi.SetupAsync();
+            if (result?.Success == true)
+            {
+                _qrCodeBase64 = result.QrCodeBase64;
+                _manualEntryKey = result.ManualEntryKey;
+            }
+            else
+            {
+                _setupError = result?.Message ?? "Failed to initiate 2FA setup";
+            }
+        }
+        catch (Exception ex)
+        {
+            _setupError = "Failed to initiate 2FA setup";
+            Console.WriteLine($"2FA setup error: {ex.Message}");
+        }
+    }
+
+    private async Task VerifySetupCode()
+    {
+        if (string.IsNullOrEmpty(_verifyCode) || _verifyCode.Length != 6) return;
+
+        _isVerifying = true;
+        _setupError = null;
+
+        try
+        {
+            var result = await TwoFactorApi.VerifySetupAsync(_verifyCode);
+            if (result?.Success == true)
+            {
+                _recoveryCodes = result.RecoveryCodes;
+                _setupStep = 3;
+                _isEnabled = true;
+                _enabledAt = DateTime.Now;
+            }
+            else
+            {
+                _setupError = result?.Message ?? "Invalid verification code";
+            }
+        }
+        catch (Exception ex)
+        {
+            _setupError = "Verification failed. Please try again.";
+            Console.WriteLine($"2FA verify error: {ex.Message}");
+        }
+        finally
+        {
+            _isVerifying = false;
+        }
+    }
+
+    private void CloseSetupModal()
+    {
+        _showSetupModal = false;
+    }
+
+    private void ShowDisableModal()
+    {
+        _disableCode = null;
+        _disableError = null;
+        _showDisableModal = true;
+    }
+
+    private async Task DisableTwoFactor()
+    {
+        if (string.IsNullOrEmpty(_disableCode) || _disableCode.Length != 6) return;
+
+        _isDisabling = true;
+        _disableError = null;
+
+        try
+        {
+            var success = await TwoFactorApi.DisableAsync(_disableCode);
+            if (success)
+            {
+                _isEnabled = false;
+                _enabledAt = null;
+                _showDisableModal = false;
+            }
+            else
+            {
+                _disableError = "Invalid verification code";
+            }
+        }
+        catch (Exception ex)
+        {
+            _disableError = "Failed to disable 2FA";
+            Console.WriteLine($"2FA disable error: {ex.Message}");
+        }
+        finally
+        {
+            _isDisabling = false;
+        }
+    }
+}

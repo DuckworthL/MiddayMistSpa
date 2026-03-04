@@ -1,0 +1,388 @@
+@page "/accounting/income"
+@inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject IAccountingApiService AccountingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using MiddayMistSpa.Web.Models
+
+<PageTitle>Income - MiddayMist Spa</PageTitle>
+
+<AuthorizedPage OnAuthReady="LoadData">
+    <div class="container-fluid fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/accounting">Accounting</a></li>
+                        <li class="breadcrumb-item active">Income</li>
+                    </ol>
+                </nav>
+                <h1 class="h3 mb-0" style="color: #2C2C2C;">Income Records</h1>
+            </div>
+            <button class="btn btn-primary" @onclick="ShowAddModal">
+                <i class="bi bi-plus-lg me-1"></i> Record Income
+            </button>
+        </div>
+
+        @* Summary Cards *@
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card bg-success bg-opacity-10 border-0">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">This Month</p>
+                        <h4 class="text-success mb-0">₱@_monthTotal.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Services Revenue</p>
+                        <h4 class="mb-0">₱@_servicesRevenue.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">Product Sales</p>
+                        <h4 class="mb-0">₱@_productSales.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted mb-1 small">YTD Total</p>
+                        <h4 class="mb-0">₱@_ytdTotal.ToString("N2")</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card mb-4">
+            <div class="card-body py-3">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" placeholder="Search income..." @bind="_searchTerm"
+                            @bind:event="oninput" />
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @bind="_sourceFilter">
+                            <option value="">All Sources</option>
+                            <option value="Services">Services</option>
+                            <option value="Products">Products</option>
+                            <option value="Membership">Membership</option>
+                            <option value="Gift Cards">Gift Cards</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" @bind="_paymentFilter">
+                            <option value="">All Payments</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Card">Card</option>
+                            <option value="GCash">GCash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" @bind="_dateFrom" @bind:after="LoadData" />
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" @bind="_dateTo" @bind:after="LoadData" />
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-outline-secondary w-100" @onclick="ExportIncome">
+                            <i class="bi bi-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Income Table *@
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Entry #</th>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>Customer</th>
+                                <th>Status</th>
+                                <th class="text-end">Amount</th>
+                                <th style="width: 80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_isLoading)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                    </td>
+                                </tr>
+                            }
+                            else if (!FilteredIncome.Any())
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        No income records found
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var income in FilteredIncome)
+                                {
+                                    <tr>
+                                        <td><span class="text-primary fw-medium">@income.EntryNumber</span></td>
+                                        <td>@income.Date.ToString("MMM dd, yyyy")</td>
+                                        <td>@income.Description</td>
+                                        <td><span class="badge @GetSourceBadge(income.Category)">@income.Category</span></td>
+                                        <td>@income.Customer</td>
+                                        <td><span class="badge bg-success">@income.Status</span></td>
+                                        <td class="text-end fw-medium text-success">+₱@income.Amount.ToString("N2")</td>
+                                        <td>
+                                            <button class="btn btn-link btn-sm p-1" @onclick="() => ViewIncome(income)">
+                                                <i class="bi bi-eye text-info"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Add Modal *@
+    @if (_showModal)
+    {
+        <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Record Income</h5>
+                        <button type="button" class="btn-close" @onclick="() => _showModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info py-2 small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Most income is automatically recorded from POS transactions. Use this form for manual entries
+                            only.
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" @bind="_formModel.Date" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₱</span>
+                                    <input type="number" class="form-control" @bind="_formModel.Amount" step="0.01" />
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <input type="text" class="form-control" @bind="_formModel.Description" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Revenue Account</label>
+                                <select class="form-select" @bind="_formModel.RevenueAccountId">
+                                    <option value="0">-- Select Revenue Account --</option>
+                                    @foreach (var account in _accounts.Where(a => a.AccountType == "Revenue"))
+                                    {
+                                        <option value="@account.AccountId">@account.AccountCode - @account.AccountName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Deposit Account</label>
+                                <select class="form-select" @bind="_formModel.DepositAccountId">
+                                    <option value="0">-- Select Deposit Account --</option>
+                                    @foreach (var account in _accounts.Where(a => a.AccountType == "Asset"))
+                                    {
+                                        <option value="@account.AccountId">@account.AccountCode - @account.AccountName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Customer (Optional)</label>
+                                <input type="text" class="form-control" @bind="_formModel.CustomerName" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveIncome">Save Income</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</AuthorizedPage>
+
+@code {
+    private List<IncomeRecordResponse> _incomeRecords = new();
+    private List<ChartOfAccountResponse> _accounts = new();
+    private bool _isLoading = true;
+
+    private string _searchTerm = "";
+    private string _sourceFilter = "";
+    private string _paymentFilter = "";
+    private DateTime? _dateFrom;
+    private DateTime? _dateTo;
+
+    private decimal _monthTotal = 0m;
+    private decimal _servicesRevenue = 0m;
+    private decimal _productSales = 0m;
+    private decimal _ytdTotal = 0m;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+
+    private bool _showModal = false;
+    private IncomeFormModel _formModel = new();
+
+    protected override void OnInitialized()
+    {
+        // Data loading moved to LoadData, triggered by AuthorizedPage.OnAuthReady
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var response = await AccountingService.GetIncomeRecordsAsync(
+            startDate: _dateFrom,
+            endDate: _dateTo,
+            page: _currentPage,
+            pageSize: 20);
+
+            _incomeRecords = response.Items;
+            _totalPages = response.TotalPages;
+
+            // Calculate summary stats
+            _monthTotal = _incomeRecords.Where(i => i.Date.Month == DateTime.Today.Month && i.Date.Year ==
+            DateTime.Today.Year).Sum(i => i.Amount);
+            _servicesRevenue = _incomeRecords.Where(i => i.Category == "Services").Sum(i => i.Amount);
+            _productSales = _incomeRecords.Where(i => i.Category == "Products").Sum(i => i.Amount);
+            _ytdTotal = _incomeRecords.Where(i => i.Date.Year == DateTime.Today.Year).Sum(i => i.Amount);
+
+            // Load accounts for dropdown
+            _accounts = await AccountingService.GetAccountsHierarchyAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading income records: {ex.Message}");
+            _incomeRecords = new List<IncomeRecordResponse>();
+        }
+        _isLoading = false;
+    }
+
+    private IEnumerable<IncomeRecordResponse> FilteredIncome => _incomeRecords.Where(i =>
+    (string.IsNullOrEmpty(_searchTerm) ||
+    (i.Description?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    (i.Customer?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    i.EntryNumber.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+    (string.IsNullOrEmpty(_sourceFilter) || i.Category == _sourceFilter) &&
+    (string.IsNullOrEmpty(_paymentFilter) || (i.Description?.Contains(_paymentFilter, StringComparison.OrdinalIgnoreCase) ?? false))
+    );
+
+    private string GetSourceBadge(string source) => source switch
+    {
+        "Services" => "bg-success",
+        "Products" => "bg-info",
+        "Membership" => "bg-primary",
+        "Gift Cards" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private void ShowAddModal()
+    {
+        _formModel = new IncomeFormModel
+        {
+            Date = DateTime.Now
+        };
+        _showModal = true;
+    }
+
+    private void ViewIncome(IncomeRecordResponse income)
+    {
+        // TODO: View details
+    }
+
+    private async Task SaveIncome()
+    {
+        try
+        {
+            var request = new CreateIncomeRequest
+            {
+                Date = _formModel.Date,
+                Description = _formModel.Description,
+                CustomerName = _formModel.CustomerName,
+                RevenueAccountId = _formModel.RevenueAccountId,
+                DepositAccountId = _formModel.DepositAccountId,
+                Amount = _formModel.Amount
+            };
+
+            await AccountingService.CreateIncomeAsync(request);
+            _showModal = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving income: {ex.Message}");
+        }
+    }
+
+    private async Task ExportIncome()
+    {
+        try
+        {
+            var q = '"';
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("MiddayMist Spa - Income Report");
+            var fromLabel = _dateFrom?.ToString("MMM dd, yyyy") ?? "All";
+            var toLabel = _dateTo?.ToString("MMM dd, yyyy") ?? "Present";
+            sb.AppendLine($"Period: {fromLabel} to {toLabel}");
+            sb.AppendLine($"Generated: {DateTime.Now:MMM dd, yyyy hh:mm tt}");
+            sb.AppendLine();
+            sb.AppendLine("Entry #,Date,Description,Customer,Category,Amount,Status");
+            foreach (var r in _incomeRecords.OrderByDescending(r => r.Date))
+            {
+                var desc = (r.Description ?? "").Replace(q.ToString(), "'");
+                sb.AppendLine($"{q}{r.EntryNumber}{q},{r.Date:yyyy-MM-dd},{q}{desc}{q},{q}{r.Customer ?? ""}{q},{q}{r.Category}{q},{r.Amount:F2},{r.Status}");
+            }
+            sb.AppendLine();
+            sb.AppendLine($"Total Income,,,,,,{_incomeRecords.Sum(r => r.Amount):F2}");
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Income_{DateTime.Now:yyyyMMdd}.csv", "text/csv", base64);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Export failed: {ex.Message}");
+        }
+    }
+
+    private class IncomeFormModel
+    {
+        public DateTime Date { get; set; } = DateTime.Now;
+        public string Description { get; set; } = "";
+        public string? CustomerName { get; set; }
+        public int RevenueAccountId { get; set; }
+        public int DepositAccountId { get; set; }
+        public decimal Amount { get; set; }
+    }
+}

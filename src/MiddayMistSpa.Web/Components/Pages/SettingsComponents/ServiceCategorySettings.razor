@@ -1,0 +1,242 @@
+@* Service Category Settings Component *@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-grid me-2"></i>Service Categories</h5>
+        <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Category
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Order</th>
+                        <th>Category Name</th>
+                        <th>Description</th>
+                        <th style="width: 100px;">Services</th>
+                        <th style="width: 80px;">Active</th>
+                        <th style="width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var category in _categories)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveUp(category)"
+                                        disabled="@(category.Order == 1)">
+                                        <i class="bi bi-chevron-up"></i>
+                                    </button>
+                                    <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveDown(category)"
+                                        disabled="@(category.Order == _categories.Count)">
+                                        <i class="bi bi-chevron-down"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge" style="@($"background: {category.Color};")">@category.Name.Substring(0, 1)</span>
+                                    <span class="fw-medium">@category.Name</span>
+                                </div>
+                            </td>
+                        <td class="text-muted">@category.Description</td>
+                        <td>
+                            <span class="badge bg-secondary">@category.ServiceCount services</span>
+                        </td>
+                        <td>
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" @bind="category.IsActive" />
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-link btn-sm p-1" @onclick="() => EditCategory(category)">
+                                <i class="bi bi-pencil text-primary"></i>
+                            </button>
+                            <button class="btn btn-link btn-sm p-1" @onclick="() => DeleteCategory(category)"
+                                disabled="@(category.ServiceCount > 0)">
+                                <i class="bi bi-trash text-danger"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!_categories.Any())
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-grid display-4"></i>
+                <p class="mt-2">No categories defined yet</p>
+                <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">Add First Category</button>
+            </div>
+        }
+    </div>
+</div>
+
+@* Add/Edit Modal *@
+@if (_showModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editingCategory != null ? "Edit" : "Add") Category</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Category Name</label>
+                        <input type="text" class="form-control" @bind="_formModel.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" rows="2" @bind="_formModel.Description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Color</label>
+                        <div class="d-flex gap-2">
+                            @foreach (var color in _availableColors)
+                            {
+                                var borderColor = _formModel.Color == color ? "#333" : "transparent";
+                                var buttonStyle = $"width: 32px; height: 32px; background: {color}; border: 2px solid {borderColor};";
+                                <button type="button" class="btn rounded-circle p-0"
+                                    style="@buttonStyle"
+                                    @onclick="() => _formModel.Color = color">
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" @bind="_formModel.IsActive" id="catActive" />
+                        <label class="form-check-label" for="catActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveCategory">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CategoryModel> _categories = new()
+{
+new() { Id = 1, Name = "Massage", Description = "All massage services", Color = "#8B5A9C", Order = 1, ServiceCount = 5,
+IsActive = true },
+new() { Id = 2, Name = "Facial", Description = "Facial treatments and skincare", Color = "#E8B4B8", Order = 2,
+ServiceCount = 4, IsActive = true },
+new() { Id = 3, Name = "Body Treatment", Description = "Body wraps, scrubs, and treatments", Color = "#67597A", Order =
+3, ServiceCount = 3, IsActive = true },
+new() { Id = 4, Name = "Nail Services", Description = "Manicure and pedicure services", Color = "#D4A5A5", Order = 4,
+ServiceCount = 6, IsActive = true },
+new() { Id = 5, Name = "Hair Services", Description = "Hair styling and treatments", Color = "#6B5B7A", Order = 5,
+ServiceCount = 2, IsActive = false }
+};
+
+    private List<string> _availableColors = new()
+{
+"#8B5A9C", "#E8B4B8", "#67597A", "#D4A5A5", "#6B5B7A",
+"#9B7A8C", "#7A6B8A", "#B8A5C4", "#C4B5D4", "#A59BC4"
+};
+
+    private bool _showModal = false;
+    private CategoryModel? _editingCategory = null;
+    private CategoryModel _formModel = new();
+
+    private void ShowAddModal()
+    {
+        _editingCategory = null;
+        _formModel = new CategoryModel { Color = _availableColors[0], IsActive = true };
+        _showModal = true;
+    }
+
+    private void EditCategory(CategoryModel category)
+    {
+        _editingCategory = category;
+        _formModel = new CategoryModel
+        {
+            Id = category.Id,
+            Name = category.Name,
+            Description = category.Description,
+            Color = category.Color,
+            IsActive = category.IsActive
+        };
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingCategory = null;
+    }
+
+    private void SaveCategory()
+    {
+        if (_editingCategory != null)
+        {
+            _editingCategory.Name = _formModel.Name;
+            _editingCategory.Description = _formModel.Description;
+            _editingCategory.Color = _formModel.Color;
+            _editingCategory.IsActive = _formModel.IsActive;
+        }
+        else
+        {
+            _formModel.Id = _categories.Any() ? _categories.Max(c => c.Id) + 1 : 1;
+            _formModel.Order = _categories.Count + 1;
+            _categories.Add(_formModel);
+        }
+        CloseModal();
+    }
+
+    private void DeleteCategory(CategoryModel category)
+    {
+        _categories.Remove(category);
+        ReorderCategories();
+    }
+
+    private void MoveUp(CategoryModel category)
+    {
+        var idx = _categories.IndexOf(category);
+        if (idx > 0)
+        {
+            _categories.RemoveAt(idx);
+            _categories.Insert(idx - 1, category);
+            ReorderCategories();
+        }
+    }
+
+    private void MoveDown(CategoryModel category)
+    {
+        var idx = _categories.IndexOf(category);
+        if (idx < _categories.Count - 1)
+        {
+            _categories.RemoveAt(idx);
+            _categories.Insert(idx + 1, category);
+            ReorderCategories();
+        }
+    }
+
+    private void ReorderCategories()
+    {
+        for (int i = 0; i < _categories.Count; i++)
+        {
+            _categories[i].Order = i + 1;
+        }
+    }
+
+    private class CategoryModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Color { get; set; } = "#8B5A9C";
+        public int Order { get; set; }
+        public int ServiceCount { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

@@ -1,0 +1,44 @@
+@* Status Badge Component *@
+<span class="badge @BadgeClass">@Status</span>
+
+@code {
+    [Parameter] public string Status { get; set; } = string.Empty;
+
+    private string BadgeClass => Status?.ToLower() switch
+    {
+        // Appointment statuses
+        "scheduled" or "confirmed" => "bg-primary",
+        "checked in" or "checkedin" or "checked-in" => "bg-info",
+        "in progress" or "in-progress" => "bg-info",
+        "completed" => "bg-success",
+        "cancelled" or "canceled" => "bg-danger",
+        "no show" or "no-show" or "noshow" => "bg-warning text-dark",
+
+        // Payment statuses
+        "paid" => "bg-success",
+        "pending" => "bg-warning text-dark",
+        "partial" => "bg-info",
+        "refunded" => "bg-secondary",
+        "voided" => "bg-danger",
+        "failed" => "bg-danger",
+
+        // Employee statuses
+        "active" => "bg-success",
+        "inactive" => "bg-secondary",
+        "on leave" or "on-leave" => "bg-warning text-dark",
+
+        // Membership types
+        "regular" => "bg-secondary",
+        "bronze" => "bg-warning text-dark",
+        "silver" => "bg-secondary",
+        "gold" => "bg-warning text-dark",
+        "platinum" => "bg-primary",
+
+        // Stock status
+        "in stock" or "in-stock" => "bg-success",
+        "low stock" or "low-stock" => "bg-warning text-dark",
+        "out of stock" or "out-of-stock" => "bg-danger",
+
+        _ => "bg-secondary"
+    };
+}
