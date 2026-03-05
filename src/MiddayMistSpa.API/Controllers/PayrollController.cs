@@ -38,7 +38,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpPost("periods")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollPeriodResponse>> CreatePayrollPeriod([FromBody] CreatePayrollPeriodRequest request)
     {
         try
@@ -58,7 +58,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("periods/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PayrollPeriodResponse>> GetPayrollPeriod(int id)
     {
         var result = await _payrollService.GetPayrollPeriodByIdAsync(id);
@@ -69,7 +69,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("periods")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PagedResponse<PayrollPeriodListResponse>>> SearchPayrollPeriods([FromQuery] PayrollPeriodSearchRequest request)
     {
         var result = await _payrollService.SearchPayrollPeriodsAsync(request);
@@ -77,7 +77,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPut("periods/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollPeriodResponse>> UpdatePayrollPeriod(int id, [FromBody] UpdatePayrollPeriodRequest request)
     {
         try
@@ -97,7 +97,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPost("periods/{id}/finalize")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollPeriodResponse>> FinalizePayrollPeriod(int id)
     {
         try
@@ -118,7 +118,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpDelete("periods/{id}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult> DeletePayrollPeriod(int id)
     {
         try
@@ -145,7 +145,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpGet("periods/{id}/records")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PagedResponse<PayrollRecordResponse>>> GetPeriodRecords(
         int id, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
@@ -154,7 +154,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPost("records")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollRecordResponse>> CreatePayrollRecord([FromBody] CreatePayrollRecordRequest request)
     {
         try
@@ -174,7 +174,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("records/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PayrollRecordResponse>> GetPayrollRecord(int id)
     {
         var result = await _payrollService.GetPayrollRecordByIdAsync(id);
@@ -185,7 +185,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("records")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PagedResponse<PayrollRecordListResponse>>> SearchPayrollRecords([FromQuery] PayrollRecordSearchRequest request)
     {
         var result = await _payrollService.SearchPayrollRecordsAsync(request);
@@ -193,7 +193,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPut("records/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollRecordResponse>> UpdatePayrollRecord(int id, [FromBody] UpdatePayrollRecordRequest request)
     {
         try
@@ -213,7 +213,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpDelete("records/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult> DeletePayrollRecord(int id)
     {
         try
@@ -240,7 +240,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpPost("generate")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<List<PayrollRecordResponse>>> GeneratePayroll([FromBody] GeneratePayrollRequest request)
     {
         try
@@ -260,7 +260,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPost("records/{id}/recalculate")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollRecordResponse>> RecalculatePayrollRecord(int id)
     {
         try
@@ -280,7 +280,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPost("records/{id}/pay")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult<PayrollRecordResponse>> ProcessPayment(int id, [FromBody] ProcessPayrollPaymentRequest request)
     {
         try
@@ -300,7 +300,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpPost("periods/{id}/pay-all")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult> ProcessBulkPayment(int id, [FromBody] BulkPaymentRequest request)
     {
         try
@@ -325,7 +325,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpGet("calculate/contributions")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<ContributionCalculationResponse>> CalculateContributions([FromQuery] decimal monthlySalary)
     {
         var result = await _payrollService.CalculateContributionsAsync(monthlySalary);
@@ -333,7 +333,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("calculate/tax")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<TaxCalculationResponse>> CalculateWithholdingTax([FromQuery] decimal taxableIncome)
     {
         var result = await _payrollService.CalculateWithholdingTaxAsync(taxableIncome);
@@ -345,7 +345,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpGet("periods/{id}/summary")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PayrollSummaryResponse>> GetPayrollSummary(int id)
     {
         try
@@ -365,7 +365,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("employees/{employeeId}/history")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<EmployeePayrollHistoryResponse>> GetEmployeePayrollHistory(int employeeId, [FromQuery] int year)
     {
         try
@@ -386,7 +386,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("reports/monthly")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<MonthlyPayrollReportResponse>> GetMonthlyPayrollReport([FromQuery] int year, [FromQuery] int month)
     {
         if (year == 0) year = DateTime.UtcNow.Year;
@@ -397,7 +397,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("reports/contributions")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<ContributionReportResponse>> GetContributionReport([FromQuery] int year, [FromQuery] int month)
     {
         if (year == 0) year = DateTime.UtcNow.Year;
@@ -412,7 +412,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpGet("records/{id}/payslip")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<PayslipResponse>> GetPayslip(int id)
     {
         try
@@ -459,7 +459,7 @@ public class PayrollController : ControllerBase
     // ============================================================================
 
     [HttpGet("thirteenth-month/{employeeId}/{year}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<ThirteenthMonthPayResponse>> GetThirteenthMonthPay(int employeeId, int year)
     {
         try
@@ -479,7 +479,7 @@ public class PayrollController : ControllerBase
     }
 
     [HttpGet("thirteenth-month/{year}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:payroll.view")]
     public async Task<ActionResult<List<ThirteenthMonthPayResponse>>> GetThirteenthMonthPayAll(int year)
     {
         try

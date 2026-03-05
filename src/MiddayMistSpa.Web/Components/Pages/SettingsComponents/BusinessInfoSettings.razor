@@ -1,150 +1,150 @@
 @* Business Info Settings Component *@
+@inject ISettingsApiService SettingsApi
+
 <div class="card">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-building me-2"></i>Business Information</h5>
     </div>
     <div class="card-body">
-        <div class="row g-4">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">Business Name</label>
-                    <input type="text" class="form-control" @bind="_business.Name" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Legal Name</label>
-                    <input type="text" class="form-control" @bind="_business.LegalName" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Tax ID / TIN</label>
-                    <input type="text" class="form-control" @bind="_business.TaxId" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-control" @bind="_business.Email" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Phone</label>
-                    <input type="tel" class="form-control" @bind="_business.Phone" />
-                </div>
+        @if (_isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading business info...</p>
             </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label">Address</label>
-                    <textarea class="form-control" rows="3" @bind="_business.Address"></textarea>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">City</label>
-                    <input type="text" class="form-control" @bind="_business.City" />
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label">State/Province</label>
-                        <input type="text" class="form-control" @bind="_business.State" />
+        }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Business Name</label>
+                        <input type="text" class="form-control" @bind="_business.Name" />
                     </div>
-                    <div class="col-6">
-                        <label class="form-label">ZIP Code</label>
-                        <input type="text" class="form-control" @bind="_business.ZipCode" />
+                    <div class="mb-3">
+                        <label class="form-label">Legal Name</label>
+                        <input type="text" class="form-control" @bind="_business.LegalName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tax ID / TIN</label>
+                        <input type="text" class="form-control" @bind="_business.TaxId" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" @bind="_business.Email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" @bind="_business.Phone" />
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Website</label>
-                    <input type="url" class="form-control" @bind="_business.Website" />
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea class="form-control" rows="3" @bind="_business.Address"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">City</label>
+                        <input type="text" class="form-control" @bind="_business.City" />
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">State/Province</label>
+                            <input type="text" class="form-control" @bind="_business.State" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">ZIP Code</label>
+                            <input type="text" class="form-control" @bind="_business.ZipCode" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Website</label>
+                        <input type="url" class="form-control" @bind="_business.Website" />
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <hr class="my-4" />
-
-        <h6 class="mb-3">Operating Hours</h6>
-        <div class="table-responsive">
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Day</th>
-                        <th>Open</th>
-                        <th>Close</th>
-                        <th>Closed</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var day in _operatingHours)
+            <div class="d-flex gap-2 mt-4">
+                <button class="btn btn-primary" @onclick="SaveSettings" disabled="@_isSaving">
+                    @if (_isSaving)
                     {
-                        <tr>
-                            <td class="fw-medium">@day.Day</td>
-                            <td>
-                                <input type="time" class="form-control form-control-sm" value="@day.OpenTime"
-                                    @onchange="(e) => HandleOpenTimeChange(day, e)" disabled="@day.IsClosed"
-                                    style="width: 130px;" />
-                            </td>
-                            <td>
-                                <input type="time" class="form-control form-control-sm" value="@day.CloseTime"
-                                    @onchange="(e) => HandleCloseTimeChange(day, e)" disabled="@day.IsClosed"
-                                    style="width: 130px;" />
-                            </td>
-                            <td>
-                                <input type="checkbox" class="form-check-input" @bind="day.IsClosed" />
-                            </td>
-                        </tr>
+                        <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                </tbody>
-            </table>
-        </div>
+                    <i class="bi bi-check-lg me-1"></i> Save Changes
+                </button>
+            </div>
 
-        <div class="d-flex gap-2 mt-4">
-            <button class="btn btn-primary" @onclick="SaveSettings">
-                <i class="bi bi-check-lg me-1"></i> Save Changes
-            </button>
-        </div>
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <div class="alert @_statusAlertClass mt-3 alert-dismissible fade show" role="alert">
+                    @_statusMessage
+                    <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+                </div>
+            }
+        }
     </div>
 </div>
 
 @code {
-    private BusinessInfoModel _business = new();
-    private List<OperatingHoursModel> _operatingHours = new()
-{
-new() { Day = "Monday", OpenTime = "09:00", CloseTime = "18:00" },
-new() { Day = "Tuesday", OpenTime = "09:00", CloseTime = "18:00" },
-new() { Day = "Wednesday", OpenTime = "09:00", CloseTime = "18:00" },
-new() { Day = "Thursday", OpenTime = "09:00", CloseTime = "18:00" },
-new() { Day = "Friday", OpenTime = "09:00", CloseTime = "18:00" },
-new() { Day = "Saturday", OpenTime = "10:00", CloseTime = "17:00" },
-new() { Day = "Sunday", IsClosed = true }
-};
+    private BusinessInfoDto _business = new();
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
 
-    private void SaveSettings()
+    protected override async Task OnInitializedAsync()
     {
-        // TODO: Save to API
+        await LoadSettings();
     }
 
-    private void HandleOpenTimeChange(OperatingHoursModel day, ChangeEventArgs e)
+    private async Task LoadSettings()
     {
-        day.OpenTime = e.Value?.ToString() ?? "09:00";
+        _isLoading = true;
+        try
+        {
+            var result = await SettingsApi.GetBusinessInfoAsync();
+            if (result != null)
+                _business = result;
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error loading business info: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
-    private void HandleCloseTimeChange(OperatingHoursModel day, ChangeEventArgs e)
+    private async Task SaveSettings()
     {
-        day.CloseTime = e.Value?.ToString() ?? "18:00";
+        _isSaving = true;
+        _statusMessage = string.Empty;
+        try
+        {
+            var result = await SettingsApi.SaveBusinessInfoAsync(_business);
+            if (result != null)
+            {
+                _business = result;
+                _statusMessage = "Business information saved successfully.";
+                _statusAlertClass = "alert-success";
+            }
+            else
+            {
+                _statusMessage = "Failed to save business information.";
+                _statusAlertClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error saving business info: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
-    private class BusinessInfoModel
-    {
-        public string Name { get; set; } = "MiddayMist Spa";
-        public string LegalName { get; set; } = "MiddayMist Spa Inc.";
-        public string TaxId { get; set; } = "";
-        public string Email { get; set; } = "info@middaymistspa.com";
-        public string Phone { get; set; } = "";
-        public string Address { get; set; } = "";
-        public string City { get; set; } = "";
-        public string State { get; set; } = "";
-        public string ZipCode { get; set; } = "";
-        public string Website { get; set; } = "";
-    }
-
-    private class OperatingHoursModel
-    {
-        public string Day { get; set; } = "";
-        public string OpenTime { get; set; } = "09:00";
-        public string CloseTime { get; set; } = "18:00";
-        public bool IsClosed { get; set; }
-    }
 }

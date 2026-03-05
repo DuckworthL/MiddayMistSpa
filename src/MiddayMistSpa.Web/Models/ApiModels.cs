@@ -814,11 +814,13 @@ public class CreateCategoryRequest
 public class UpdateServiceRequest
 {
     public string? Name { get; set; }
+    public string? ServiceName => Name;
     public string? ServiceCode { get; set; }
     public string? Description { get; set; }
     public int? CategoryId { get; set; }
     public int? DurationMinutes { get; set; }
     public decimal? Price { get; set; }
+    public decimal? RegularPrice => Price;
     public bool? IsActive { get; set; }
 }
 
@@ -1989,4 +1991,133 @@ public class UpdateCaptchaSettingsRequest
     public bool Enabled { get; set; }
     public string SiteKey { get; set; } = string.Empty;
     public string SecretKey { get; set; } = string.Empty;
+}
+
+// =========================================================================
+// Settings Models
+// =========================================================================
+
+public class GeneralSettingsDto
+{
+    public string AppName { get; set; } = "MiddayMist Spa";
+    public string Currency { get; set; } = "PHP";
+    public string DateFormat { get; set; } = "MM/dd/yyyy";
+    public string TimeFormat { get; set; } = "12";
+    public string Timezone { get; set; } = "Asia/Manila";
+    public string Language { get; set; } = "en";
+    public int DefaultDuration { get; set; } = 60;
+    public int BookingLeadTime { get; set; } = 24;
+    public int CancellationWindow { get; set; } = 48;
+    public bool AllowOnlineBooking { get; set; } = true;
+    public bool RequireDeposit { get; set; }
+    public bool SendReminders { get; set; } = true;
+}
+
+public class BusinessInfoDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string LegalName { get; set; } = string.Empty;
+    public string TaxId { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public string Address { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string State { get; set; } = string.Empty;
+    public string ZipCode { get; set; } = string.Empty;
+    public string Website { get; set; } = string.Empty;
+    public List<OperatingHoursDto> OperatingHours { get; set; } = new();
+}
+
+public class OperatingHoursDto
+{
+    public string Day { get; set; } = string.Empty;
+    public string OpenTime { get; set; } = "09:00";
+    public string CloseTime { get; set; } = "18:00";
+    public bool IsClosed { get; set; }
+}
+
+public class NotificationSettingsDto
+{
+    public bool Enabled { get; set; } = true;
+    public int RefreshIntervalSeconds { get; set; } = 30;
+    public int AutoDismissDays { get; set; } = 30;
+    public bool ShowBadgeCount { get; set; } = true;
+    public bool ShowPopupAlert { get; set; }
+    public int MaxInDropdown { get; set; } = 10;
+    public List<NotificationTriggerDto> Triggers { get; set; } = new();
+}
+
+public class NotificationTriggerDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool Enabled { get; set; } = true;
+    public string Priority { get; set; } = "Normal";
+    public string Icon { get; set; } = "bi-bell";
+    public string IconColor { get; set; } = "text-primary";
+}
+
+public class SettingsUserListResponse
+{
+    public int UserId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public int RoleId { get; set; }
+    public string Status { get; set; } = "Active";
+    public string? Phone { get; set; }
+    public DateTime? LastLogin { get; set; }
+    public int? EmployeeId { get; set; }
+}
+
+public class CreateUserRequest
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+}
+
+public class UpdateUserRequest
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+}
+
+public class ResetPasswordRequest
+{
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class SettingsRoleListResponse
+{
+    public int RoleId { get; set; }
+    public string RoleCode { get; set; } = string.Empty;
+    public string RoleName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsSystem { get; set; }
+    public int UserCount { get; set; }
+    public string Icon { get; set; } = "bi-person";
+    public HashSet<string> Permissions { get; set; } = new();
+}
+
+public class CreateRoleRequest
+{
+    public string RoleName { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int CopyFromRoleId { get; set; }
+}
+
+public class UpdateRolePermissionsRequest
+{
+    public HashSet<string> Permissions { get; set; } = new();
 }

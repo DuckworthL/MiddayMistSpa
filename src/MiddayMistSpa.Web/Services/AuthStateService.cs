@@ -33,6 +33,7 @@ public class AuthStateService : IAuthStateService
 {
     private readonly IApiClient _apiClient;
     private readonly ProtectedLocalStorage _localStorage;
+    private readonly IRolePermissionService _rolePermissionService;
     private string? _token;
     private Models.UserInfo? _currentUser;
 
@@ -42,10 +43,11 @@ public class AuthStateService : IAuthStateService
     public string? CurrentToken => _token;
     public Models.UserInfo? CurrentUser => _currentUser;
 
-    public AuthStateService(IApiClient apiClient, ProtectedLocalStorage localStorage)
+    public AuthStateService(IApiClient apiClient, ProtectedLocalStorage localStorage, IRolePermissionService rolePermissionService)
     {
         _apiClient = apiClient;
         _localStorage = localStorage;
+        _rolePermissionService = rolePermissionService;
     }
 
     public async Task<LoginResult> LoginAsync(string username, string password, string? captchaToken = null)
@@ -83,6 +85,9 @@ public class AuthStateService : IAuthStateService
                 await _localStorage.SetAsync("currentUser", _currentUser);
             }
 
+            // Load permissions from API after successful login
+            await _rolePermissionService.LoadPermissionsAsync();
+
             OnAuthStateChanged?.Invoke();
             return new LoginResult { Success = true };
         }
@@ -117,6 +122,9 @@ public class AuthStateService : IAuthStateService
                 await _localStorage.SetAsync("currentUser", _currentUser);
             }
 
+            // Load permissions from API after successful 2FA
+            await _rolePermissionService.LoadPermissionsAsync();
+
             OnAuthStateChanged?.Invoke();
             return true;
         }
@@ -129,6 +137,7 @@ public class AuthStateService : IAuthStateService
         _token = null;
         _currentUser = null;
         _apiClient.ClearAuthToken();
+        _rolePermissionService.ClearPermissions();
 
         try
         {
@@ -163,6 +172,10 @@ public class AuthStateService : IAuthStateService
                 _token = tokenResult.Value;
                 _currentUser = userResult.Success ? userResult.Value : null;
                 _apiClient.SetAuthToken(_token);
+
+                // Load permissions from API after session restore
+                await _rolePermissionService.LoadPermissionsAsync();
+
                 OnAuthStateChanged?.Invoke();
                 return true;
             }

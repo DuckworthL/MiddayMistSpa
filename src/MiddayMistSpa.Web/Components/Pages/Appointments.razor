@@ -33,9 +33,12 @@
                         <i class="bi bi-calendar3"></i>
                     </button>
                 </div>
-                <button class="btn btn-primary" @onclick="ShowNewAppointmentModal">
-                    <i class="bi bi-plus-lg me-1"></i> New Appointment
-                </button>
+                @if (_canCreate)
+                {
+                    <button class="btn btn-primary" @onclick="ShowNewAppointmentModal">
+                        <i class="bi bi-plus-lg me-1"></i> New Appointment
+                    </button>
+                }
             </div>
         </div>
 
@@ -148,7 +151,7 @@
                                             </td>
                                             <td class="text-end">
                                                 <div class="btn-group btn-group-sm">
-                                                    @if (appt.Status is "Scheduled" or "Confirmed")
+                                                    @if (_canEdit && appt.Status is "Scheduled" or "Confirmed")
                                                     {
                                                         <button class="btn btn-outline-success" @onclick="() => StartAppointment(appt)"
                                                                 title="Start Service">
@@ -162,21 +165,21 @@
                                                             <i class="bi bi-eye"></i>
                                                         </button>
                                                     }
-                                                    @if (appt.Status is "Scheduled" or "Confirmed")
+                                                    @if (_canEdit && appt.Status is "Scheduled" or "Confirmed")
                                                     {
                                                         <button class="btn btn-outline-primary" @onclick="() => EditAppointment(appt)"
                                                                 title="Edit">
                                                             <i class="bi bi-pencil"></i>
                                                         </button>
                                                     }
-                                                    @if (appt.Status is "Scheduled" or "Confirmed" or "Checked In")
+                                                    @if (_canDelete && appt.Status is "Scheduled" or "Confirmed" or "Checked In")
                                                     {
                                                         <button class="btn btn-outline-danger"
                                                                 @onclick="() => ShowCancelConfirmation(appt)" title="Cancel">
                                                             <i class="bi bi-x-lg"></i>
                                                         </button>
                                                     }
-                                                    @if (!appt.IsArchived && appt.Status is "Completed" or "Cancelled" or "No Show")
+                                                    @if (_canDelete && !appt.IsArchived && appt.Status is "Completed" or "Cancelled" or "No Show")
                                                     {
                                                         <button class="btn btn-outline-secondary"
                                                                 @onclick="() => ArchiveAppointment(appt)" title="Archive">
@@ -195,9 +198,12 @@
                                             <i class="bi bi-calendar-x display-4 text-muted"></i>
                                             <p class="text-muted mt-2">No appointments for @_selectedDate.ToString("MMMM dd")
                                             </p>
-                                            <button class="btn btn-primary btn-sm" @onclick="ShowNewAppointmentModal">
-                                                <i class="bi bi-plus me-1"></i> Schedule Appointment
-                                            </button>
+                                            @if (_canCreate)
+                                            {
+                                                <button class="btn btn-primary btn-sm" @onclick="ShowNewAppointmentModal">
+                                                    <i class="bi bi-plus me-1"></i> Schedule Appointment
+                                                </button>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -684,6 +690,11 @@
     private PagedResponse<AppointmentResponse> _appointments = new();
     private bool _isLoading = true;
     private DateTime _selectedDate = PhilippineTime.Today;
+
+    // Permission flags
+    private bool _canCreate;
+    private bool _canEdit;
+    private bool _canDelete;
     private string? _statusFilter;
     private string _searchTerm = string.Empty;
     private bool _showArchived = false;
@@ -779,6 +790,11 @@
 
     private async Task LoadData()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canCreate = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("appointments.create");
+        _canEdit = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("appointments.edit");
+        _canDelete = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("appointments.delete");
+
         await LoadLookups();
         await LoadAppointments();
     }

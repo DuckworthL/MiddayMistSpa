@@ -25,7 +25,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("dashboard")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<DashboardResponse>> GetDashboard([FromQuery] DashboardRequest request)
     {
         try
@@ -41,7 +41,7 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("quick-stats")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<QuickStatsResponse>> GetQuickStats()
     {
         try
@@ -61,7 +61,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("sales")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,Accountant")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<SalesReportResponse>> GetSalesReport([FromQuery] SalesReportRequest request)
     {
         try
@@ -81,7 +81,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("services/performance")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<ServicePerformanceResponse>> GetServicePerformance([FromQuery] ServicePerformanceRequest request)
     {
         try
@@ -101,7 +101,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("employees/performance")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,HR")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<EmployeePerformanceResponse>> GetEmployeePerformance([FromQuery] EmployeePerformanceRequest request)
     {
         try
@@ -121,7 +121,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("customers/analytics")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<CustomerAnalyticsResponse>> GetCustomerAnalytics([FromQuery] CustomerAnalyticsRequest request)
     {
         try
@@ -141,7 +141,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("inventory")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,InventoryManager")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<InventoryReportResponse>> GetInventoryReport([FromQuery] InventoryReportRequest request)
     {
         try
@@ -161,7 +161,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("payroll")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<PayrollSummaryReportResponse>> GetPayrollSummary([FromQuery] PayrollSummaryRequest request)
     {
         try
@@ -181,7 +181,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("financial")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<FinancialSummaryResponse>> GetFinancialSummary([FromQuery] FinancialSummaryRequest request)
     {
         try
@@ -201,7 +201,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpGet("appointments/analytics")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<AppointmentAnalyticsResponse>> GetAppointmentAnalytics([FromQuery] AppointmentAnalyticsRequest request)
     {
         try
@@ -221,7 +221,7 @@ public class ReportsController : ControllerBase
     // ============================================================================
 
     [HttpPost("export")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,Accountant")]
+    [Authorize(Policy = "Permission:reports.export")]
     public async Task<IActionResult> ExportReport([FromBody] ExportRequest request)
     {
         try

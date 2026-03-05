@@ -31,7 +31,7 @@ public class InventoryController : ControllerBase
     #region Product Categories
 
     [HttpPost("categories")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<ProductCategoryResponse>> CreateCategory([FromBody] CreateProductCategoryRequest request)
     {
         try
@@ -62,7 +62,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPut("categories/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<ProductCategoryResponse>> UpdateCategory(int id, [FromBody] UpdateProductCategoryRequest request)
     {
         try
@@ -77,7 +77,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpDelete("categories/{id}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<IActionResult> DeleteCategory(int id)
     {
         try
@@ -97,7 +97,7 @@ public class InventoryController : ControllerBase
     #region Products
 
     [HttpPost("products")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<ProductResponse>> CreateProduct([FromBody] CreateProductRequest request)
     {
         try
@@ -189,7 +189,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPut("products/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<ProductResponse>> UpdateProduct(int id, [FromBody] UpdateProductRequest request)
     {
         try
@@ -204,7 +204,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("products/{id}/deactivate")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<IActionResult> DeactivateProduct(int id)
     {
         var result = await _inventoryService.DeactivateProductAsync(id);
@@ -213,7 +213,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("products/{id}/reactivate")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<IActionResult> ReactivateProduct(int id)
     {
         var result = await _inventoryService.ReactivateProductAsync(id);
@@ -226,7 +226,7 @@ public class InventoryController : ControllerBase
     #region Stock Management
 
     [HttpPost("stock/adjust")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<StockAdjustmentResponse>> AdjustStock([FromBody] CreateStockAdjustmentRequest request)
     {
         var userId = GetCurrentUserId();
@@ -244,7 +244,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("stock/receive")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<StockAdjustmentResponse>> ReceiveStock(
         [FromQuery] int productId,
         [FromQuery] decimal quantity,
@@ -265,7 +265,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("stock/write-off-expired/{productId}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<StockAdjustmentResponse>> WriteOffExpired(int productId)
     {
         var userId = GetCurrentUserId();
@@ -283,7 +283,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("stock/write-off-damaged")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<StockAdjustmentResponse>> WriteOffDamaged(
         [FromQuery] int productId,
         [FromQuery] decimal quantity,
@@ -322,7 +322,7 @@ public class InventoryController : ControllerBase
     #region Suppliers
 
     [HttpPost("suppliers")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<SupplierResponse>> CreateSupplier([FromBody] CreateSupplierRequest request)
     {
         try
@@ -353,7 +353,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPut("suppliers/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<SupplierResponse>> UpdateSupplier(int id, [FromBody] UpdateSupplierRequest request)
     {
         try
@@ -368,7 +368,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("suppliers/{id}/deactivate")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<IActionResult> DeactivateSupplier(int id)
     {
         var result = await _inventoryService.DeactivateSupplierAsync(id);
@@ -381,7 +381,7 @@ public class InventoryController : ControllerBase
     #region Purchase Orders
 
     [HttpPost("purchase-orders")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<PurchaseOrderResponse>> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest request)
     {
         var userId = GetCurrentUserId();
@@ -429,7 +429,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id}/approve")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<PurchaseOrderResponse>> ApprovePurchaseOrder(int id)
     {
         var userId = GetCurrentUserId();
@@ -447,7 +447,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id}/receive")]
-    [Authorize(Roles = "SuperAdmin,Admin,Inventory")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<PurchaseOrderResponse>> ReceivePurchaseOrder(int id)
     {
         var userId = GetCurrentUserId();
@@ -465,7 +465,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("purchase-orders/{id}/cancel")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:inventory.manage")]
     public async Task<ActionResult<PurchaseOrderResponse>> CancelPurchaseOrder(int id)
     {
         try
@@ -491,7 +491,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpGet("valuation")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<InventoryValuationResponse>> GetInventoryValuation()
     {
         var valuation = await _inventoryService.GetInventoryValuationAsync();
@@ -499,7 +499,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpGet("total-value")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<object>> GetTotalInventoryValue()
     {
         var value = await _inventoryService.GetTotalInventoryValueAsync();

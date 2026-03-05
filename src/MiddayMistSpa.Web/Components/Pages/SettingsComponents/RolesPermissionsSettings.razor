@@ -1,4 +1,6 @@
 @* Roles & Permissions Settings Component *@
+@inject ISettingsApiService SettingsApi
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Roles & Permissions</h5>
@@ -7,90 +9,112 @@
         </button>
     </div>
     <div class="card-body">
-        <div class="row">
-            <div class="col-md-4">
-                <div class="list-group">
-                    @foreach (var role in _roles)
+        @if (_isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading roles...</p>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="list-group">
+                        @foreach (var role in _roles)
+                        {
+                            <button type="button"
+                                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(_selectedRole?.RoleId == role.RoleId ? "active" : "")"
+                                    @onclick="() => SelectRole(role)">
+                                <div>
+                                    <i class="bi @role.Icon me-2"></i>
+                                    @role.RoleName
+                                </div>
+                                <span class="badge bg-secondary">@role.UserCount users</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    @if (_selectedRole != null)
                     {
-                        <button type="button"
-                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(_selectedRole?.Id == role.Id ? "active" : "")"
-                                @onclick="() => SelectRole(role)">
-                            <div>
-                                <i class="bi @role.Icon me-2"></i>
-                                @role.Name
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">@_selectedRole.RoleName Permissions</h6>
+                                @if (!_selectedRole.IsSystem)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="ShowDeleteConfirmation">
+                                        <i class="bi bi-trash"></i> Delete Role
+                                    </button>
+                                }
                             </div>
-                            <span class="badge bg-secondary">@role.UserCount users</span>
-                        </button>
+                            <div class="card-body">
+                                @if (_selectedRole.IsSystem)
+                                {
+                                    <div class="alert alert-info py-2">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        This is a system role. Some permissions cannot be modified.
+                                    </div>
+                                }
+
+                                @foreach (var module in _permissionModules)
+                                {
+                                    <div class="mb-4">
+                                        <h6 class="text-muted mb-2">@module.Name</h6>
+                                        <div class="row g-2">
+                                            @foreach (var permission in module.Permissions)
+                                            {
+                                                var permKey = $"{module.Key}.{permission.Key}";
+                                                var hasPermission = _selectedRole.Permissions.Contains(permKey);
+                                                <div class="col-md-6">
+                                                    <div class="form-check">
+                                                        <input type="checkbox" class="form-check-input" id="@permKey"
+                                                               checked="@hasPermission"
+                                                               disabled="@(_selectedRole.IsSystem && _selectedRole.RoleName == "SuperAdmin")"
+                                                               @onchange="() => TogglePermission(permKey)" />
+                                                        <label class="form-check-label" for="@permKey">
+                                                            @permission.Name
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="d-flex gap-2 mt-4">
+                                    <button class="btn btn-primary" @onclick="SavePermissions" disabled="@_isSaving">
+                                        @if (_isSaving)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                        }
+                                        <i class="bi bi-check-lg me-1"></i> Save Permissions
+                                    </button>
+                                    <button class="btn btn-outline-secondary" @onclick="ResetPermissions">
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-shield display-4"></i>
+                            <p class="mt-2">Select a role to view and edit permissions</p>
+                        </div>
                     }
                 </div>
             </div>
-            <div class="col-md-8">
-                @if (_selectedRole != null)
-                {
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">@_selectedRole.Name Permissions</h6>
-                            @if (!_selectedRole.IsSystem)
-                            {
-                                <button class="btn btn-outline-danger btn-sm" @onclick="DeleteRole">
-                                    <i class="bi bi-trash"></i> Delete Role
-                                </button>
-                            }
-                        </div>
-                        <div class="card-body">
-                            @if (_selectedRole.IsSystem)
-                            {
-                                <div class="alert alert-info py-2">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    This is a system role. Some permissions cannot be modified.
-                                </div>
-                            }
 
-                            @foreach (var module in _permissionModules)
-                            {
-                                <div class="mb-4">
-                                    <h6 class="text-muted mb-2">@module.Name</h6>
-                                    <div class="row g-2">
-                                        @foreach (var permission in module.Permissions)
-                                        {
-                                            var permKey = $"{module.Key}.{permission.Key}";
-                                            var hasPermission = _selectedRole.Permissions.Contains(permKey);
-                                            <div class="col-md-6">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input" id="@permKey"
-                                                           checked="@hasPermission"
-                                                           disabled="@(_selectedRole.IsSystem && _selectedRole.Name == "SuperAdmin")"
-                                                           @onchange="() => TogglePermission(permKey)" />
-                                                    <label class="form-check-label" for="@permKey">
-                                                        @permission.Name
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            }
-
-                            <div class="d-flex gap-2 mt-4">
-                                <button class="btn btn-primary" @onclick="SavePermissions">
-                                    <i class="bi bi-check-lg me-1"></i> Save Permissions
-                                </button>
-                                <button class="btn btn-outline-secondary" @onclick="ResetPermissions">
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-shield display-4"></i>
-                        <p class="mt-2">Select a role to view and edit permissions</p>
-                    </div>
-                }
-            </div>
-        </div>
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <div class="alert @_statusAlertClass mt-3 alert-dismissible fade show" role="alert">
+                    @_statusMessage
+                    <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+                </div>
+            }
+        }
     </div>
 </div>
 
@@ -119,14 +143,58 @@
                             <option value="0">-- Start with no permissions --</option>
                             @foreach (var role in _roles)
                             {
-                                <option value="@role.Id">@role.Name</option>
+                                <option value="@role.RoleId">@role.RoleName</option>
                             }
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="AddRole">Add Role</button>
+                    <button class="btn btn-primary" @onclick="AddRole" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Add Role
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Role Confirmation Modal *@
+@if (_showDeleteConfirm)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete Role</h5>
+                    <button type="button" class="btn-close btn-close-white"
+                            @onclick="() => _showDeleteConfirm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the role <strong>@_roleToDelete?.RoleName</strong>?</p>
+                    @if (_roleToDelete?.UserCount > 0)
+                    {
+                        <div class="alert alert-warning py-2 mb-0">
+                            <i class="bi bi-exclamation-circle me-1"></i>
+                            This role has <strong>@_roleToDelete.UserCount user(s)</strong> assigned.
+                            They will be reassigned to the <strong>Receptionist</strong> role.
+                        </div>
+                    }
+                    <p class="text-muted mt-2 mb-0">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showDeleteConfirm = false">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDeleteRole" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-trash me-1"></i> Delete Role
+                    </button>
                 </div>
             </div>
         </div>
@@ -134,83 +202,23 @@
 }
 
 @code {
-    private List<RoleModel> _roles = new()
-    {
-        new() { Id = 1, Name = "SuperAdmin", Icon = "bi-shield-lock", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "appointments.view", "appointments.create", "appointments.edit", "appointments.delete",
-                "customers.view", "customers.create", "customers.edit", "customers.delete",
-                "services.view", "services.create", "services.edit", "services.delete",
-                "employees.view", "employees.create", "employees.edit", "employees.delete",
-                "inventory.view", "inventory.manage",
-                "pos.access", "pos.refund", "pos.discount",
-                "accounting.view", "accounting.manage",
-                "payroll.view", "payroll.manage",
-                "shifts.view", "shifts.manage",
-                "timeattendance.view", "timeattendance.manage",
-                "reports.view", "reports.export",
-                "notifications.view", "notifications.manage",
-                "settings.access", "settings.manage" } },
-        new() { Id = 2, Name = "Admin", Icon = "bi-person-gear", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "appointments.view", "appointments.create", "appointments.edit", "appointments.delete",
-                "customers.view", "customers.create", "customers.edit", "customers.delete",
-                "services.view", "services.create", "services.edit", "services.delete",
-                "employees.view", "employees.create", "employees.edit", "employees.delete",
-                "inventory.view", "inventory.manage",
-                "pos.access", "pos.refund", "pos.discount",
-                "accounting.view", "accounting.manage",
-                "payroll.view", "payroll.manage",
-                "shifts.view", "shifts.manage",
-                "timeattendance.view", "timeattendance.manage",
-                "reports.view", "reports.export",
-                "notifications.view", "notifications.manage",
-                "settings.access", "settings.manage" } },
-        new() { Id = 3, Name = "Receptionist", Icon = "bi-person-workspace", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "appointments.view", "appointments.create", "appointments.edit",
-                "customers.view", "customers.create", "customers.edit",
-                "services.view",
-                "pos.access",
-                "timeattendance.view",
-                "notifications.view" } },
-        new() { Id = 4, Name = "Therapist", Icon = "bi-person-heart", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "appointments.view",
-                "customers.view",
-                "services.view",
-                "timeattendance.view",
-                "notifications.view" } },
-        new() { Id = 5, Name = "HR", Icon = "bi-people", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "employees.view", "employees.create", "employees.edit", "employees.delete",
-                "shifts.view", "shifts.manage",
-                "payroll.view", "payroll.manage",
-                "timeattendance.view", "timeattendance.manage",
-                "reports.view", "reports.export",
-                "notifications.view" } },
-        new() { Id = 6, Name = "Inventory", Icon = "bi-box-seam", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "inventory.view", "inventory.manage",
-                "reports.view", "reports.export",
-                "timeattendance.view",
-                "notifications.view" } },
-        new() { Id = 7, Name = "Accountant", Icon = "bi-calculator", IsSystem = true, UserCount = 1,
-            Permissions = new HashSet<string> {
-                "dashboard.view",
-                "accounting.view", "accounting.manage",
-                "payroll.view", "payroll.manage",
-                "pos.access",
-                "reports.view", "reports.export",
-                "timeattendance.view",
-                "notifications.view" } }
-    };
+    private List<SettingsRoleListResponse> _roles = new();
+    private SettingsRoleListResponse? _selectedRole = null;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
+    private bool _showModal = false;
+    private string _newRoleName = "";
+    private string _newRoleDescription = "";
+    private int _copyFromRoleId = 0;
+
+    // Delete confirmation
+    private bool _showDeleteConfirm;
+    private SettingsRoleListResponse? _roleToDelete;
+
+    // Original permissions snapshot for reset
+    private HashSet<string>? _originalPermissions;
 
     private List<PermissionModule> _permissionModules = new()
     {
@@ -247,15 +255,33 @@
             new("access", "Access Settings"), new("manage", "Manage Settings") } }
     };
 
-    private RoleModel? _selectedRole = null;
-    private bool _showModal = false;
-    private string _newRoleName = "";
-    private string _newRoleDescription = "";
-    private int _copyFromRoleId = 0;
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
 
-    private void SelectRole(RoleModel role)
+    private async Task LoadRoles()
+    {
+        _isLoading = true;
+        try
+        {
+            _roles = await SettingsApi.GetRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error loading roles: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SelectRole(SettingsRoleListResponse role)
     {
         _selectedRole = role;
+        _originalPermissions = new HashSet<string>(role.Permissions);
     }
 
     private void TogglePermission(string permKey)
@@ -267,14 +293,44 @@
             _selectedRole.Permissions.Add(permKey);
     }
 
-    private void SavePermissions()
+    private async Task SavePermissions()
     {
-        // TODO: Save to API
+        if (_selectedRole == null) return;
+        _isSaving = true;
+        _statusMessage = string.Empty;
+        try
+        {
+            var request = new UpdateRolePermissionsRequest { Permissions = _selectedRole.Permissions };
+            var result = await SettingsApi.UpdateRolePermissionsAsync(_selectedRole.RoleId, request);
+            if (result != null)
+            {
+                _statusMessage = $"Permissions saved for {_selectedRole.RoleName}.";
+                _statusAlertClass = "alert-success";
+                _originalPermissions = new HashSet<string>(result.Permissions);
+            }
+            else
+            {
+                _statusMessage = "Failed to save permissions.";
+                _statusAlertClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void ResetPermissions()
     {
-        // TODO: Reset to original
+        if (_selectedRole != null && _originalPermissions != null)
+        {
+            _selectedRole.Permissions = new HashSet<string>(_originalPermissions);
+        }
     }
 
     private void ShowAddRoleModal()
@@ -285,41 +341,91 @@
         _showModal = true;
     }
 
-    private void AddRole()
+    private async Task AddRole()
     {
-        var newRole = new RoleModel
+        if (string.IsNullOrWhiteSpace(_newRoleName))
         {
-            Id = _roles.Max(r => r.Id) + 1,
-            Name = _newRoleName,
-            Icon = "bi-person",
-            IsSystem = false,
-            UserCount = 0,
-            Permissions = _copyFromRoleId > 0
-        ? new HashSet<string>(_roles.First(r => r.Id == _copyFromRoleId).Permissions)
-        : new HashSet<string>()
-        };
-        _roles.Add(newRole);
-        _showModal = false;
-        _selectedRole = newRole;
-    }
+            _statusMessage = "Role name is required.";
+            _statusAlertClass = "alert-danger";
+            return;
+        }
 
-    private void DeleteRole()
-    {
-        if (_selectedRole != null && !_selectedRole.IsSystem)
+        _isSaving = true;
+        try
         {
-            _roles.Remove(_selectedRole);
-            _selectedRole = null;
+            var request = new CreateRoleRequest
+            {
+                RoleName = _newRoleName,
+                Description = _newRoleDescription,
+                CopyFromRoleId = _copyFromRoleId
+            };
+            var (result, error) = await SettingsApi.CreateRoleAsync(request);
+            if (result != null)
+            {
+                _showModal = false;
+                _statusMessage = $"Role '{result.RoleName}' created.";
+                _statusAlertClass = "alert-success";
+                await LoadRoles();
+                _selectedRole = _roles.FirstOrDefault(r => r.RoleId == result.RoleId);
+            }
+            else
+            {
+                _statusMessage = error ?? "Failed to create role.";
+                _statusAlertClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
         }
     }
 
-    private class RoleModel
+    private void ShowDeleteConfirmation()
     {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-        public string Icon { get; set; } = "bi-person";
-        public bool IsSystem { get; set; }
-        public int UserCount { get; set; }
-        public HashSet<string> Permissions { get; set; } = new();
+        if (_selectedRole == null || _selectedRole.IsSystem) return;
+        _roleToDelete = _selectedRole;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDeleteRole()
+    {
+        if (_roleToDelete == null || _roleToDelete.IsSystem) return;
+
+        _isSaving = true;
+        try
+        {
+            var (success, error) = await SettingsApi.DeleteRoleAsync(_roleToDelete.RoleId);
+            if (success)
+            {
+                _statusMessage = $"Role '{_roleToDelete.RoleName}' deleted successfully.";
+                _statusAlertClass = "alert-success";
+                _selectedRole = null;
+                _roleToDelete = null;
+                _showDeleteConfirm = false;
+                await LoadRoles();
+            }
+            else
+            {
+                _statusMessage = error ?? "Failed to delete role.";
+                _statusAlertClass = "alert-danger";
+                _showDeleteConfirm = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+            _showDeleteConfirm = false;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private class PermissionModule

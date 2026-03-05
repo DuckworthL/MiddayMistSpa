@@ -1,4 +1,6 @@
 @* Service Category Settings Component *@
+@inject IServiceApiService ServiceApi
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-grid me-2"></i>Service Categories</h5>
@@ -7,71 +9,90 @@
         </button>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">Order</th>
-                        <th>Category Name</th>
-                        <th>Description</th>
-                        <th style="width: 100px;">Services</th>
-                        <th style="width: 80px;">Active</th>
-                        <th style="width: 120px;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var category in _categories)
-                    {
-                        <tr>
-                            <td>
-                                <div class="d-flex flex-column gap-1">
-                                    <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveUp(category)"
-                                        disabled="@(category.Order == 1)">
-                                        <i class="bi bi-chevron-up"></i>
-                                    </button>
-                                    <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveDown(category)"
-                                        disabled="@(category.Order == _categories.Count)">
-                                        <i class="bi bi-chevron-down"></i>
-                                    </button>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge" style="@($"background: {category.Color};")">@category.Name.Substring(0, 1)</span>
-                                    <span class="fw-medium">@category.Name</span>
-                                </div>
-                            </td>
-                        <td class="text-muted">@category.Description</td>
-                        <td>
-                            <span class="badge bg-secondary">@category.ServiceCount services</span>
-                        </td>
-                        <td>
-                            <div class="form-check form-switch">
-                                <input type="checkbox" class="form-check-input" @bind="category.IsActive" />
-                            </div>
-                        </td>
-                        <td>
-                            <button class="btn btn-link btn-sm p-1" @onclick="() => EditCategory(category)">
-                                <i class="bi bi-pencil text-primary"></i>
-                            </button>
-                            <button class="btn btn-link btn-sm p-1" @onclick="() => DeleteCategory(category)"
-                                disabled="@(category.ServiceCount > 0)">
-                                <i class="bi bi-trash text-danger"></i>
-                            </button>
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-
-        @if (!_categories.Any())
+        @if (_isLoading)
         {
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-grid display-4"></i>
-                <p class="mt-2">No categories defined yet</p>
-                <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">Add First Category</button>
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading categories...</p>
             </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">Order</th>
+                            <th>Category Name</th>
+                            <th>Description</th>
+                            <th style="width: 100px;">Services</th>
+                            <th style="width: 80px;">Active</th>
+                            <th style="width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var category in _categories)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveUp(category)"
+                                                disabled="@(category.Order == 1)">
+                                            <i class="bi bi-chevron-up"></i>
+                                        </button>
+                                        <button class="btn btn-link btn-sm p-0 text-muted" @onclick="() => MoveDown(category)"
+                                                disabled="@(category.Order == _categories.Count)">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge"
+                                              style="@($"background: {category.Color};")">@category.Name.Substring(0, 1)</span>
+                                        <span class="fw-medium">@category.Name</span>
+                                    </div>
+                                </td>
+                                <td class="text-muted">@category.Description</td>
+                                <td>
+                                    <span class="badge bg-secondary">@category.ServiceCount services</span>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" @bind="category.IsActive" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-link btn-sm p-1" @onclick="() => EditCategory(category)">
+                                        <i class="bi bi-pencil text-primary"></i>
+                                    </button>
+                                    <button class="btn btn-link btn-sm p-1" @onclick="() => DeleteCategory(category)"
+                                            disabled="@(category.ServiceCount > 0)">
+                                        <i class="bi bi-trash text-danger"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (!_categories.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-grid display-4"></i>
+                    <p class="mt-2">No categories defined yet</p>
+                    <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">Add First Category</button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <div class="alert @_statusAlertClass m-3 alert-dismissible fade show" role="alert">
+                    @_statusMessage
+                    <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+                </div>
+            }
         }
     </div>
 </div>
@@ -101,10 +122,9 @@
                             @foreach (var color in _availableColors)
                             {
                                 var borderColor = _formModel.Color == color ? "#333" : "transparent";
-                                var buttonStyle = $"width: 32px; height: 32px; background: {color}; border: 2px solid {borderColor};";
-                                <button type="button" class="btn rounded-circle p-0"
-                                    style="@buttonStyle"
-                                    @onclick="() => _formModel.Color = color">
+                                var buttonStyle = $"width: 32px; height: 32px; background: {color}; border: 2px solid                        {borderColor};";
+                                <button type="button" class="btn rounded-circle p-0"                                    style="@buttonStyle"
+                                        @onclick="() => _formModel.Color = color">
                                 </button>
                             }
                         </div>
@@ -124,29 +144,53 @@
 }
 
 @code {
-    private List<CategoryModel> _categories = new()
-{
-new() { Id = 1, Name = "Massage", Description = "All massage services", Color = "#8B5A9C", Order = 1, ServiceCount = 5,
-IsActive = true },
-new() { Id = 2, Name = "Facial", Description = "Facial treatments and skincare", Color = "#E8B4B8", Order = 2,
-ServiceCount = 4, IsActive = true },
-new() { Id = 3, Name = "Body Treatment", Description = "Body wraps, scrubs, and treatments", Color = "#67597A", Order =
-3, ServiceCount = 3, IsActive = true },
-new() { Id = 4, Name = "Nail Services", Description = "Manicure and pedicure services", Color = "#D4A5A5", Order = 4,
-ServiceCount = 6, IsActive = true },
-new() { Id = 5, Name = "Hair Services", Description = "Hair styling and treatments", Color = "#6B5B7A", Order = 5,
-ServiceCount = 2, IsActive = false }
-};
-
+    private List<CategoryModel> _categories = new();
     private List<string> _availableColors = new()
-{
-"#8B5A9C", "#E8B4B8", "#67597A", "#D4A5A5", "#6B5B7A",
-"#9B7A8C", "#7A6B8A", "#B8A5C4", "#C4B5D4", "#A59BC4"
-};
+    {
+        "#8B5A9C", "#E8B4B8", "#67597A", "#D4A5A5", "#6B5B7A",
+        "#9B7A8C", "#7A6B8A", "#B8A5C4", "#C4B5D4", "#A59BC4"
+    };
 
     private bool _showModal = false;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
     private CategoryModel? _editingCategory = null;
     private CategoryModel _formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _isLoading = true;
+        try
+        {
+            var apiCategories = await ServiceApi.GetCategoriesAsync();
+            _categories = apiCategories.Select((c, idx) => new CategoryModel
+            {
+                Id = c.CategoryId,
+                Name = c.CategoryName,
+                Description = c.Description ?? "",
+                Color = _availableColors[idx % _availableColors.Count],
+                Order = idx + 1,
+                ServiceCount = c.ServiceCount,
+                IsActive = c.IsActive
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error loading categories: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
 
     private void ShowAddModal()
     {
@@ -175,26 +219,48 @@ ServiceCount = 2, IsActive = false }
         _editingCategory = null;
     }
 
-    private void SaveCategory()
+    private async Task SaveCategory()
     {
-        if (_editingCategory != null)
+        _isSaving = true;
+        _statusMessage = string.Empty;
+        try
         {
-            _editingCategory.Name = _formModel.Name;
-            _editingCategory.Description = _formModel.Description;
-            _editingCategory.Color = _formModel.Color;
-            _editingCategory.IsActive = _formModel.IsActive;
+            var request = new CreateCategoryRequest
+            {
+                Name = _formModel.Name,
+                Description = _formModel.Description,
+                IsActive = _formModel.IsActive
+            };
+
+            int? categoryId = _editingCategory != null ? _editingCategory.Id : null;
+            var success = await ServiceApi.SaveCategoryAsync(request, categoryId);
+            if (success)
+            {
+                _statusMessage = _editingCategory != null ? "Category updated." : "Category created.";
+                _statusAlertClass = "alert-success";
+                await LoadCategories();
+            }
+            else
+            {
+                _statusMessage = "Failed to save category.";
+                _statusAlertClass = "alert-danger";
+            }
+            CloseModal();
         }
-        else
+        catch (Exception ex)
         {
-            _formModel.Id = _categories.Any() ? _categories.Max(c => c.Id) + 1 : 1;
-            _formModel.Order = _categories.Count + 1;
-            _categories.Add(_formModel);
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
         }
-        CloseModal();
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void DeleteCategory(CategoryModel category)
     {
+        // TODO: Need delete category API endpoint - for now just remove locally
         _categories.Remove(category);
         ReorderCategories();
     }

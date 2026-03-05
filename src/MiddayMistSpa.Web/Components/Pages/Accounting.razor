@@ -73,10 +73,10 @@
                                 <div>
                                     <p class="text-muted mb-1 small">Net Profit</p>
                                     <h3 class="mb-0" style="color: #6A9C89;">₱@((_totalRevenue -
-                                                                                                                _totalExpenses).ToString("N2"))
+                                                                            _totalExpenses).ToString("N2"))
                                     </h3>
                                     <small class="text-success">@((_totalRevenue > 0 ? (_totalRevenue - _totalExpenses) /
-                                                                                                                _totalRevenue * 100 : 0).ToString("F1"))%
+                                                                            _totalRevenue * 100 : 0).ToString("F1"))%
                                         margin</small>
                                     </div>
                                     <div class="rounded-circle p-2" style="background: #E8F2EE;">
@@ -110,12 +110,15 @@
                         <div class="card">
                             <div class="card-body py-3">
                                 <div class="d-flex gap-3 flex-wrap">
-                                    <a href="/accounting/income" class="btn btn-outline-success">
-                                        <i class="bi bi-plus-circle me-1"></i> Record Income
-                                    </a>
-                                    <a href="/accounting/expenses" class="btn btn-outline-danger">
-                                        <i class="bi bi-dash-circle me-1"></i> Record Expense
-                                    </a>
+                                    @if (_canManage)
+                                    {
+                                        <a href="/accounting/income" class="btn btn-outline-success">
+                                            <i class="bi bi-plus-circle me-1"></i> Record Income
+                                        </a>
+                                        <a href="/accounting/expenses" class="btn btn-outline-danger">
+                                            <i class="bi bi-dash-circle me-1"></i> Record Expense
+                                        </a>
+                                    }
                                     <a href="/accounting/invoices" class="btn btn-outline-primary">
                                         <i class="bi bi-file-text me-1"></i> Invoices
                                     </a>
@@ -225,7 +228,8 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach (var txn in (_showAllTransactions ? _allTransactions : _recentTransactions))
+                                            @foreach (var txn in (_showAllTransactions ? _allTransactions :
+                                                                                _recentTransactions))
                                             {
                                                 <tr>
                                                     <td>@txn.Date.ToString("MMM dd, yyyy")</td>
@@ -271,7 +275,8 @@
                                             expenseHeight = Math.Max(expenseHeight, month.Expenses > 0 ? 4 : 0);
 
                                             <div class="col">
-                                                <div style="height: 120px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;">
+                                                <div
+                                                    style="height: 120px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center;">
                                                     <div class="d-flex gap-1 align-items-end">
                                                         <div style="width: 14px; background: linear-gradient(to top, #6A9C89, #8AB4A5); border-radius: 3px 3px 0 0; height: @(revenueHeight)px;"
                                                              title="Revenue: ₱@month.Revenue.ToString("N0")"></div>
@@ -329,6 +334,9 @@
 @code {
     private bool _isLoading = true;
     private string _selectedPeriod = "month";
+
+    // Permission flags
+    private bool _canManage;
     private decimal _totalRevenue = 0;
     private decimal _totalExpenses = 0;
     private decimal _outstandingAmount = 0;
@@ -344,6 +352,9 @@
 
     private async Task LoadData()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canManage = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("accounting.manage");
+
         await LoadFinancialData();
     }
 
@@ -419,11 +430,11 @@
 
             // Set default accounts (these would come from an API in a real scenario)
             _accounts = new List<AccountBalance>
-            {
-                new() { Name = "Cash on Hand", Balance = summary?.CashOnHand ?? 0, Icon = "bi-cash", Color = "#10B981" },
-                new() { Name = "Accounts Receivable", Balance = summary?.AccountsReceivable ?? 0, Icon = "bi-receipt", Color = "#3B82F6" },
-                new() { Name = "Accounts Payable", Balance = summary?.AccountsPayable ?? 0, Icon = "bi-credit-card", Color = "#F59E0B" }
-            };
+{
+new() { Name = "Cash on Hand", Balance = summary?.CashOnHand ?? 0, Icon = "bi-cash", Color = "#10B981" },
+new() { Name = "Accounts Receivable", Balance = summary?.AccountsReceivable ?? 0, Icon = "bi-receipt", Color = "#3B82F6" },
+new() { Name = "Accounts Payable", Balance = summary?.AccountsPayable ?? 0, Icon = "bi-credit-card", Color = "#F59E0B" }
+};
 
             // Load recent transactions (income, expenses, and POS transactions)
             _allTransactions.Clear();
@@ -460,24 +471,25 @@
             }
 
             // Also load POS/sale transactions (these are the main revenue source)
-            var posTransactions = await TransactionService.GetTransactionsAsync(page: 1, pageSize: 50, startDate: startDate, endDate: endDate);
+            var posTransactions = await TransactionService.GetTransactionsAsync(page: 1, pageSize: 50, startDate: startDate,
+            endDate: endDate);
             if (posTransactions?.Items != null)
             {
                 foreach (var txn in posTransactions.Items)
                 {
                     // Avoid duplicating entries already captured as Income journal entries
                     var alreadyExists = _allTransactions.Any(t =>
-                        t.Type == "Income" &&
-                        Math.Abs(t.Amount - txn.TotalAmount) < 0.01m &&
-                        t.Date.Date == txn.TransactionDate.Date);
+                    t.Type == "Income" &&
+                    Math.Abs(t.Amount - txn.TotalAmount) < 0.01m &&
+                    t.Date.Date == txn.TransactionDate.Date);
                     if (!alreadyExists)
                     {
                         var serviceNames = txn.ServiceItems.Any()
-                            ? string.Join(", ", txn.ServiceItems.Select(s => s.ServiceName))
-                            : null;
+                        ? string.Join(", ", txn.ServiceItems.Select(s => s.ServiceName))
+                        : null;
                         var productNames = txn.ProductItems.Any()
-                            ? string.Join(", ", txn.ProductItems.Select(p => p.ProductName))
-                            : null;
+                        ? string.Join(", ", txn.ProductItems.Select(p => p.ProductName))
+                        : null;
                         var description = serviceNames ?? productNames ?? $"Transaction {txn.TransactionNumber}";
 
                         _allTransactions.Add(new TransactionItem

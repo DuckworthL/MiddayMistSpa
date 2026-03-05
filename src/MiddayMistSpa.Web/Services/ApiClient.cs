@@ -16,6 +16,7 @@ public interface IApiClient
     Task<TResponse?> PutAsync<TRequest, TResponse>(string endpoint, TRequest data);
     Task<(TResponse? Result, string? ErrorMessage)> PutWithErrorAsync<TRequest, TResponse>(string endpoint, TRequest data);
     Task<bool> DeleteAsync(string endpoint);
+    Task<(bool Success, string? ErrorMessage)> DeleteWithErrorAsync(string endpoint);
     Task<(byte[]? FileContent, string? FileName, string? ContentType, string? ErrorMessage)> PostForFileAsync<TRequest>(string endpoint, TRequest data);
     void SetAuthToken(string token);
     void ClearAuthToken();
@@ -225,6 +226,39 @@ public class ApiClient : IApiClient
         catch (Exception)
         {
             return false;
+        }
+    }
+
+    public async Task<(bool Success, string? ErrorMessage)> DeleteWithErrorAsync(string endpoint)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync(endpoint);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                OnUnauthorized?.Invoke();
+                return (false, "Unauthorized");
+            }
+
+            if (response.IsSuccessStatusCode)
+                return (true, null);
+
+            // Try to read error message from response body
+            try
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                    return (false, msgProp.GetString());
+            }
+            catch { }
+
+            return (false, $"Request failed with status {(int)response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
         }
     }
 

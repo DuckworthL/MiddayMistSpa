@@ -1655,3 +1655,97 @@ public class CaptchaApiService : ICaptchaApiService
         return result != null;
     }
 }
+// =========================================================================
+// Settings API Service
+// =========================================================================
+
+public interface ISettingsApiService
+{
+    // General Settings
+    Task<GeneralSettingsDto?> GetGeneralSettingsAsync();
+    Task<GeneralSettingsDto?> SaveGeneralSettingsAsync(GeneralSettingsDto dto);
+
+    // Business Info
+    Task<BusinessInfoDto?> GetBusinessInfoAsync();
+    Task<BusinessInfoDto?> SaveBusinessInfoAsync(BusinessInfoDto dto);
+
+    // Notification Settings
+    Task<NotificationSettingsDto?> GetNotificationSettingsAsync();
+    Task<NotificationSettingsDto?> SaveNotificationSettingsAsync(NotificationSettingsDto dto);
+
+    // User Management
+    Task<List<SettingsUserListResponse>> GetUsersAsync();
+    Task<(SettingsUserListResponse? Result, string? Error)> CreateUserAsync(CreateUserRequest request);
+    Task<(SettingsUserListResponse? Result, string? Error)> UpdateUserAsync(int userId, UpdateUserRequest request);
+    Task<SettingsUserListResponse?> ToggleUserStatusAsync(int userId);
+    Task<bool> ResetUserPasswordAsync(int userId, ResetPasswordRequest request);
+
+    // Role Management
+    Task<List<SettingsRoleListResponse>> GetRolesAsync();
+    Task<(SettingsRoleListResponse? Result, string? Error)> CreateRoleAsync(CreateRoleRequest request);
+    Task<SettingsRoleListResponse?> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequest request);
+    Task<(bool Success, string? Error)> DeleteRoleAsync(int roleId);
+}
+
+public class SettingsApiService : ISettingsApiService
+{
+    private readonly IApiClient _apiClient;
+
+    public SettingsApiService(IApiClient apiClient)
+    {
+        _apiClient = apiClient;
+    }
+
+    // General Settings
+    public async Task<GeneralSettingsDto?> GetGeneralSettingsAsync()
+        => await _apiClient.GetAsync<GeneralSettingsDto>("api/settings/general");
+
+    public async Task<GeneralSettingsDto?> SaveGeneralSettingsAsync(GeneralSettingsDto dto)
+        => await _apiClient.PutAsync<GeneralSettingsDto, GeneralSettingsDto>("api/settings/general", dto);
+
+    // Business Info
+    public async Task<BusinessInfoDto?> GetBusinessInfoAsync()
+        => await _apiClient.GetAsync<BusinessInfoDto>("api/settings/business");
+
+    public async Task<BusinessInfoDto?> SaveBusinessInfoAsync(BusinessInfoDto dto)
+        => await _apiClient.PutAsync<BusinessInfoDto, BusinessInfoDto>("api/settings/business", dto);
+
+    // Notification Settings
+    public async Task<NotificationSettingsDto?> GetNotificationSettingsAsync()
+        => await _apiClient.GetAsync<NotificationSettingsDto>("api/settings/notifications");
+
+    public async Task<NotificationSettingsDto?> SaveNotificationSettingsAsync(NotificationSettingsDto dto)
+        => await _apiClient.PutAsync<NotificationSettingsDto, NotificationSettingsDto>("api/settings/notifications", dto);
+
+    // User Management
+    public async Task<List<SettingsUserListResponse>> GetUsersAsync()
+        => await _apiClient.GetAsync<List<SettingsUserListResponse>>("api/settings/users") ?? new();
+
+    public async Task<(SettingsUserListResponse? Result, string? Error)> CreateUserAsync(CreateUserRequest request)
+        => await _apiClient.PostWithErrorAsync<CreateUserRequest, SettingsUserListResponse>("api/settings/users", request);
+
+    public async Task<(SettingsUserListResponse? Result, string? Error)> UpdateUserAsync(int userId, UpdateUserRequest request)
+        => await _apiClient.PutWithErrorAsync<UpdateUserRequest, SettingsUserListResponse>($"api/settings/users/{userId}", request);
+
+    public async Task<SettingsUserListResponse?> ToggleUserStatusAsync(int userId)
+        => await _apiClient.PutAsync<object, SettingsUserListResponse>($"api/settings/users/{userId}/toggle-status", new { });
+
+    public async Task<bool> ResetUserPasswordAsync(int userId, ResetPasswordRequest request)
+    {
+        var result = await _apiClient.PostAsync<ResetPasswordRequest, object>($"api/settings/users/{userId}/reset-password", request);
+        return result != null;
+    }
+
+    // Role Management
+    public async Task<List<SettingsRoleListResponse>> GetRolesAsync()
+        => await _apiClient.GetAsync<List<SettingsRoleListResponse>>("api/settings/roles") ?? new();
+
+    public async Task<(SettingsRoleListResponse? Result, string? Error)> CreateRoleAsync(CreateRoleRequest request)
+        => await _apiClient.PostWithErrorAsync<CreateRoleRequest, SettingsRoleListResponse>("api/settings/roles", request);
+
+    public async Task<SettingsRoleListResponse?> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequest request)
+        => await _apiClient.PutAsync<UpdateRolePermissionsRequest, SettingsRoleListResponse>($"api/settings/roles/{roleId}/permissions", request);
+
+    public async Task<(bool Success, string? Error)> DeleteRoleAsync(int roleId)
+        => await _apiClient.DeleteWithErrorAsync($"api/settings/roles/{roleId}");
+}

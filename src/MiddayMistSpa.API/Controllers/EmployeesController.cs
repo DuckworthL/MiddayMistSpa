@@ -27,7 +27,7 @@ public class EmployeesController : ControllerBase
     /// Create a new employee
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.create")]
     public async Task<ActionResult<EmployeeResponse>> CreateEmployee([FromBody] CreateEmployeeRequest request)
     {
         try
@@ -113,7 +113,7 @@ public class EmployeesController : ControllerBase
     /// Update employee
     /// </summary>
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<EmployeeResponse>> UpdateEmployee(int id, [FromBody] UpdateEmployeeRequest request)
     {
         try
@@ -136,7 +136,7 @@ public class EmployeesController : ControllerBase
     /// Deactivate employee (soft delete)
     /// </summary>
     [HttpPost("{id:int}/deactivate")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.delete")]
     public async Task<ActionResult> DeactivateEmployee(int id)
     {
         var result = await _employeeService.DeactivateEmployeeAsync(id);
@@ -150,7 +150,7 @@ public class EmployeesController : ControllerBase
     /// Reactivate employee
     /// </summary>
     [HttpPost("{id:int}/reactivate")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult> ReactivateEmployee(int id)
     {
         var result = await _employeeService.ReactivateEmployeeAsync(id);
@@ -168,7 +168,7 @@ public class EmployeesController : ControllerBase
     /// Create a schedule for an employee
     /// </summary>
     [HttpPost("{employeeId:int}/schedules")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<ScheduleResponse>> CreateSchedule(int employeeId, [FromBody] CreateScheduleRequest request)
     {
         try
@@ -212,7 +212,7 @@ public class EmployeesController : ControllerBase
     /// Update a schedule
     /// </summary>
     [HttpPut("schedules/{scheduleId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<ScheduleResponse>> UpdateSchedule(int scheduleId, [FromBody] UpdateScheduleRequest request)
     {
         try
@@ -230,7 +230,7 @@ public class EmployeesController : ControllerBase
     /// Delete a schedule
     /// </summary>
     [HttpDelete("schedules/{scheduleId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.delete")]
     public async Task<ActionResult> DeleteSchedule(int scheduleId)
     {
         var result = await _employeeService.DeleteScheduleAsync(scheduleId);
@@ -244,7 +244,7 @@ public class EmployeesController : ControllerBase
     /// Set bulk schedule for an employee (weekly schedule)
     /// </summary>
     [HttpPost("{employeeId:int}/schedules/bulk")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<List<ScheduleResponse>>> SetBulkSchedule(int employeeId, [FromBody] BulkScheduleRequest request)
     {
         try
@@ -265,7 +265,7 @@ public class EmployeesController : ControllerBase
     /// Get available therapists for a time slot
     /// </summary>
     [HttpGet("therapists/available")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:appointments.view")]
     public async Task<ActionResult<List<EmployeeListResponse>>> GetAvailableTherapists(
         [FromQuery] DateTime date,
         [FromQuery] TimeSpan startTime,
@@ -322,7 +322,7 @@ public class EmployeesController : ControllerBase
     /// Get all pending time off requests
     /// </summary>
     [HttpGet("time-off/pending")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<PagedResponse<TimeOffResponse>>> GetPendingTimeOffRequests([FromQuery] PagedRequest request)
     {
         var result = await _employeeService.GetPendingTimeOffRequestsAsync(request);
@@ -333,7 +333,7 @@ public class EmployeesController : ControllerBase
     /// Approve or reject a time off request
     /// </summary>
     [HttpPost("time-off/{timeOffId:int}/review")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<TimeOffResponse>> ReviewTimeOffRequest(int timeOffId, [FromBody] ApproveTimeOffRequest request)
     {
         try
@@ -387,7 +387,7 @@ public class EmployeesController : ControllerBase
     /// Initialize leave balance for an employee
     /// </summary>
     [HttpPost("{employeeId:int}/leave-balance/{year:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<LeaveBalanceResponse>> InitializeLeaveBalance(int employeeId, int year)
     {
         try
@@ -405,7 +405,7 @@ public class EmployeesController : ControllerBase
     /// Update leave balance for an employee
     /// </summary>
     [HttpPut("{employeeId:int}/leave-balance/{year:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:employees.edit")]
     public async Task<ActionResult<LeaveBalanceResponse>> UpdateLeaveBalance(int employeeId, int year, [FromBody] UpdateLeaveBalanceRequest request)
     {
         try
@@ -427,7 +427,7 @@ public class EmployeesController : ControllerBase
     /// Create an advance/loan for an employee
     /// </summary>
     [HttpPost("{employeeId:int}/advances")]
-    [Authorize(Policy = "AccountingAccess")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<AdvanceResponse>> CreateAdvance(int employeeId, [FromBody] CreateAdvanceRequest request)
     {
         try
@@ -452,7 +452,7 @@ public class EmployeesController : ControllerBase
     /// Get advances for an employee
     /// </summary>
     [HttpGet("{employeeId:int}/advances")]
-    [Authorize(Policy = "AccountingAccess")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<List<AdvanceResponse>>> GetEmployeeAdvances(int employeeId)
     {
         try
@@ -470,7 +470,7 @@ public class EmployeesController : ControllerBase
     /// Get all active advances
     /// </summary>
     [HttpGet("advances/active")]
-    [Authorize(Policy = "AccountingAccess")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<List<AdvanceResponse>>> GetActiveAdvances()
     {
         var advances = await _employeeService.GetActiveAdvancesAsync();
@@ -481,7 +481,7 @@ public class EmployeesController : ControllerBase
     /// Record a payment for an advance
     /// </summary>
     [HttpPost("advances/{advanceId:int}/payment")]
-    [Authorize(Policy = "AccountingAccess")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<AdvanceResponse>> RecordAdvancePayment(int advanceId, [FromBody] decimal amount)
     {
         try

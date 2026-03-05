@@ -1,17 +1,58 @@
 namespace MiddayMistSpa.Web.Services;
 
 /// <summary>
-/// Service for managing role-based permissions and navigation access
+/// Service for managing role-based permissions and navigation access.
+/// Fetches permissions from the API (which reads from the database) and caches them.
 /// </summary>
 public interface IRolePermissionService
 {
     bool CanAccessPage(string? userRole, string pagePath);
     List<NavMenuItem> GetNavMenuForRole(string? userRole);
+
+    /// <summary>
+    /// Check if the current user has a specific permission key (e.g., "services.create").
+    /// </summary>
+    bool HasPermission(string permissionKey);
+
+    /// <summary>
+    /// Load permissions for the current user from the API. Call after login.
+    /// </summary>
+    Task LoadPermissionsAsync();
+
+    /// <summary>
+    /// Clear cached permissions. Call on logout.
+    /// </summary>
+    void ClearPermissions();
 }
 
 public class RolePermissionService : IRolePermissionService
 {
-    private static readonly Dictionary<string, HashSet<string>> RolePermissions = new()
+    private readonly IApiClient _apiClient;
+    private HashSet<string> _cachedPermissions = new();
+    private string? _cachedRole;
+    private bool _loaded;
+
+    // Maps permission keys to page paths
+    private static readonly Dictionary<string, string[]> PermissionToPages = new()
+    {
+        ["dashboard.view"] = new[] { "/" },
+        ["appointments.view"] = new[] { "/appointments" },
+        ["customers.view"] = new[] { "/customers", "/customers/segmentation" },
+        ["services.view"] = new[] { "/services" },
+        ["employees.view"] = new[] { "/employees" },
+        ["inventory.view"] = new[] { "/inventory" },
+        ["pos.access"] = new[] { "/pos" },
+        ["accounting.view"] = new[] { "/transactions", "/accounting", "/accounting/income", "/accounting/expenses", "/accounting/invoices", "/accounting/journal" },
+        ["payroll.view"] = new[] { "/payroll" },
+        ["shifts.view"] = new[] { "/shifts" },
+        ["timeattendance.view"] = new[] { "/time-attendance" },
+        ["reports.view"] = new[] { "/reports" },
+        ["notifications.view"] = new[] { "/notifications" },
+        ["settings.access"] = new[] { "/settings" }
+    };
+
+    // Hardcoded fallback for when API is unavailable
+    private static readonly Dictionary<string, HashSet<string>> FallbackRolePermissions = new()
     {
         ["SuperAdmin"] = new HashSet<string>
         {
@@ -26,51 +67,92 @@ public class RolePermissionService : IRolePermissionService
             "/employees", "/shifts", "/inventory", "/transactions", "/accounting", "/accounting/income",
             "/accounting/expenses", "/accounting/invoices", "/accounting/journal",
             "/payroll", "/time-attendance", "/reports", "/settings", "/profile", "/notifications"
-        },
-        ["Receptionist"] = new HashSet<string>
-        {
-            "/", "/appointments", "/customers", "/services", "/pos", "/time-attendance", "/profile", "/notifications"
-        },
-        ["Therapist"] = new HashSet<string>
-        {
-            "/", "/appointments", "/time-attendance", "/profile", "/notifications"
-        },
-        ["Inventory"] = new HashSet<string>
-        {
-            "/", "/inventory", "/time-attendance", "/reports", "/profile", "/notifications"
-        },
-        ["Accountant"] = new HashSet<string>
-        {
-            "/", "/transactions", "/accounting", "/accounting/income", "/accounting/expenses",
-            "/accounting/invoices", "/accounting/journal", "/payroll", "/time-attendance", "/reports", "/profile", "/notifications"
-        },
-        ["HR"] = new HashSet<string>
-        {
-            "/", "/employees", "/shifts", "/payroll", "/time-attendance", "/reports", "/profile", "/notifications"
-        },
-        ["Sales"] = new HashSet<string>
-        {
-            "/", "/customers", "/customers/segmentation", "/transactions", "/time-attendance", "/reports", "/profile", "/notifications"
         }
     };
+
+    public RolePermissionService(IApiClient apiClient)
+    {
+        _apiClient = apiClient;
+    }
+
+    public bool HasPermission(string permissionKey)
+    {
+        if (string.IsNullOrEmpty(permissionKey))
+            return false;
+
+        // SuperAdmin always has all permissions
+        if (_cachedRole == "SuperAdmin")
+            return true;
+
+        return _cachedPermissions.Contains(permissionKey);
+    }
+
+    public async Task LoadPermissionsAsync()
+    {
+        try
+        {
+            var permissions = await _apiClient.GetAsync<HashSet<string>>("api/auth/me/permissions");
+            if (permissions != null)
+            {
+                _cachedPermissions = permissions;
+                _loaded = true;
+            }
+        }
+        catch
+        {
+            // If API call fails, keep existing permissions
+        }
+    }
+
+    public void ClearPermissions()
+    {
+        _cachedPermissions = new HashSet<string>();
+        _cachedRole = null;
+        _loaded = false;
+    }
 
     public bool CanAccessPage(string? userRole, string pagePath)
     {
         if (string.IsNullOrEmpty(userRole))
             return false;
 
-        // Normalize the path
+        _cachedRole = userRole;
+
+        // Always allow profile
         var normalizedPath = pagePath.ToLowerInvariant().TrimEnd('/');
         if (string.IsNullOrEmpty(normalizedPath))
             normalizedPath = "/";
+
+        if (normalizedPath == "/profile")
+            return true;
 
         // SuperAdmin and Admin have access to everything
         if (userRole == "SuperAdmin" || userRole == "Admin")
             return true;
 
-        if (RolePermissions.TryGetValue(userRole, out var permissions))
+        // If we have loaded permissions from the API, use them
+        if (_loaded && _cachedPermissions.Count > 0)
         {
-            return permissions.Any(p =>
+            // Build allowed pages from permission keys
+            var allowedPages = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/", "/profile", "/notifications" };
+            foreach (var perm in _cachedPermissions)
+            {
+                if (PermissionToPages.TryGetValue(perm, out var pages))
+                {
+                    foreach (var page in pages)
+                        allowedPages.Add(page);
+                }
+            }
+
+            return allowedPages.Any(p =>
+                normalizedPath.Equals(p, StringComparison.OrdinalIgnoreCase) ||
+                normalizedPath.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Fallback to hardcoded permissions if API hasn't been called yet
+        if (FallbackRolePermissions.TryGetValue(userRole, out var fallbackPerms))
+        {
+            return fallbackPerms.Any(p =>
                 normalizedPath.Equals(p, StringComparison.OrdinalIgnoreCase) ||
                 normalizedPath.StartsWith(p + "/", StringComparison.OrdinalIgnoreCase));
         }
@@ -85,17 +167,40 @@ public class RolePermissionService : IRolePermissionService
         if (string.IsNullOrEmpty(userRole))
             return new List<NavMenuItem>();
 
+        _cachedRole = userRole;
+
         // SuperAdmin and Admin see everything
         if (userRole == "SuperAdmin" || userRole == "Admin")
             return allItems;
 
-        if (!RolePermissions.TryGetValue(userRole, out var permissions))
-            return new List<NavMenuItem>();
+        // If we have loaded permissions from the API, use them
+        if (_loaded && _cachedPermissions.Count > 0)
+        {
+            var allowedPages = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "/", "/profile", "/notifications" };
+            foreach (var perm in _cachedPermissions)
+            {
+                if (PermissionToPages.TryGetValue(perm, out var pages))
+                {
+                    foreach (var page in pages)
+                        allowedPages.Add(page);
+                }
+            }
 
-        // Filter items based on role permissions
-        return allItems
-            .Where(item => permissions.Contains(item.Href.ToLowerInvariant()))
-            .ToList();
+            return allItems
+                .Where(item => allowedPages.Contains(item.Href.ToLowerInvariant()))
+                .ToList();
+        }
+
+        // Fallback
+        if (FallbackRolePermissions.TryGetValue(userRole, out var fallbackPerms))
+        {
+            return allItems
+                .Where(item => fallbackPerms.Contains(item.Href.ToLowerInvariant()))
+                .ToList();
+        }
+
+        // Unknown role — show dashboard and time attendance only
+        return allItems.Where(item => item.Href == "/" || item.Href == "/time-attendance" || item.Href == "/notifications").ToList();
     }
 
     private static List<NavMenuItem> GetAllNavItems()

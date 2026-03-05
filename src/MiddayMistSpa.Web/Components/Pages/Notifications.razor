@@ -1,6 +1,7 @@
 @page "/notifications"
 @inject IAuthStateService AuthService
 @inject INotificationApiService NotificationService
+@inject IRolePermissionService RolePermissionService
 @inject NavigationManager Navigation
 @using MiddayMistSpa.Web.Models
 
@@ -18,13 +19,16 @@
                         <p class="text-muted mb-0">Stay updated with important alerts and messages</p>
                     </div>
                     <div class="header-actions">
-                        <button class="btn btn-outline-secondary me-2" @onclick="MarkAllAsRead"
-                            disabled="@(!HasUnread)">
-                            <i class="bi bi-check-all me-1"></i> Mark All Read
-                        </button>
-                        <button class="btn btn-outline-danger" @onclick="ClearAll" disabled="@(!_notifications.Any())">
-                            <i class="bi bi-trash me-1"></i> Clear All
-                        </button>
+                        @if (_canManage)
+                        {
+                            <button class="btn btn-outline-secondary me-2" @onclick="MarkAllAsRead"
+                                    disabled="@(!HasUnread)">
+                                <i class="bi bi-check-all me-1"></i> Mark All Read
+                            </button>
+                            <button class="btn btn-outline-danger" @onclick="ClearAll" disabled="@(!_notifications.Any())">
+                                <i class="bi bi-trash me-1"></i> Clear All
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
@@ -41,25 +45,25 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link @(_filter == "unread" ? "active" : "")"
-                            @onclick='() => SetFilter("unread")'>
+                                @onclick='() => SetFilter("unread")'>
                             Unread <span class="badge bg-primary ms-1">@_notifications.Count(n => !n.IsRead)</span>
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link @(_filter == "appointments" ? "active" : "")"
-                            @onclick='() => SetFilter("appointments")'>
+                                @onclick='() => SetFilter("appointments")'>
                             <i class="bi bi-calendar me-1"></i> Appointments
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link @(_filter == "inventory" ? "active" : "")"
-                            @onclick='() => SetFilter("inventory")'>
+                                @onclick='() => SetFilter("inventory")'>
                             <i class="bi bi-box me-1"></i> Inventory
                         </button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link @(_filter == "system" ? "active" : "")"
-                            @onclick='() => SetFilter("system")'>
+                                @onclick='() => SetFilter("system")'>
                             <i class="bi bi-gear me-1"></i> System
                         </button>
                     </li>
@@ -87,7 +91,7 @@
                                 @foreach (var notification in FilteredNotifications)
                                 {
                                     <div class="notification-item @(!notification.IsRead ? "unread" : "") d-flex align-items-start p-3 border-bottom"
-                                        @onclick="() => MarkAsRead(notification)">
+                                         @onclick="() => MarkAsRead(notification)">
                                         <div class="notification-icon me-3 @GetIconClass(notification.Category)">
                                             <i class="bi @GetIcon(notification.Category)"></i>
                                         </div>
@@ -106,7 +110,7 @@
                                         </div>
                                         <div class="notification-actions ms-2">
                                             <button class="btn btn-sm btn-outline-secondary" @onclick:stopPropagation="true"
-                                                @onclick="() => DeleteNotification(notification)">
+                                                    @onclick="() => DeleteNotification(notification)">
                                                 <i class="bi bi-x"></i>
                                             </button>
                                         </div>
@@ -236,6 +240,9 @@
     private List<NotificationResponse> _notifications = new();
     private bool _isLoading = true;
 
+    // Permission flags
+    private bool _canManage;
+
     private bool HasUnread => _notifications.Any(n => !n.IsRead);
 
     private IEnumerable<NotificationResponse> FilteredNotifications => _filter switch
@@ -254,6 +261,9 @@
             Navigation.NavigateTo("/login");
             return;
         }
+
+        var role = AuthService.CurrentUser?.RoleName;
+        _canManage = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("notifications.manage");
 
         await LoadNotifications();
     }

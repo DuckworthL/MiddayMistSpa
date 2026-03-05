@@ -34,7 +34,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("accounts")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<PagedResponse<ChartOfAccountResponse>>> GetAccounts([FromQuery] AccountSearchRequest request)
     {
         var result = await _accountingService.SearchAccountsAsync(request);
@@ -42,7 +42,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("accounts/hierarchy")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<List<ChartOfAccountResponse>>> GetAccountsHierarchy()
     {
         var result = await _accountingService.GetAccountsHierarchyAsync();
@@ -50,7 +50,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("accounts/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<ChartOfAccountResponse>> GetAccount(int id)
     {
         var result = await _accountingService.GetAccountByIdAsync(id);
@@ -60,7 +60,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("accounts")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<ChartOfAccountResponse>> CreateAccount([FromBody] CreateAccountRequest request)
     {
         try
@@ -80,7 +80,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPut("accounts/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<ChartOfAccountResponse>> UpdateAccount(int id, [FromBody] UpdateAccountRequest request)
     {
         try
@@ -100,7 +100,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpDelete("accounts/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult> DeleteAccount(int id)
     {
         try
@@ -121,7 +121,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("journal-entries")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<PagedResponse<JournalEntryResponse>>> GetJournalEntries([FromQuery] JournalEntrySearchRequest request)
     {
         var result = await _accountingService.SearchJournalEntriesAsync(request);
@@ -129,7 +129,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("journal-entries/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<JournalEntryResponse>> GetJournalEntry(int id)
     {
         var result = await _accountingService.GetJournalEntryByIdAsync(id);
@@ -139,7 +139,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("journal-entries")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<JournalEntryResponse>> CreateJournalEntry([FromBody] CreateJournalEntryRequest request)
     {
         try
@@ -160,7 +160,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("journal-entries/{id}/post")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<JournalEntryResponse>> PostJournalEntry(int id)
     {
         try
@@ -181,7 +181,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("journal-entries/{id}/void")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<JournalEntryResponse>> VoidJournalEntry(int id, [FromBody] VoidJournalEntryRequest? request = null)
     {
         try
@@ -206,7 +206,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("reports/trial-balance")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<TrialBalanceResponse>> GetTrialBalance([FromQuery] DateTime? asOfDate)
     {
         var date = asOfDate ?? DateTime.Today;
@@ -215,7 +215,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("reports/income-statement")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<IncomeStatementResponse>> GetIncomeStatement([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
     {
         var result = await _accountingService.GetIncomeStatementAsync(startDate, endDate);
@@ -223,7 +223,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("reports/balance-sheet")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<BalanceSheetResponse>> GetBalanceSheet([FromQuery] DateTime? asOfDate)
     {
         var date = asOfDate ?? DateTime.Today;
@@ -232,7 +232,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpGet("accounts/{id}/ledger")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<AccountLedgerResponse>> GetAccountLedger(int id, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
     {
         try
@@ -251,7 +251,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("expenses")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<PagedResponse<ExpenseResponse>>> GetExpenses(
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
@@ -263,7 +263,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("expenses")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<ExpenseResponse>> CreateExpense([FromBody] CreateExpenseRequest request)
     {
         try
@@ -288,7 +288,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("income")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<PagedResponse<IncomeRecordResponse>>> GetIncomeRecords(
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
@@ -300,7 +300,7 @@ public class AccountingController : ControllerBase
     }
 
     [HttpPost("income")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<IncomeRecordResponse>> CreateIncomeRecord([FromBody] CreateIncomeRequest request)
     {
         try
@@ -325,7 +325,7 @@ public class AccountingController : ControllerBase
     // ============================================================================
 
     [HttpGet("summary")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<AccountingSummaryResponse>> GetAccountingSummary([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
         var start = startDate ?? new DateTime(DateTime.Today.Year, 1, 1);

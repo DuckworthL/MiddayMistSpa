@@ -34,7 +34,7 @@ public class TimeAttendanceController : ControllerBase
     // ============================================================================
 
     [HttpPost("schedules")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<ScheduleResponse>> CreateSchedule([FromBody] CreateScheduleRequest request)
     {
         try
@@ -54,7 +54,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("schedules/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<ScheduleResponse>> GetSchedule(int id)
     {
         var result = await _timeAttendanceService.GetScheduleByIdAsync(id);
@@ -65,7 +65,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("schedules")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<PagedResponse<ScheduleResponse>>> SearchSchedules([FromQuery] ScheduleSearchRequest request)
     {
         var result = await _timeAttendanceService.SearchSchedulesAsync(request);
@@ -73,7 +73,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("employees/{employeeId}/schedules")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Therapist")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<List<ScheduleResponse>>> GetEmployeeSchedules(int employeeId, [FromQuery] DateTime? effectiveDate)
     {
         try
@@ -88,7 +88,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("employees/{employeeId}/weekly-schedule")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Therapist")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<WeeklyScheduleResponse>> GetWeeklySchedule(int employeeId, [FromQuery] DateTime? asOfDate)
     {
         try
@@ -103,7 +103,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPut("schedules/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<ScheduleResponse>> UpdateSchedule(int id, [FromBody] UpdateScheduleRequest request)
     {
         try
@@ -123,7 +123,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpDelete("schedules/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult> DeleteSchedule(int id)
     {
         var result = await _timeAttendanceService.DeleteScheduleAsync(id);
@@ -134,7 +134,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("employees/{employeeId}/weekly-schedule")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<List<ScheduleResponse>>> SetWeeklySchedule(int employeeId, [FromBody] List<CreateScheduleRequest> schedules)
     {
         try
@@ -187,7 +187,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("time-off")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<PagedResponse<TimeOffResponse>>> SearchTimeOffRequests([FromQuery] TimeOffSearchRequest request)
     {
         var result = await _timeAttendanceService.SearchTimeOffRequestsAsync(request);
@@ -195,7 +195,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("time-off/pending")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<List<TimeOffResponse>>> GetPendingTimeOffRequests()
     {
         var result = await _timeAttendanceService.GetPendingTimeOffRequestsAsync();
@@ -222,7 +222,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("time-off/{id}/approve")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<TimeOffResponse>> ApproveTimeOffRequest(int id)
     {
         try
@@ -243,7 +243,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("time-off/{id}/reject")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<TimeOffResponse>> RejectTimeOffRequest(int id, [FromBody] RejectTimeOffRequest request)
     {
         try
@@ -291,7 +291,7 @@ public class TimeAttendanceController : ControllerBase
     // ============================================================================
 
     [HttpPost("leave-balances")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<LeaveBalanceResponse>> CreateLeaveBalance([FromBody] CreateLeaveBalanceRequest request)
     {
         try
@@ -335,7 +335,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPut("leave-balances/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<LeaveBalanceResponse>> UpdateLeaveBalance(int id, [FromBody] UpdateLeaveBalanceRequest request)
     {
         try
@@ -355,7 +355,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("leave-balances/initialize")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult> InitializeYearlyLeaveBalances([FromQuery] int? year)
     {
         var targetYear = year ?? DateTime.UtcNow.Year;
@@ -364,7 +364,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("employees/{employeeId}/leave-balance/adjust")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<LeaveBalanceResponse>> AdjustLeaveBalance(
         int employeeId,
         [FromQuery] int year,
@@ -389,7 +389,7 @@ public class TimeAttendanceController : ControllerBase
     // ============================================================================
 
     [HttpPost("advances")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<AdvanceResponse>> CreateAdvance([FromBody] CreateAdvanceRequest request)
     {
         try
@@ -410,7 +410,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("advances/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<AdvanceResponse>> GetAdvance(int id)
     {
         var result = await _timeAttendanceService.GetAdvanceByIdAsync(id);
@@ -421,7 +421,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("advances")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<PagedResponse<AdvanceResponse>>> SearchAdvances([FromQuery] AdvanceSearchRequest request)
     {
         var result = await _timeAttendanceService.SearchAdvancesAsync(request);
@@ -429,7 +429,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("employees/{employeeId}/advances")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<List<AdvanceResponse>>> GetEmployeeAdvances(int employeeId)
     {
         var result = await _timeAttendanceService.GetActiveAdvancesForEmployeeAsync(employeeId);
@@ -437,7 +437,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPut("advances/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<AdvanceResponse>> UpdateAdvance(int id, [FromBody] UpdateAdvanceRequest request)
     {
         try
@@ -457,7 +457,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("advances/{id}/payment")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<AdvanceResponse>> RecordAdvancePayment(int id, [FromBody] RecordPaymentRequest request)
     {
         try
@@ -481,7 +481,7 @@ public class TimeAttendanceController : ControllerBase
     // ============================================================================
 
     [HttpGet("employees/{employeeId}/attendance-summary")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<AttendanceSummaryResponse>> GetAttendanceSummary(
         int employeeId,
         [FromQuery] DateTime startDate,
@@ -504,7 +504,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("team-attendance")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<TeamAttendanceResponse>> GetTeamAttendance(
         [FromQuery] DateTime startDate,
         [FromQuery] DateTime endDate)
@@ -522,7 +522,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("schedule-calendar")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<List<ScheduleCalendarDayResponse>>> GetScheduleCalendar([FromQuery] ScheduleCalendarRequest request)
     {
         try
@@ -542,7 +542,7 @@ public class TimeAttendanceController : ControllerBase
     // ============================================================================
 
     [HttpPost("employees/{employeeId}/clock-in")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<AttendanceRecordDto>> ClockIn(int employeeId)
     {
         try
@@ -563,7 +563,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("employees/{employeeId}/clock-out")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<AttendanceRecordDto>> ClockOut(int employeeId)
     {
         try
@@ -583,7 +583,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("employees/{employeeId}/start-break")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<AttendanceRecordDto>> StartBreak(int employeeId)
     {
         try
@@ -603,7 +603,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("employees/{employeeId}/end-break")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<AttendanceRecordDto>> EndBreak(int employeeId)
     {
         try
@@ -623,7 +623,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("attendance")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<List<AttendanceRecordDto>>> GetAttendanceRecords(
         [FromQuery] int? employeeId = null,
         [FromQuery] DateTime? date = null)
@@ -641,7 +641,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpGet("live-status")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR,Receptionist,Therapist,Inventory,Accountant")]
+    [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<List<LiveAttendanceStatusDto>>> GetLiveStatus()
     {
         try
@@ -657,7 +657,7 @@ public class TimeAttendanceController : ControllerBase
     }
 
     [HttpPost("manual-entry")]
-    [Authorize(Roles = "SuperAdmin,Admin,HR")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
     public async Task<ActionResult<AttendanceRecordDto>> CreateManualEntry([FromBody] ManualAttendanceRequest request)
     {
         try

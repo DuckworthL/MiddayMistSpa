@@ -30,7 +30,7 @@ public class AppointmentsController : ControllerBase
     #region Appointment CRUD
 
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.create")]
     public async Task<ActionResult<AppointmentResponse>> CreateAppointment([FromBody] CreateAppointmentRequest request)
     {
         try
@@ -73,7 +73,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> UpdateAppointment(int id, [FromBody] UpdateAppointmentRequest request)
     {
         try
@@ -93,7 +93,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "Permission:appointments.delete")]
     public async Task<IActionResult> DeleteAppointment(int id)
     {
         var deleted = await _appointmentService.DeleteAppointmentAsync(id);
@@ -106,7 +106,7 @@ public class AppointmentsController : ControllerBase
     #region Status Workflow
 
     [HttpPost("{id}/confirm")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> ConfirmAppointment(int id)
     {
         try
@@ -121,7 +121,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/check-in")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> CheckInAppointment(int id)
     {
         try
@@ -136,7 +136,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/start")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist,Therapist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> StartService(int id)
     {
         try
@@ -151,7 +151,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/complete")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist,Therapist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> CompleteService(int id)
     {
         try
@@ -166,7 +166,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/cancel")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> CancelAppointment(int id, [FromBody] CancelAppointmentRequest request)
     {
         try
@@ -181,7 +181,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/no-show")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> MarkAsNoShow(int id)
     {
         try
@@ -215,7 +215,7 @@ public class AppointmentsController : ControllerBase
     #region Scheduling & Rescheduling
 
     [HttpPost("{id}/reschedule")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> RescheduleAppointment(int id, [FromBody] RescheduleAppointmentRequest request)
     {
         try
@@ -230,7 +230,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/assign-therapist")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> AssignTherapist(int id, [FromBody] AssignTherapistRequest request)
     {
         try
@@ -245,7 +245,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("{id}/therapist-notes")]
-    [Authorize(Roles = "SuperAdmin,Admin,Therapist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> AddTherapistNotes(int id, [FromBody] AddTherapistNotesRequest request)
     {
         try
@@ -264,7 +264,7 @@ public class AppointmentsController : ControllerBase
     #region Multi-Service Management
 
     [HttpPost("{id}/services")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist,Therapist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> AddServiceToAppointment(int id, [FromBody] AddServiceToAppointmentRequest request)
     {
         try
@@ -279,7 +279,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("{id}/services/{serviceItemId}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.edit")]
     public async Task<ActionResult<AppointmentResponse>> RemoveServiceFromAppointment(int id, int serviceItemId)
     {
         try
@@ -399,7 +399,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpGet("statistics")]
-    [Authorize(Roles = "SuperAdmin,Admin,Sales")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<AppointmentStatsResponse>> GetStatistics(
         [FromQuery] DateTime startDate,
         [FromQuery] DateTime endDate)
@@ -413,7 +413,7 @@ public class AppointmentsController : ControllerBase
     #region Waitlist Management
 
     [HttpPost("waitlist")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.create")]
     public async Task<ActionResult<WaitlistEntryResponse>> AddToWaitlist([FromBody] AddToWaitlistRequest request)
     {
         try
@@ -435,7 +435,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("waitlist/{waitlistId}")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.delete")]
     public async Task<IActionResult> RemoveFromWaitlist(int waitlistId)
     {
         var removed = await _appointmentService.RemoveFromWaitlistAsync(waitlistId);
@@ -444,7 +444,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost("waitlist/{waitlistId}/convert")]
-    [Authorize(Roles = "SuperAdmin,Admin,Receptionist")]
+    [Authorize(Policy = "Permission:appointments.create")]
     public async Task<ActionResult<AppointmentResponse>> ConvertWaitlistToAppointment(
         int waitlistId,
         [FromQuery] DateTime date,

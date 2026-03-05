@@ -17,7 +17,7 @@
                 <p class="text-muted mb-0">Track employee hours and attendance</p>
             </div>
             <div class="d-flex gap-2">
-                @if (_isAdminUser)
+                @if (_isAdminUser && _canManage)
                 {
                     <button class="btn btn-outline-primary" @onclick="ShowManualEntryModal">
                         <i class="bi bi-pencil-square me-1"></i> Manual Entry
@@ -260,7 +260,7 @@
                                     <th class="text-center">Break</th>
                                     <th class="text-center">Total Hours</th>
                                     <th class="text-center">Status</th>
-                                    @if (_isAdminUser)
+                                    @if (_isAdminUser && _canManage)
                                     {
                                         <th class="text-end">Actions</th>
                                     }
@@ -268,7 +268,7 @@
                             </thead>
                             <tbody>
                                 @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e =>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
                                 {
                                     <tr>
                                         <td>@entry.Date.ToString("ddd, MMM dd")</td>
@@ -298,7 +298,7 @@
                                                 <span class="badge bg-warning">Pending</span>
                                             }
                                         </td>
-                                        @if (_isAdminUser)
+                                        @if (_isAdminUser && _canManage)
                                         {
                                             <td class="text-end">
                                                 <div class="btn-group btn-group-sm">
@@ -498,6 +498,9 @@
     private bool _isSaving;
     private ManualEntryFormModel _manualEntry = new();
 
+    // Permission flags
+    private bool _canManage;
+
     // Alert
     private string _alertMessage = string.Empty;
     private Alert.AlertType _alertType = Alert.AlertType.Info;
@@ -513,6 +516,8 @@
         // Check if user is admin/HR (can select other employees)
         var userRole = AuthService.CurrentUser?.RoleName;
         _isAdminUser = userRole == "SuperAdmin" || userRole == "Admin" || userRole == "HR";
+        _canManage = userRole == "SuperAdmin" || userRole == "Admin" ||
+RolePermissionService.HasPermission("timeattendance.manage");
 
         await LoadTimeData();
 

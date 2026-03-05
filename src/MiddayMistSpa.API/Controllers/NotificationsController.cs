@@ -29,7 +29,7 @@ public class NotificationsController : ControllerBase
     /// Create a new notification
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<NotificationResponse>> CreateNotification([FromBody] CreateNotificationRequest request)
     {
         try
@@ -58,7 +58,7 @@ public class NotificationsController : ControllerBase
     /// Search notifications with filters
     /// </summary>
     [HttpGet("search")]
-    [Authorize(Roles = "SuperAdmin,Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<PagedResponse<NotificationResponse>>> SearchNotifications([FromQuery] NotificationSearchRequest request)
     {
         var result = await _notificationService.SearchNotificationsAsync(request);
@@ -134,7 +134,7 @@ public class NotificationsController : ControllerBase
     /// Send an email
     /// </summary>
     [HttpPost("email/send")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendEmail([FromBody] SendEmailRequest request)
     {
         var result = await _notificationService.SendEmailAsync(request);
@@ -145,7 +145,7 @@ public class NotificationsController : ControllerBase
     /// Send a templated email
     /// </summary>
     [HttpPost("email/send-templated")]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendTemplatedEmail(
         [FromQuery] string templateCode,
         [FromQuery] string to,
@@ -163,7 +163,7 @@ public class NotificationsController : ControllerBase
     /// Send an SMS
     /// </summary>
     [HttpPost("sms/send")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendSms([FromBody] SendSmsRequest request)
     {
         var result = await _notificationService.SendSmsAsync(request);
@@ -174,7 +174,7 @@ public class NotificationsController : ControllerBase
     /// Send a templated SMS
     /// </summary>
     [HttpPost("sms/send-templated")]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendTemplatedSms(
         [FromQuery] string templateCode,
         [FromQuery] string phoneNumber,
@@ -192,7 +192,7 @@ public class NotificationsController : ControllerBase
     /// Send appointment reminder
     /// </summary>
     [HttpPost("appointments/{appointmentId}/reminder")]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<ReminderResult>> SendAppointmentReminder(int appointmentId, [FromBody] AppointmentReminderRequest request)
     {
         try
@@ -216,7 +216,7 @@ public class NotificationsController : ControllerBase
     /// Send bulk appointment reminders for a date
     /// </summary>
     [HttpPost("appointments/bulk-reminders")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<ReminderResult>> SendBulkReminders([FromBody] BulkReminderRequest request)
     {
         try
@@ -235,7 +235,7 @@ public class NotificationsController : ControllerBase
     /// Send appointment confirmation
     /// </summary>
     [HttpPost("appointments/{appointmentId}/confirmation")]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<ReminderResult>> SendAppointmentConfirmation(int appointmentId)
     {
         try
@@ -253,7 +253,7 @@ public class NotificationsController : ControllerBase
     /// Send appointment cancellation notification
     /// </summary>
     [HttpPost("appointments/{appointmentId}/cancellation")]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<ReminderResult>> SendAppointmentCancellation(int appointmentId, [FromQuery] string? reason = null)
     {
         try
@@ -275,7 +275,7 @@ public class NotificationsController : ControllerBase
     /// Send payslip notification
     /// </summary>
     [HttpPost("employees/{employeeId}/payslip/{payrollRecordId}")]
-    [Authorize(Roles = "Admin,Manager,HRManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendPayslipNotification(int employeeId, int payrollRecordId)
     {
         var result = await _notificationService.SendPayslipNotificationAsync(employeeId, payrollRecordId);
@@ -286,7 +286,7 @@ public class NotificationsController : ControllerBase
     /// Send schedule update notification
     /// </summary>
     [HttpPost("employees/{employeeId}/schedule-update")]
-    [Authorize(Roles = "Admin,Manager,HRManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendScheduleUpdateNotification(int employeeId, [FromQuery] DateTime effectiveDate)
     {
         var result = await _notificationService.SendScheduleUpdateNotificationAsync(employeeId, effectiveDate);
@@ -297,7 +297,7 @@ public class NotificationsController : ControllerBase
     /// Send time off approval notification
     /// </summary>
     [HttpPost("time-off/{timeOffRequestId}/approval")]
-    [Authorize(Roles = "Admin,Manager,HRManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendTimeOffApprovalNotification(
         int timeOffRequestId,
         [FromQuery] bool approved,
@@ -311,7 +311,7 @@ public class NotificationsController : ControllerBase
     /// Send low leave balance notification
     /// </summary>
     [HttpPost("employees/{employeeId}/low-leave-balance")]
-    [Authorize(Roles = "Admin,Manager,HRManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendLowLeaveBalanceNotification(int employeeId)
     {
         var result = await _notificationService.SendLowLeaveBalanceNotificationAsync(employeeId);
@@ -326,7 +326,7 @@ public class NotificationsController : ControllerBase
     /// Send low stock alert
     /// </summary>
     [HttpPost("inventory/{productId}/low-stock")]
-    [Authorize(Roles = "Admin,Manager,InventoryManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendLowStockAlert(int productId)
     {
         var result = await _notificationService.SendLowStockAlertAsync(productId);
@@ -337,7 +337,7 @@ public class NotificationsController : ControllerBase
     /// Send product expiry alert
     /// </summary>
     [HttpPost("inventory/{productId}/expiry")]
-    [Authorize(Roles = "Admin,Manager,InventoryManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SendResult>> SendExpiryAlert(int productId, [FromQuery] DateTime expiryDate)
     {
         var result = await _notificationService.SendExpiryAlertAsync(productId, expiryDate);
@@ -348,7 +348,7 @@ public class NotificationsController : ControllerBase
     /// Send all pending inventory alerts
     /// </summary>
     [HttpPost("inventory/bulk-alerts")]
-    [Authorize(Roles = "Admin,Manager,InventoryManager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<int>> SendBulkInventoryAlerts()
     {
         var count = await _notificationService.SendBulkInventoryAlertsAsync();
@@ -363,7 +363,7 @@ public class NotificationsController : ControllerBase
     /// Create a new broadcast
     /// </summary>
     [HttpPost("broadcasts")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<BroadcastResponse>> CreateBroadcast([FromBody] BroadcastRequest request)
     {
         try
@@ -382,7 +382,7 @@ public class NotificationsController : ControllerBase
     /// Get broadcast by ID
     /// </summary>
     [HttpGet("broadcasts/{id}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<BroadcastResponse>> GetBroadcastById(int id)
     {
         var broadcast = await _notificationService.GetBroadcastByIdAsync(id);
@@ -393,7 +393,7 @@ public class NotificationsController : ControllerBase
     /// Get all broadcasts
     /// </summary>
     [HttpGet("broadcasts")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<List<BroadcastResponse>>> GetBroadcasts(
         [FromQuery] DateTime? startDate = null,
         [FromQuery] DateTime? endDate = null)
@@ -406,7 +406,7 @@ public class NotificationsController : ControllerBase
     /// Process a scheduled broadcast
     /// </summary>
     [HttpPost("broadcasts/{id}/process")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<BroadcastResponse>> ProcessBroadcast(int id)
     {
         try
@@ -424,7 +424,7 @@ public class NotificationsController : ControllerBase
     /// Cancel a broadcast
     /// </summary>
     [HttpPost("broadcasts/{id}/cancel")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult> CancelBroadcast(int id)
     {
         try
@@ -493,7 +493,7 @@ public class NotificationsController : ControllerBase
     /// Create email template
     /// </summary>
     [HttpPost("templates/email")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<EmailTemplateResponse>> CreateEmailTemplate([FromBody] CreateEmailTemplateRequest request)
     {
         try
@@ -511,7 +511,7 @@ public class NotificationsController : ControllerBase
     /// Get email template by ID
     /// </summary>
     [HttpGet("templates/email/{id}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<EmailTemplateResponse>> GetEmailTemplateById(int id)
     {
         var template = await _notificationService.GetEmailTemplateByIdAsync(id);
@@ -522,7 +522,7 @@ public class NotificationsController : ControllerBase
     /// Get email template by code
     /// </summary>
     [HttpGet("templates/email/by-code/{code}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<EmailTemplateResponse>> GetEmailTemplateByCode(string code)
     {
         var template = await _notificationService.GetEmailTemplateByCodeAsync(code);
@@ -533,7 +533,7 @@ public class NotificationsController : ControllerBase
     /// Get all email templates
     /// </summary>
     [HttpGet("templates/email")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<List<EmailTemplateResponse>>> GetEmailTemplates([FromQuery] string? category = null)
     {
         var result = await _notificationService.GetEmailTemplatesAsync(category);
@@ -544,7 +544,7 @@ public class NotificationsController : ControllerBase
     /// Update email template
     /// </summary>
     [HttpPut("templates/email/{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<EmailTemplateResponse>> UpdateEmailTemplate(int id, [FromBody] UpdateEmailTemplateRequest request)
     {
         try
@@ -562,7 +562,7 @@ public class NotificationsController : ControllerBase
     /// Delete email template
     /// </summary>
     [HttpDelete("templates/email/{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult> DeleteEmailTemplate(int id)
     {
         var deleted = await _notificationService.DeleteEmailTemplateAsync(id);
@@ -577,7 +577,7 @@ public class NotificationsController : ControllerBase
     /// Create SMS template
     /// </summary>
     [HttpPost("templates/sms")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SmsTemplateResponse>> CreateSmsTemplate([FromBody] CreateSmsTemplateRequest request)
     {
         try
@@ -595,7 +595,7 @@ public class NotificationsController : ControllerBase
     /// Get SMS template by ID
     /// </summary>
     [HttpGet("templates/sms/{id}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SmsTemplateResponse>> GetSmsTemplateById(int id)
     {
         var template = await _notificationService.GetSmsTemplateByIdAsync(id);
@@ -606,7 +606,7 @@ public class NotificationsController : ControllerBase
     /// Get SMS template by code
     /// </summary>
     [HttpGet("templates/sms/by-code/{code}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SmsTemplateResponse>> GetSmsTemplateByCode(string code)
     {
         var template = await _notificationService.GetSmsTemplateByCodeAsync(code);
@@ -617,7 +617,7 @@ public class NotificationsController : ControllerBase
     /// Get all SMS templates
     /// </summary>
     [HttpGet("templates/sms")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<List<SmsTemplateResponse>>> GetSmsTemplates([FromQuery] string? category = null)
     {
         var result = await _notificationService.GetSmsTemplatesAsync(category);
@@ -628,7 +628,7 @@ public class NotificationsController : ControllerBase
     /// Update SMS template
     /// </summary>
     [HttpPut("templates/sms/{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<SmsTemplateResponse>> UpdateSmsTemplate(int id, [FromBody] UpdateSmsTemplateRequest request)
     {
         try
@@ -646,7 +646,7 @@ public class NotificationsController : ControllerBase
     /// Delete SMS template
     /// </summary>
     [HttpDelete("templates/sms/{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult> DeleteSmsTemplate(int id)
     {
         var deleted = await _notificationService.DeleteSmsTemplateAsync(id);
@@ -661,7 +661,7 @@ public class NotificationsController : ControllerBase
     /// Get notification statistics
     /// </summary>
     [HttpGet("stats")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Policy = "Permission:notifications.manage")]
     public async Task<ActionResult<NotificationStatsResponse>> GetNotificationStats([FromQuery] NotificationStatsRequest request)
     {
         var result = await _notificationService.GetNotificationStatsAsync(request);

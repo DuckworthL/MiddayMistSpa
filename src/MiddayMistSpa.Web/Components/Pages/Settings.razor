@@ -29,10 +29,6 @@
                                     @onclick='() => _activeTab = "business"'>
                                 <i class="bi bi-building me-2"></i> Business Info
                             </button>
-                            <button class="nav-link @(_activeTab == "services" ? "active" : "")"
-                                    @onclick='() => _activeTab = "services"'>
-                                <i class="bi bi-gem me-2"></i> Service Categories
-                            </button>
                             <button class="nav-link @(_activeTab == "users" ? "active" : "")"
                                     @onclick='() => _activeTab = "users"'>
                                 <i class="bi bi-people me-2"></i> User Management
@@ -67,9 +63,6 @@
                         break;
                     case "business":
                         <BusinessInfoSettings />
-                        break;
-                    case "services":
-                        <ServiceCategorySettings />
                         break;
                     case "users":
                         <UserManagementSettings />

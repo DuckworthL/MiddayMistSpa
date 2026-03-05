@@ -120,11 +120,10 @@ if (!builder.Environment.IsDevelopment())
         options.AddPolicy("HRAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "HR"));
         options.AddPolicy("AccountingAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Accountant"));
         options.AddPolicy("InventoryAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Inventory"));
-        options.AddPolicy("SalesAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Sales"));
         options.AddPolicy("ReceptionistAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Receptionist"));
         options.AddPolicy("TherapistAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Therapist"));
         options.AddPolicy("AllStaff", policy => policy.RequireRole(
-            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales"));
+            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR"));
     });
 
     // Controllers for API endpoints
@@ -164,6 +163,7 @@ builder.Services.AddScoped<IShiftApiService, ShiftApiService>();
 builder.Services.AddScoped<ICurrencyApiService, CurrencyApiService>();
 builder.Services.AddScoped<ITwoFactorApiService, TwoFactorApiService>();
 builder.Services.AddScoped<ICaptchaApiService, CaptchaApiService>();
+builder.Services.AddScoped<ISettingsApiService, SettingsApiService>();
 
 var app = builder.Build();
 

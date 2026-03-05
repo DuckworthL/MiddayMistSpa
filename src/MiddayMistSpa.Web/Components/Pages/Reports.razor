@@ -32,16 +32,19 @@
                     <option value="Excel">Excel</option>
                     <option value="CSV">CSV</option>
                 </select>
-                <button class="btn btn-outline-primary" @onclick="ExportReport" disabled="@_isExporting">
-                    @if (_isExporting)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span> <text>Exporting...</text>
-                    }
-                    else
-                    {
-                        <i class="bi bi-download me-1"></i> <text>Export</text>
-                    }
-                </button>
+                @if (_canExport)
+                {
+                    <button class="btn btn-outline-primary" @onclick="ExportReport" disabled="@_isExporting">
+                        @if (_isExporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span> <text>Exporting...</text>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download me-1"></i> <text>Export</text>
+                        }
+                    </button>
+                }
             </div>
         </div>
 
@@ -405,16 +408,19 @@
         </ChildContent>
         <FooterContent>
             <button class="btn btn-secondary" @onclick="() => _showCustomReportModal = false">Cancel</button>
-            <button class="btn btn-primary" @onclick="GenerateCustomReport" disabled="@_isExporting">
-                @if (_isExporting)
-                {
-                    <span class="spinner-border spinner-border-sm me-1"></span> <text>Generating...</text>
-                }
-                else
-                {
-                    <i class="bi bi-download me-1"></i> <text>Generate Report</text>
-                }
-            </button>
+            @if (_canExport)
+            {
+                <button class="btn btn-primary" @onclick="GenerateCustomReport" disabled="@_isExporting">
+                    @if (_isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span> <text>Generating...</text>
+                    }
+                    else
+                    {
+                        <i class="bi bi-download me-1"></i> <text>Generate Report</text>
+                    }
+                </button>
+            }
         </FooterContent>
     </Modal>
 
@@ -477,6 +483,9 @@
     // Alert
     private string _alertMessage = string.Empty;
     private Alert.AlertType _alertType = Alert.AlertType.Info;
+
+    // Permission flags
+    private bool _canExport;
 
     protected override void OnInitialized()
     {
@@ -645,6 +654,9 @@
 
     private async Task LoadReportData()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canExport = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("reports.export");
+
         _isLoading = true;
 
         try

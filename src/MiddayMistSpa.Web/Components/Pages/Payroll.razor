@@ -18,12 +18,15 @@
                 <p class="text-muted mb-0">Process payroll and manage compensation</p>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary" @onclick="ShowBonusModal">
-                    <i class="bi bi-gift me-1"></i> Add Bonus
-                </button>
-                <button class="btn btn-primary" @onclick="ShowRunPayrollModal">
-                    <i class="bi bi-play-fill me-1"></i> Run Payroll
-                </button>
+                @if (_canManage)
+                {
+                    <button class="btn btn-outline-primary" @onclick="ShowBonusModal">
+                        <i class="bi bi-gift me-1"></i> Add Bonus
+                    </button>
+                    <button class="btn btn-primary" @onclick="ShowRunPayrollModal">
+                        <i class="bi bi-play-fill me-1"></i> Run Payroll
+                    </button>
+                }
             </div>
         </div>
 
@@ -667,6 +670,9 @@
     private string _alertMessage = string.Empty;
     private Alert.AlertType _alertType = Alert.AlertType.Info;
 
+    // Permission flags
+    private bool _canManage;
+
     // Payroll Detail Modal
     private bool _showPayrollDetailModal;
     private PayrollHistoryViewModel? _detailHistory;
@@ -682,6 +688,9 @@
 
     private async Task InitializeData()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canManage = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("payroll.manage");
+
         await LoadEmployees();
         await LoadPayrollData();
     }

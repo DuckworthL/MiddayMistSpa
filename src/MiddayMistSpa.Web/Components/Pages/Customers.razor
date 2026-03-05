@@ -20,9 +20,12 @@
                 <a href="/customers/segmentation" class="btn btn-outline-primary">
                     <i class="bi bi-diagram-3 me-1"></i> Segmentation
                 </a>
-                <button class="btn btn-primary" @onclick="ShowAddModal">
-                    <i class="bi bi-plus-lg me-1"></i> Add Customer
-                </button>
+                @if (_canCreate)
+                {
+                    <button class="btn btn-primary" @onclick="ShowAddModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add Customer
+                    </button>
+                }
             </div>
         </div>
 
@@ -192,10 +195,13 @@
                                                                        class="btn btn-outline-success" title="Book Appointment">
                                                                     <i class="bi bi-calendar-plus"></i>
                                                                 </a>
-                                                                <button class="btn btn-outline-secondary"
-                                                                        @onclick="() => EditCustomer(customer)" title="Edit">
-                                                                    <i class="bi bi-pencil"></i>
-                                                                </button>
+                                                                @if (_canEdit)
+                                                                {
+                                                                    <button class="btn btn-outline-secondary"
+                                                                            @onclick="() => EditCustomer(customer)" title="Edit">
+                                                                        <i class="bi bi-pencil"></i>
+                                                                    </button>
+                                                                }
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -207,9 +213,12 @@
                                                     <td colspan="7" class="text-center py-5">
                                                         <i class="bi bi-people display-4 text-muted"></i>
                                                         <p class="text-muted mt-2">No customers found</p>
-                                                        <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
-                                                            <i class="bi bi-plus me-1"></i> Add First Customer
-                                                        </button>
+                                                        @if (_canCreate)
+                                                        {
+                                                            <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
+                                                                <i class="bi bi-plus me-1"></i> Add First Customer
+                                                            </button>
+                                                        }
                                                     </td>
                                                 </tr>
                                             }
@@ -360,6 +369,11 @@
 @code {
     private PagedResponse<CustomerResponse> _customers = new();
     private bool _isLoading = true;
+
+    // Permission flags
+    private bool _canCreate;
+    private bool _canEdit;
+    private bool _canDelete;
     private int _currentPage = 1;
     private int _pageSize = 20;
     private string _searchQuery = string.Empty;
@@ -391,6 +405,11 @@
 
     private async Task LoadCustomers()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canCreate = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("customers.create");
+        _canEdit = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("customers.edit");
+        _canDelete = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("customers.delete");
+
         _isLoading = true;
         _customers = await CustomerService.GetCustomersAsync(_currentPage, _pageSize, _searchQuery, _membershipFilter);
         _isLoading = false;

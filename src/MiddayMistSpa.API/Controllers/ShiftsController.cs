@@ -25,7 +25,7 @@ public class ShiftsController : ControllerBase
     /// Create a recurring weekly shift for an employee
     /// </summary>
     [HttpPost("employee/{employeeId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult<ShiftResponse>> CreateShift(int employeeId, [FromBody] CreateShiftRequest request)
     {
         try
@@ -51,7 +51,7 @@ public class ShiftsController : ControllerBase
     /// Get all active shifts for an employee
     /// </summary>
     [HttpGet("employee/{employeeId:int}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:shifts.view")]
     public async Task<ActionResult<List<ShiftResponse>>> GetEmployeeShifts(int employeeId)
     {
         try
@@ -69,7 +69,7 @@ public class ShiftsController : ControllerBase
     /// Get weekly schedule summary for an employee
     /// </summary>
     [HttpGet("employee/{employeeId:int}/weekly")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:shifts.view")]
     public async Task<ActionResult<WeeklyShiftScheduleResponse>> GetWeeklySchedule(int employeeId)
     {
         try
@@ -87,7 +87,7 @@ public class ShiftsController : ControllerBase
     /// Update an existing shift
     /// </summary>
     [HttpPut("{shiftId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult<ShiftResponse>> UpdateShift(int shiftId, [FromBody] UpdateShiftRequest request)
     {
         try
@@ -110,7 +110,7 @@ public class ShiftsController : ControllerBase
     /// Delete a shift
     /// </summary>
     [HttpDelete("{shiftId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult> DeleteShift(int shiftId)
     {
         var result = await _shiftService.DeleteShiftAsync(shiftId);
@@ -124,7 +124,7 @@ public class ShiftsController : ControllerBase
     /// Set a full weekly shift schedule for an employee (replaces existing active shifts)
     /// </summary>
     [HttpPost("employee/{employeeId:int}/bulk")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult<List<ShiftResponse>>> SetBulkShifts(int employeeId, [FromBody] BulkShiftRequest request)
     {
         try
@@ -154,7 +154,7 @@ public class ShiftsController : ControllerBase
     /// Create a shift exception (time off, sick leave, emergency, custom hours)
     /// </summary>
     [HttpPost("exceptions")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult<ShiftExceptionResponse>> CreateShiftException([FromBody] CreateShiftExceptionRequest request)
     {
         try
@@ -177,7 +177,7 @@ public class ShiftsController : ControllerBase
     /// Get shift exceptions for an employee (optional date range filter)
     /// </summary>
     [HttpGet("exceptions/employee/{employeeId:int}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:shifts.view")]
     public async Task<ActionResult<List<ShiftExceptionResponse>>> GetEmployeeExceptions(
         int employeeId,
         [FromQuery] DateTime? fromDate = null,
@@ -198,7 +198,7 @@ public class ShiftsController : ControllerBase
     /// Get all shift exceptions for a specific date
     /// </summary>
     [HttpGet("exceptions/date/{date:datetime}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:shifts.view")]
     public async Task<ActionResult<List<ShiftExceptionResponse>>> GetExceptionsByDate(DateTime date)
     {
         var exceptions = await _shiftService.GetExceptionsByDateAsync(date);
@@ -209,7 +209,7 @@ public class ShiftsController : ControllerBase
     /// Update a shift exception
     /// </summary>
     [HttpPut("exceptions/{exceptionId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult<ShiftExceptionResponse>> UpdateShiftException(int exceptionId, [FromBody] UpdateShiftExceptionRequest request)
     {
         try
@@ -232,7 +232,7 @@ public class ShiftsController : ControllerBase
     /// Delete a shift exception
     /// </summary>
     [HttpDelete("exceptions/{exceptionId:int}")]
-    [Authorize(Policy = "HRAccess")]
+    [Authorize(Policy = "Permission:shifts.manage")]
     public async Task<ActionResult> DeleteShiftException(int exceptionId)
     {
         var result = await _shiftService.DeleteShiftExceptionAsync(exceptionId);
@@ -250,7 +250,7 @@ public class ShiftsController : ControllerBase
     /// Get an employee's availability for a specific date
     /// </summary>
     [HttpGet("availability/{employeeId:int}/{date:datetime}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:shifts.view")]
     public async Task<ActionResult<EmployeeAvailabilityResponse>> GetEmployeeAvailability(int employeeId, DateTime date)
     {
         try
@@ -268,7 +268,7 @@ public class ShiftsController : ControllerBase
     /// Get all available staff for a specific date and optional time slot
     /// </summary>
     [HttpGet("available-staff")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:appointments.view")]
     public async Task<ActionResult<List<EmployeeAvailabilityResponse>>> GetAvailableStaff([FromQuery] StaffAvailabilityRequest request)
     {
         var staff = await _shiftService.GetAvailableStaffAsync(request);

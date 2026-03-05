@@ -35,7 +35,7 @@ public class CustomersController : ControllerBase
     /// Create a new customer
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.create")]
     public async Task<ActionResult<CustomerResponse>> CreateCustomer([FromBody] CreateCustomerRequest request)
     {
         try
@@ -54,7 +54,7 @@ public class CustomersController : ControllerBase
     /// Get customer by ID
     /// </summary>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<CustomerResponse>> GetCustomer(int id)
     {
         var customer = await _customerService.GetCustomerByIdAsync(id);
@@ -68,7 +68,7 @@ public class CustomersController : ControllerBase
     /// Get customer by code
     /// </summary>
     [HttpGet("code/{code}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<CustomerResponse>> GetCustomerByCode(string code)
     {
         var customer = await _customerService.GetCustomerByCodeAsync(code);
@@ -82,7 +82,7 @@ public class CustomersController : ControllerBase
     /// Get customer by phone number
     /// </summary>
     [HttpGet("phone/{phone}")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<CustomerResponse>> GetCustomerByPhone(string phone)
     {
         var customer = await _customerService.GetCustomerByPhoneAsync(phone);
@@ -96,7 +96,7 @@ public class CustomersController : ControllerBase
     /// Search customers with filters and pagination
     /// </summary>
     [HttpGet]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<PagedResponse<CustomerListResponse>>> SearchCustomers([FromQuery] CustomerSearchRequest request)
     {
         var result = await _customerService.SearchCustomersAsync(request);
@@ -107,7 +107,7 @@ public class CustomersController : ControllerBase
     /// Get recently active customers
     /// </summary>
     [HttpGet("recent")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<CustomerListResponse>>> GetRecentCustomers([FromQuery] int count = 10)
     {
         var customers = await _customerService.GetRecentCustomersAsync(count);
@@ -118,7 +118,7 @@ public class CustomersController : ControllerBase
     /// Get customers as lookup items for dropdowns
     /// </summary>
     [HttpGet("lookup")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<LookupItemDto>>> GetCustomerLookup([FromQuery] string? search = null)
     {
         var request = new CustomerSearchRequest { PageSize = 500, SearchTerm = search };
@@ -136,7 +136,7 @@ public class CustomersController : ControllerBase
     /// Update customer
     /// </summary>
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<CustomerResponse>> UpdateCustomer(int id, [FromBody] UpdateCustomerRequest request)
     {
         try
@@ -159,7 +159,7 @@ public class CustomersController : ControllerBase
     /// Deactivate customer
     /// </summary>
     [HttpPost("{id:int}/deactivate")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:customers.delete")]
     public async Task<ActionResult> DeactivateCustomer(int id)
     {
         var result = await _customerService.DeactivateCustomerAsync(id);
@@ -173,7 +173,7 @@ public class CustomersController : ControllerBase
     /// Reactivate customer
     /// </summary>
     [HttpPost("{id:int}/reactivate")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult> ReactivateCustomer(int id)
     {
         var result = await _customerService.ReactivateCustomerAsync(id);
@@ -191,7 +191,7 @@ public class CustomersController : ControllerBase
     /// Get customer preferences (important for service delivery)
     /// </summary>
     [HttpGet("{id:int}/preferences")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<CustomerPreferencesResponse>> GetCustomerPreferences(int id)
     {
         var preferences = await _customerService.GetCustomerPreferencesAsync(id);
@@ -205,7 +205,7 @@ public class CustomersController : ControllerBase
     /// Update customer preferences
     /// </summary>
     [HttpPut("{id:int}/preferences")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<CustomerPreferencesResponse>> UpdateCustomerPreferences(
         int id,
         [FromBody] CustomerPreferencesResponse preferences)
@@ -229,7 +229,7 @@ public class CustomersController : ControllerBase
     /// Get loyalty points balance
     /// </summary>
     [HttpGet("{id:int}/loyalty/balance")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<int>> GetLoyaltyBalance(int id)
     {
         try
@@ -247,7 +247,7 @@ public class CustomersController : ControllerBase
     /// Get loyalty transaction history
     /// </summary>
     [HttpGet("{id:int}/loyalty/history")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<LoyaltyPointHistoryResponse>>> GetLoyaltyHistory(int id, [FromQuery] int count = 50)
     {
         try
@@ -265,7 +265,7 @@ public class CustomersController : ControllerBase
     /// Add loyalty points
     /// </summary>
     [HttpPost("{id:int}/loyalty/add")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<LoyaltyTransactionResponse>> AddLoyaltyPoints(int id, [FromBody] AddLoyaltyPointsRequest request)
     {
         try
@@ -283,7 +283,7 @@ public class CustomersController : ControllerBase
     /// Redeem loyalty points
     /// </summary>
     [HttpPost("{id:int}/loyalty/redeem")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<LoyaltyTransactionResponse>> RedeemLoyaltyPoints(int id, [FromBody] RedeemLoyaltyPointsRequest request)
     {
         try
@@ -305,7 +305,7 @@ public class CustomersController : ControllerBase
     /// Get customer visit history
     /// </summary>
     [HttpGet("{id:int}/visits")]
-    [Authorize(Policy = "AllStaff")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<CustomerVisitHistoryResponse>>> GetVisitHistory(int id, [FromQuery] int count = 10)
     {
         var history = await _customerService.GetCustomerVisitHistoryAsync(id, count);
@@ -320,7 +320,7 @@ public class CustomersController : ControllerBase
     /// Get all customer segments
     /// </summary>
     [HttpGet("segments")]
-    [Authorize(Policy = "SalesAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<CustomerSegmentResponse>>> GetAllSegments()
     {
         var segments = await _customerService.GetAllSegmentsAsync();
@@ -331,7 +331,7 @@ public class CustomersController : ControllerBase
     /// Get customers by segment
     /// </summary>
     [HttpGet("segments/{segmentName}/customers")]
-    [Authorize(Policy = "SalesAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<CustomerListResponse>>> GetCustomersBySegment(string segmentName)
     {
         var customers = await _customerService.GetCustomersBySegmentAsync(segmentName);
@@ -342,7 +342,7 @@ public class CustomersController : ControllerBase
     /// Assign customer to segment
     /// </summary>
     [HttpPost("{id:int}/segment")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult> AssignToSegment(int id, [FromBody] string segmentName)
     {
         try
@@ -364,7 +364,7 @@ public class CustomersController : ControllerBase
     /// Upgrade customer membership
     /// </summary>
     [HttpPost("{id:int}/membership/upgrade")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<CustomerResponse>> UpgradeMembership(
         int id,
         [FromQuery] string membershipType,
@@ -385,7 +385,7 @@ public class CustomersController : ControllerBase
     /// Get customers with expiring memberships
     /// </summary>
     [HttpGet("membership/expiring")]
-    [Authorize(Policy = "ReceptionistAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<List<CustomerListResponse>>> GetExpiringMemberships([FromQuery] int daysAhead = 30)
     {
         var customers = await _customerService.GetExpiringMembershipsAsync(daysAhead);
@@ -400,7 +400,7 @@ public class CustomersController : ControllerBase
     /// Run DBSCAN clustering analysis on all customers
     /// </summary>
     [HttpPost("segments/analyze")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult<ClusteringResultResponse>> RunClusteringAnalysis([FromBody] DbscanParametersRequest? parameters)
     {
         _logger.LogInformation("DBSCAN clustering analysis requested");
@@ -412,7 +412,7 @@ public class CustomersController : ControllerBase
     /// Get current clustering status and summary
     /// </summary>
     [HttpGet("segments/status")]
-    [Authorize(Policy = "SalesAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<ClusteringStatusResponse>> GetClusteringStatus()
     {
         var status = await _clusteringService.GetClusteringStatusAsync();
@@ -423,7 +423,7 @@ public class CustomersController : ControllerBase
     /// Get detailed information about a specific segment
     /// </summary>
     [HttpGet("segments/{segmentId:int}/details")]
-    [Authorize(Policy = "SalesAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<SegmentDetailResponse>> GetSegmentDetails(int segmentId)
     {
         var details = await _clusteringService.GetSegmentDetailsAsync(segmentId);
@@ -436,7 +436,7 @@ public class CustomersController : ControllerBase
     /// Get RFM metrics for a specific customer
     /// </summary>
     [HttpGet("{id:int}/rfm")]
-    [Authorize(Policy = "SalesAccess")]
+    [Authorize(Policy = "Permission:customers.view")]
     public async Task<ActionResult<CustomerRfmMetricsResponse>> GetCustomerRfmMetrics(int id)
     {
         var metrics = await _clusteringService.GetCustomerRfmMetricsAsync(id);
@@ -449,7 +449,7 @@ public class CustomersController : ControllerBase
     /// Recalculate segment statistics based on current customer data
     /// </summary>
     [HttpPost("segments/recalculate")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:customers.edit")]
     public async Task<ActionResult> RecalculateSegmentStats()
     {
         await _clusteringService.RecalculateSegmentStatsAsync();
@@ -460,7 +460,7 @@ public class CustomersController : ControllerBase
     /// Export customer segmentation report as PDF or Excel
     /// </summary>
     [HttpPost("segments/export")]
-    [Authorize(Policy = "AdminOrAbove")]
+    [Authorize(Policy = "Permission:reports.export")]
     public async Task<IActionResult> ExportSegmentation([FromBody] SegmentExportRequest request)
     {
         try

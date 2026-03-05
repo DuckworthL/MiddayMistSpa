@@ -32,7 +32,7 @@ public class TransactionsController : ControllerBase
     // ============================================================================
 
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin,Admin,Cashier,Receptionist")]
+    [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<TransactionResponse>> CreateTransaction([FromBody] CreateTransactionRequest request)
     {
         try
@@ -48,7 +48,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpPost("{appointmentId}/pending")]
-    [Authorize(Roles = "SuperAdmin,Admin,Cashier,Receptionist")]
+    [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<TransactionResponse>> CreatePendingTransaction(int appointmentId)
     {
         try
@@ -64,7 +64,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpPost("{id}/finalize")]
-    [Authorize(Roles = "SuperAdmin,Admin,Cashier,Receptionist")]
+    [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<TransactionResponse>> FinalizePendingTransaction(int id, [FromBody] FinalizePendingTransactionRequest request)
     {
         try
@@ -120,7 +120,7 @@ public class TransactionsController : ControllerBase
     // ============================================================================
 
     [HttpPost("{id}/payment")]
-    [Authorize(Roles = "SuperAdmin,Admin,Cashier")]
+    [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<TransactionResponse>> ProcessPayment(int id, [FromBody] ProcessPaymentRequest request)
     {
         try
@@ -135,7 +135,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpPost("{id}/void")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:pos.refund")]
     public async Task<ActionResult<TransactionResponse>> VoidTransaction(int id, [FromBody] VoidTransactionRequest request)
     {
         try
@@ -155,7 +155,7 @@ public class TransactionsController : ControllerBase
     // ============================================================================
 
     [HttpPost("{id}/refund")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:pos.refund")]
     public async Task<ActionResult<RefundResponse>> ProcessRefund(int id, [FromBody] CreateRefundRequest request)
     {
         try
@@ -196,7 +196,7 @@ public class TransactionsController : ControllerBase
     // ============================================================================
 
     [HttpGet("dashboard")]
-    [Authorize(Roles = "SuperAdmin,Admin,Cashier")]
+    [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<POSDashboardResponse>> GetPOSDashboard([FromQuery] DateTime? date)
     {
         var targetDate = date ?? DateTime.UtcNow;
@@ -205,7 +205,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpGet("reports/daily")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<DailySalesReportResponse>> GetDailySalesReport([FromQuery] DateTime? date)
     {
         var targetDate = date ?? DateTime.UtcNow;
@@ -214,7 +214,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpGet("reports/sales")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<TransactionSalesReportResponse>> GetSalesReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
     {
         var result = await _transactionService.GetSalesReportAsync(startDate, endDate);
@@ -222,7 +222,7 @@ public class TransactionsController : ControllerBase
     }
 
     [HttpGet("reports/cashier/{cashierId}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:reports.view")]
     public async Task<ActionResult<CashierShiftReportResponse>> GetCashierShiftReport(int cashierId, [FromQuery] DateTime? date)
     {
         try

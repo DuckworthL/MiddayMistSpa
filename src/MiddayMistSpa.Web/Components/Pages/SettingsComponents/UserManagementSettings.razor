@@ -1,4 +1,6 @@
 @* User Management Settings Component *@
+@inject ISettingsApiService SettingsApi
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-people me-2"></i>User Management</h5>
@@ -7,88 +9,106 @@
         </button>
     </div>
     <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <input type="text" class="form-control" placeholder="Search users..." @bind="_searchTerm"
-                       @bind:event="oninput" />
+        @if (_isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading users...</p>
             </div>
-            <div class="col-md-3">
-                <select class="form-select" @bind="_roleFilter">
-                    <option value="">All Roles</option>
-                    <option value="SuperAdmin">Super Admin</option>
-                    <option value="Admin">Admin</option>
-                    <option value="Receptionist">Receptionist</option>
-                    <option value="Therapist">Therapist</option>
-                    <option value="HR">HR</option>
-                    <option value="Inventory">Inventory</option>
-                    <option value="Accountant">Accountant</option>
-                </select>
+        }
+        else
+        {
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" placeholder="Search users..." @bind="_searchTerm"
+                           @bind:event="oninput" />
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="_roleFilter">
+                        <option value="">All Roles</option>
+                        <option value="SuperAdmin">Super Admin</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Receptionist">Receptionist</option>
+                        <option value="Therapist">Therapist</option>
+                        <option value="HR">HR</option>
+                        <option value="Inventory">Inventory</option>
+                        <option value="Accountant">Accountant</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" @bind="_statusFilter">
+                        <option value="">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Pending">Pending</option>
+                    </select>
+                </div>
             </div>
-            <div class="col-md-3">
-                <select class="form-select" @bind="_statusFilter">
-                    <option value="">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Pending">Pending</option>
-                </select>
-            </div>
-        </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Last Login</th>
-                        <th style="width: 120px;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var user in FilteredUsers)
-                    {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
                         <tr>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="avatar"
-                                         style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
-                                        @user.FirstName.Substring(0, 1)@user.LastName.Substring(0, 1)
-                                    </div>
-                                    <div>
-                                        <div class="fw-medium">@user.FirstName @user.LastName</div>
-                                        <small class="text-muted">@@@user.Username</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>@user.Email</td>
-                            <td>
-                                <span class="badge @GetRoleBadgeClass(user.Role)">@user.Role</span>
-                            </td>
-                            <td>
-                                <span class="badge @GetStatusBadgeClass(user.Status)">@user.Status</span>
-                            </td>
-                            <td class="text-muted">@user.LastLogin?.ToString("MMM dd, yyyy HH:mm") ?? "Never"</td>
-                            <td>
-                                <button class="btn btn-link btn-sm p-1" @onclick="() => EditUser(user)" title="Edit">
-                                    <i class="bi bi-pencil text-primary"></i>
-                                </button>
-                                <button class="btn btn-link btn-sm p-1" @onclick="() => ResetPassword(user)"
-                                        title="Reset Password">
-                                    <i class="bi bi-key text-warning"></i>
-                                </button>
-                                <button class="btn btn-link btn-sm p-1" @onclick="() => ToggleStatus(user)"
-                                        title="@(user.Status == "Active" ? "Deactivate" : "Activate")">
-                                    <i
-                                    class="bi @(user.Status == "Active" ? "bi-person-x text-danger" : "bi-person-check text-success")"></i>
-                                </button>
-                            </td>
+                            <th style="min-width: 180px;">User</th>
+                            <th style="min-width: 200px;">Email</th>
+                            <th style="min-width: 110px;">Role</th>
+                            <th style="min-width: 80px;">Status</th>
+                            <th style="min-width: 110px; white-space: nowrap;">Last Login</th>
+                            <th style="width: 110px; text-align: center;">Actions</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @foreach (var user in FilteredUsers)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="avatar"
+                                             style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary)); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+                                            @user.FirstName.Substring(0, 1)@user.LastName.Substring(0, 1)
+                                        </div>
+                                        <div>
+                                            <div class="fw-medium">@user.FirstName @user.LastName</div>
+                                            <small class="text-muted">@@@user.Username</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>@user.Email</td>
+                                <td>
+                                    <span class="badge @GetRoleBadgeClass(user.Role)">@user.Role</span>
+                                </td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(user.Status)">@user.Status</span>
+                                </td>
+                                <td class="text-muted">@(user.LastLogin?.ToString("MMM dd, yyyy HH:mm") ?? "Never")</td>
+                                <td>
+                                    <button class="btn btn-link btn-sm p-1" @onclick="() => EditUser(user)" title="Edit">
+                                        <i class="bi bi-pencil text-primary"></i>
+                                    </button>
+                                    <button class="btn btn-link btn-sm p-1" @onclick="() => ShowResetPasswordModal(user)"
+                                            title="Reset Password">
+                                        <i class="bi bi-key text-warning"></i>
+                                    </button>
+                                    <button class="btn btn-link btn-sm p-1" @onclick="() => ToggleStatus(user)"
+                                            title="@(user.Status == "Active" ? "Deactivate" : "Activate")">
+                                        <i
+                                        class="bi @(user.Status == "Active" ? "bi-person-x text-danger" : "bi-person-check text-success")"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_statusMessage))
+            {
+                <div class="alert @_statusAlertClass mt-3 alert-dismissible fade show" role="alert">
+                    @_statusMessage
+                    <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+                </div>
+            }
+        }
     </div>
 </div>
 
@@ -148,23 +168,52 @@
                             <label class="form-label">Phone</label>
                             <input type="tel" class="form-control" @bind="_formModel.Phone" />
                         </div>
-                        @if (_formModel.Role == "Therapist")
-                        {
-                            <div class="col-12">
-                                <label class="form-label">Assign to Employee Record</label>
-                                <select class="form-select">
-                                    <option value="">-- Select Employee --</option>
-                                    <option value="1">Maria Santos</option>
-                                    <option value="2">Ana Reyes</option>
-                                    <option value="3">Sofia Garcia</option>
-                                </select>
-                            </div>
-                        }
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-                    <button class="btn btn-primary" @onclick="SaveUser">Save User</button>
+                    <button class="btn btn-primary" @onclick="SaveUser" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Save User
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Reset Password Modal *@
+@if (_showResetPasswordModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset Password - @_resetPasswordUser?.Username</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showResetPasswordModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" class="form-control" @bind="_newPassword" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" @bind="_confirmNewPassword" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _showResetPasswordModal = false">Cancel</button>
+                    <button class="btn btn-warning" @onclick="ResetPassword" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Reset Password
+                    </button>
                 </div>
             </div>
         </div>
@@ -172,41 +221,53 @@
 }
 
 @code {
-    private List<UserModel> _users = new()
-    {
-        new() { Id = 1, FirstName = "System", LastName = "Administrator", Username = "superadmin", Email =
-"superadmin@middaymistspa.com",
-            Role = "SuperAdmin", Status = "Active", LastLogin = DateTime.Now.AddHours(-1) },
-        new() { Id = 2, FirstName = "Admin", LastName = "User", Username = "admin", Email = "admin@middaymistspa.com",
-            Role = "Admin", Status = "Active", LastLogin = DateTime.Now.AddHours(-2) },
-        new() { Id = 3, FirstName = "Maria", LastName = "Santos", Username = "maria.santos", Email = "maria@middaymistspa.com",
-            Role = "Receptionist", Status = "Active", LastLogin = DateTime.Now.AddHours(-5) },
-        new() { Id = 4, FirstName = "Ana", LastName = "Reyes", Username = "ana.reyes", Email = "ana@middaymistspa.com",
-            Role = "Therapist", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) },
-        new() { Id = 5, FirstName = "Rosa", LastName = "Cruz", Username = "rosa.cruz", Email = "rosa@middaymistspa.com",
-            Role = "HR", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) },
-        new() { Id = 6, FirstName = "Juan", LastName = "Dela Cruz", Username = "juan.delacruz", Email =
-"juan@middaymistspa.com",
-            Role = "Inventory", Status = "Active", LastLogin = DateTime.Now.AddDays(-2) },
-        new() { Id = 7, FirstName = "Sofia", LastName = "Garcia", Username = "sofia.garcia", Email = "sofia@middaymistspa.com",
-            Role = "Accountant", Status = "Active", LastLogin = DateTime.Now.AddDays(-1) }
-    };
-
+    private List<SettingsUserListResponse> _users = new();
     private string _searchTerm = "";
     private string _roleFilter = "";
     private string _statusFilter = "";
     private bool _showModal = false;
-    private UserModel? _editingUser = null;
-    private UserModel _formModel = new();
+    private bool _showResetPasswordModal = false;
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
+    private SettingsUserListResponse? _editingUser = null;
+    private SettingsUserListResponse? _resetPasswordUser = null;
+    private UserFormModel _formModel = new();
+    private string _newPassword = "";
+    private string _confirmNewPassword = "";
 
-    private IEnumerable<UserModel> FilteredUsers => _users.Where(u =>
-    (string.IsNullOrEmpty(_searchTerm) ||
-    u.FirstName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
-    u.LastName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
-    u.Email.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)) &&
-    (string.IsNullOrEmpty(_roleFilter) || u.Role == _roleFilter) &&
-    (string.IsNullOrEmpty(_statusFilter) || u.Status == _statusFilter)
+    private IEnumerable<SettingsUserListResponse> FilteredUsers => _users.Where(u =>
+        (string.IsNullOrEmpty(_searchTerm) ||
+         u.FirstName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+         u.LastName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+         u.Email.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrEmpty(_roleFilter) || u.Role == _roleFilter) &&
+        (string.IsNullOrEmpty(_statusFilter) || u.Status == _statusFilter)
     );
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        _isLoading = true;
+        try
+        {
+            _users = await SettingsApi.GetUsersAsync();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error loading users: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
 
     private string GetRoleBadgeClass(string role) => role switch
     {
@@ -231,22 +292,21 @@
     private void ShowAddModal()
     {
         _editingUser = null;
-        _formModel = new UserModel { Role = "Therapist" };
+        _formModel = new UserFormModel { Role = "Therapist" };
         _showModal = true;
     }
 
-    private void EditUser(UserModel user)
+    private void EditUser(SettingsUserListResponse user)
     {
         _editingUser = user;
-        _formModel = new UserModel
+        _formModel = new UserFormModel
         {
-            Id = user.Id,
             FirstName = user.FirstName,
             LastName = user.LastName,
             Username = user.Username,
             Email = user.Email,
             Role = user.Role,
-            Phone = user.Phone
+            Phone = user.Phone ?? ""
         };
         _showModal = true;
     }
@@ -257,47 +317,163 @@
         _editingUser = null;
     }
 
-    private void SaveUser()
+    private async Task SaveUser()
     {
-        if (_editingUser != null)
+        _isSaving = true;
+        _statusMessage = string.Empty;
+        try
         {
-            _editingUser.FirstName = _formModel.FirstName;
-            _editingUser.LastName = _formModel.LastName;
-            _editingUser.Email = _formModel.Email;
-            _editingUser.Role = _formModel.Role;
-            _editingUser.Phone = _formModel.Phone;
+            if (_editingUser != null)
+            {
+                var request = new UpdateUserRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    Role = _formModel.Role,
+                    Phone = _formModel.Phone
+                };
+                var (result, error) = await SettingsApi.UpdateUserAsync(_editingUser.UserId, request);
+                if (result != null)
+                {
+                    _statusMessage = "User updated successfully.";
+                    _statusAlertClass = "alert-success";
+                    await LoadUsers();
+                }
+                else
+                {
+                    _statusMessage = error ?? "Failed to update user.";
+                    _statusAlertClass = "alert-danger";
+                }
+            }
+            else
+            {
+                if (_formModel.Password != _formModel.ConfirmPassword)
+                {
+                    _statusMessage = "Passwords do not match.";
+                    _statusAlertClass = "alert-danger";
+                    _isSaving = false;
+                    return;
+                }
+                var request = new CreateUserRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Username = _formModel.Username,
+                    Email = _formModel.Email,
+                    Password = _formModel.Password,
+                    Role = _formModel.Role,
+                    Phone = _formModel.Phone
+                };
+                var (result, error) = await SettingsApi.CreateUserAsync(request);
+                if (result != null)
+                {
+                    _statusMessage = "User created successfully.";
+                    _statusAlertClass = "alert-success";
+                    await LoadUsers();
+                }
+                else
+                {
+                    _statusMessage = error ?? "Failed to create user.";
+                    _statusAlertClass = "alert-danger";
+                }
+            }
+            CloseModal();
         }
-        else
+        catch (Exception ex)
         {
-            _formModel.Id = _users.Any() ? _users.Max(u => u.Id) + 1 : 1;
-            _formModel.Status = "Pending";
-            _users.Add(_formModel);
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
         }
-        CloseModal();
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
-    private void ResetPassword(UserModel user)
+    private void ShowResetPasswordModal(SettingsUserListResponse user)
     {
-        // TODO: Implement password reset via API
+        _resetPasswordUser = user;
+        _newPassword = "";
+        _confirmNewPassword = "";
+        _showResetPasswordModal = true;
     }
 
-    private void ToggleStatus(UserModel user)
+    private async Task ResetPassword()
     {
-        user.Status = user.Status == "Active" ? "Inactive" : "Active";
+        if (_resetPasswordUser == null) return;
+        if (_newPassword != _confirmNewPassword)
+        {
+            _statusMessage = "Passwords do not match.";
+            _statusAlertClass = "alert-danger";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newPassword) || _newPassword.Length < 6)
+        {
+            _statusMessage = "Password must be at least 6 characters.";
+            _statusAlertClass = "alert-danger";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var success = await SettingsApi.ResetUserPasswordAsync(_resetPasswordUser.UserId, new ResetPasswordRequest
+            {
+                NewPassword
+= _newPassword
+            });
+            if (success)
+            {
+                _statusMessage = $"Password reset for {_resetPasswordUser.Username}.";
+                _statusAlertClass = "alert-success";
+            }
+            else
+            {
+                _statusMessage = "Failed to reset password.";
+                _statusAlertClass = "alert-danger";
+            }
+            _showResetPasswordModal = false;
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
-    private class UserModel
+    private async Task ToggleStatus(SettingsUserListResponse user)
     {
-        public int Id { get; set; }
+        try
+        {
+            var result = await SettingsApi.ToggleUserStatusAsync(user.UserId);
+            if (result != null)
+            {
+                await LoadUsers();
+                _statusMessage = $"User {user.Username} {(result.Status == "Active" ? "activated" : "deactivated")}.";
+                _statusAlertClass = "alert-success";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+    }
+
+    private class UserFormModel
+    {
         public string FirstName { get; set; } = "";
         public string LastName { get; set; } = "";
         public string Username { get; set; } = "";
         public string Email { get; set; } = "";
         public string Role { get; set; } = "";
-        public string Status { get; set; } = "Active";
         public string Phone { get; set; } = "";
         public string Password { get; set; } = "";
         public string ConfirmPassword { get; set; } = "";
-        public DateTime? LastLogin { get; set; }
     }
 }

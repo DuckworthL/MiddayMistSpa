@@ -17,15 +17,18 @@
                 <p class="text-muted mb-0">Track products, stock levels, and supplies</p>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline-secondary" @onclick="ShowCategoryModalDialog">
-                    <i class="bi bi-folder-plus me-1"></i> Category
-                </button>
-                <button class="btn btn-outline-primary" @onclick="ShowStockAdjustmentModal">
-                    <i class="bi bi-boxes me-1"></i> Stock Adjustment
-                </button>
-                <button class="btn btn-primary" @onclick="ShowNewProductModal">
-                    <i class="bi bi-plus-lg me-1"></i> New Product
-                </button>
+                @if (_canManage)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="ShowCategoryModalDialog">
+                        <i class="bi bi-folder-plus me-1"></i> Category
+                    </button>
+                    <button class="btn btn-outline-primary" @onclick="ShowStockAdjustmentModal">
+                        <i class="bi bi-boxes me-1"></i> Stock Adjustment
+                    </button>
+                    <button class="btn btn-primary" @onclick="ShowNewProductModal">
+                        <i class="bi bi-plus-lg me-1"></i> New Product
+                    </button>
+                }
             </div>
         </div>
 
@@ -172,27 +175,30 @@
                                             </td>
                                             <td class="text-end">
                                                 <div class="btn-group btn-group-sm">
-                                                    <button class="btn btn-outline-success" @onclick="() => QuickStockAdd(product)"
-                                                            title="Add Stock">
-                                                        <i class="bi bi-plus"></i>
-                                                    </button>
-                                                    <button class="btn btn-outline-primary" @onclick="() => EditProduct(product)"
-                                                            title="Edit">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </button>
-                                                    @if (product.IsActive)
+                                                    @if (_canManage)
                                                     {
-                                                        <button class="btn btn-outline-warning"
-                                                                @onclick="() => ShowArchiveConfirmation(product)" title="Archive">
-                                                            <i class="bi bi-archive"></i>
+                                                        <button class="btn btn-outline-success" @onclick="() => QuickStockAdd(product)"
+                                                                title="Add Stock">
+                                                            <i class="bi bi-plus"></i>
                                                         </button>
-                                                    }
-                                                    else
-                                                    {
-                                                        <button class="btn btn-outline-success" @onclick="() => RestoreProduct(product)"
-                                                                title="Restore">
-                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        <button class="btn btn-outline-primary" @onclick="() => EditProduct(product)"
+                                                                title="Edit">
+                                                            <i class="bi bi-pencil"></i>
                                                         </button>
+                                                        @if (product.IsActive)
+                                                        {
+                                                            <button class="btn btn-outline-warning"
+                                                                    @onclick="() => ShowArchiveConfirmation(product)" title="Archive">
+                                                                <i class="bi bi-archive"></i>
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button class="btn btn-outline-success" @onclick="() => RestoreProduct(product)"
+                                                                    title="Restore">
+                                                                <i class="bi bi-arrow-counterclockwise"></i>
+                                                            </button>
+                                                        }
                                                     }
                                                 </div>
                                             </td>
@@ -205,9 +211,12 @@
                                         <td colspan="8" class="text-center py-5">
                                             <i class="bi bi-inbox display-4 text-muted"></i>
                                             <p class="text-muted mt-2">No products found</p>
-                                            <button class="btn btn-primary btn-sm" @onclick="ShowNewProductModal">
-                                                <i class="bi bi-plus me-1"></i> Add Product
-                                            </button>
+                                            @if (_canManage)
+                                            {
+                                                <button class="btn btn-primary btn-sm" @onclick="ShowNewProductModal">
+                                                    <i class="bi bi-plus me-1"></i> Add Product
+                                                </button>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -434,6 +443,9 @@
     private PagedResponse<ProductResponse> _products = new();
     private List<ProductCategoryResponse> _categories = new();
     private bool _isLoading = true;
+
+    // Permission flags
+    private bool _canManage;
     private int _currentPage = 1;
     private string _searchTerm = string.Empty;
     private int? _categoryFilter;
@@ -481,6 +493,9 @@
 
     private async Task LoadData()
     {
+        var role = AuthService.CurrentUser?.RoleName;
+        _canManage = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("inventory.manage");
+
         try
         {
             await LoadCategories();

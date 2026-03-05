@@ -24,7 +24,7 @@ public class ServicesController : ControllerBase
     #region Categories
 
     [HttpPost("categories")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.create")]
     public async Task<ActionResult<CategoryResponse>> CreateCategory([FromBody] CreateCategoryRequest request)
     {
         try
@@ -57,7 +57,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPut("categories/{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.edit")]
     public async Task<ActionResult<CategoryResponse>> UpdateCategory(int id, [FromBody] UpdateCategoryRequest request)
     {
         try
@@ -77,7 +77,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpDelete("categories/{id}")]
-    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "Permission:services.delete")]
     public async Task<IActionResult> DeleteCategory(int id)
     {
         try
@@ -97,7 +97,7 @@ public class ServicesController : ControllerBase
     #region Services
 
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.create")]
     public async Task<ActionResult<ServiceResponse>> CreateService([FromBody] CreateServiceRequest request)
     {
         try
@@ -185,7 +185,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.edit")]
     public async Task<ActionResult<ServiceResponse>> UpdateService(int id, [FromBody] UpdateServiceRequest request)
     {
         try
@@ -205,7 +205,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPatch("{id}/pricing")]
-    [Authorize(Roles = "SuperAdmin,Admin,Accountant")]
+    [Authorize(Policy = "Permission:services.edit")]
     public async Task<ActionResult<ServiceResponse>> UpdatePricing(int id, [FromBody] UpdatePricingRequest request)
     {
         try
@@ -236,7 +236,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPost("{id}/deactivate")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.delete")]
     public async Task<IActionResult> DeactivateService(int id)
     {
         var result = await _serviceService.DeactivateServiceAsync(id);
@@ -245,7 +245,7 @@ public class ServicesController : ControllerBase
     }
 
     [HttpPost("{id}/reactivate")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Policy = "Permission:services.edit")]
     public async Task<IActionResult> ReactivateService(int id)
     {
         var result = await _serviceService.ReactivateServiceAsync(id);

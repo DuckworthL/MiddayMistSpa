@@ -14,13 +14,15 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly ITwoFactorService _twoFactorService;
     private readonly ICaptchaService _captchaService;
+    private readonly IPermissionService _permissionService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ITwoFactorService twoFactorService, ICaptchaService captchaService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ITwoFactorService twoFactorService, ICaptchaService captchaService, IPermissionService permissionService, ILogger<AuthController> logger)
     {
         _authService = authService;
         _twoFactorService = twoFactorService;
         _captchaService = captchaService;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -215,6 +217,21 @@ public class AuthController : ControllerBase
         };
 
         return Ok(userInfo);
+    }
+
+    /// <summary>
+    /// Get current user's permissions based on their role
+    /// </summary>
+    [HttpGet("me/permissions")]
+    [Authorize]
+    public async Task<ActionResult<HashSet<string>>> GetCurrentUserPermissions()
+    {
+        var roleName = User.FindFirstValue(ClaimTypes.Role);
+        if (string.IsNullOrEmpty(roleName))
+            return Ok(new HashSet<string>());
+
+        var permissions = await _permissionService.GetPermissionsAsync(roleName);
+        return Ok(permissions);
     }
 
     /// <summary>
