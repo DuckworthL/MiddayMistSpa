@@ -61,7 +61,14 @@ if (!builder.Environment.IsDevelopment())
     builder.Services.AddScoped<IAccountingService, AccountingService>();
     builder.Services.AddScoped<IClusteringService, ClusteringService>();
     builder.Services.AddScoped<ICurrencyService, CurrencyService>();
+    builder.Services.AddScoped<IExportService, ExportService>();
+    builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
     builder.Services.AddScoped<ICaptchaService, CaptchaService>();
+    builder.Services.AddScoped<ISettingsService, SettingsService>();
+    builder.Services.AddScoped<IPermissionService, PermissionService>();
+    builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissionAuthorizationHandler>();
+    builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
+    builder.Services.AddMemoryCache();
 
     // HTTP Clients - External API integrations
     builder.Services.AddHttpClient<IIpGeoLocationService, IpWhoIsService>(client =>
@@ -112,18 +119,51 @@ if (!builder.Environment.IsDevelopment())
         };
     });
 
-    // Authorization - Role-based policies
+    // Authorization - Role-based and permission-based policies
     builder.Services.AddAuthorization(options =>
     {
+        // Legacy role-based policies
         options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("SuperAdmin"));
         options.AddPolicy("AdminOrAbove", policy => policy.RequireRole("SuperAdmin", "Admin"));
-        options.AddPolicy("HRAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "HR"));
-        options.AddPolicy("AccountingAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Accountant"));
-        options.AddPolicy("InventoryAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Inventory"));
-        options.AddPolicy("ReceptionistAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Receptionist"));
-        options.AddPolicy("TherapistAccess", policy => policy.RequireRole("SuperAdmin", "Admin", "Therapist"));
         options.AddPolicy("AllStaff", policy => policy.RequireRole(
-            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR"));
+            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales"));
+
+        // Permission-based policies
+        options.AddPolicy("Permission:appointments.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("appointments.view")));
+        options.AddPolicy("Permission:appointments.create", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("appointments.create")));
+        options.AddPolicy("Permission:appointments.edit", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("appointments.edit")));
+        options.AddPolicy("Permission:appointments.delete", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("appointments.delete")));
+        options.AddPolicy("Permission:customers.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("customers.view")));
+        options.AddPolicy("Permission:customers.create", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("customers.create")));
+        options.AddPolicy("Permission:customers.edit", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("customers.edit")));
+        options.AddPolicy("Permission:customers.delete", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("customers.delete")));
+        options.AddPolicy("Permission:services.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("services.view")));
+        options.AddPolicy("Permission:services.create", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("services.create")));
+        options.AddPolicy("Permission:services.edit", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("services.edit")));
+        options.AddPolicy("Permission:services.delete", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("services.delete")));
+        options.AddPolicy("Permission:employees.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("employees.view")));
+        options.AddPolicy("Permission:employees.create", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("employees.create")));
+        options.AddPolicy("Permission:employees.edit", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("employees.edit")));
+        options.AddPolicy("Permission:employees.delete", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("employees.delete")));
+        options.AddPolicy("Permission:inventory.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("inventory.view")));
+        options.AddPolicy("Permission:inventory.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("inventory.manage")));
+        options.AddPolicy("Permission:pos.access", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("pos.access")));
+        options.AddPolicy("Permission:pos.refund", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("pos.refund")));
+        options.AddPolicy("Permission:pos.discount", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("pos.discount")));
+        options.AddPolicy("Permission:accounting.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("accounting.view")));
+        options.AddPolicy("Permission:accounting.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("accounting.manage")));
+        options.AddPolicy("Permission:payroll.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("payroll.view")));
+        options.AddPolicy("Permission:payroll.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("payroll.manage")));
+        options.AddPolicy("Permission:shifts.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("shifts.view")));
+        options.AddPolicy("Permission:shifts.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("shifts.manage")));
+        options.AddPolicy("Permission:timeattendance.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("timeattendance.view")));
+        options.AddPolicy("Permission:timeattendance.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("timeattendance.manage")));
+        options.AddPolicy("Permission:reports.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("reports.view")));
+        options.AddPolicy("Permission:reports.export", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("reports.export")));
+        options.AddPolicy("Permission:notifications.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("notifications.view")));
+        options.AddPolicy("Permission:notifications.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("notifications.manage")));
+        options.AddPolicy("Permission:settings.access", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("settings.access")));
+        options.AddPolicy("Permission:settings.manage", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("settings.manage")));
     });
 
     // Controllers for API endpoints
