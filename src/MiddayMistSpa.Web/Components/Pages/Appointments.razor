@@ -1,4 +1,5 @@
 @page "/appointments"
+@page "/appointments/{AppointmentId:int}"
 @inject IAppointmentApiService AppointmentService
 @inject IServiceApiService ServiceApiService
 @inject IEmployeeApiService EmployeeService
@@ -436,9 +437,16 @@
                                         {
                                             @foreach (var si in _activeAppointment.ServiceItems)
                                             {
-                                                <div class="d-flex justify-content-between mb-1">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
                                                     <span>@si.ServiceName (@si.DurationMinutes min)</span>
-                                                    <span>₱@si.UnitPrice.ToString("N0")</span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span>₱@si.UnitPrice.ToString("N0")</span>
+                                                        <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                                @onclick="() => RemoveServiceFromAppointment(si.AppointmentServiceItemId)"
+                                                                title="Remove service">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             }
                                         }
@@ -560,7 +568,21 @@
                                                                 <tr>
                                                                     <td>@item.Name</td>
                                                                     <td class="text-end">@item.Price.ToString("C")</td>
-                                                                    <td class="text-center">@item.Quantity</td>
+                                                                    <td class="text-center">
+                                                                        <div class="d-flex align-items-center justify-content-center gap-1">
+                                                                            <button class="btn btn-sm btn-outline-secondary px-1 py-0"
+                                                                                    @onclick="() => DecrementProductQty(item)"
+                                                                                    disabled="@(item.Quantity <= 1)">
+                                                                                <i class="bi bi-dash"></i>
+                                                                            </button>
+                                                                            <span
+                                                                            style="min-width: 24px; display: inline-block; text-align: center;">@item.Quantity</span>
+                                                                            <button class="btn btn-sm btn-outline-secondary px-1 py-0"
+                                                                                    @onclick="() => IncrementProductQty(item)">
+                                                                                <i class="bi bi-plus"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
                                                                     <td class="text-end">
                                                                         <button class="btn btn-sm btn-outline-danger"
                                                                                 @onclick="() => RemoveProduct(item)">
@@ -605,6 +627,27 @@
                                                         <div class="d-flex justify-content-between mb-1">
                                                             <span>Products:</span>
                                                             <span>@_checkoutProducts.Sum(p => p.Price * p.Quantity).ToString("C")</span>
+                                                        </div>
+                                                    }
+                                                    @if (_activeAppointment.CustomerId > 0)
+                                                    {
+                                                        <div class="d-flex align-items-center gap-2 mb-1 mt-2">
+                                                            <span class="badge bg-warning text-dark">@_apptCustomerTier</span>
+                                                            <small class="text-muted">@_apptCustomerPoints pts available</small>
+                                                            @if (_apptCustomerPoints > 0)
+                                                            {
+                                                                <input type="number" class="form-control form-control-sm" style="width:90px"
+                                                                       min="0" max="@_apptCustomerPoints" placeholder="Redeem"
+                                                                       @bind="_apptPointsToRedeem" @bind:event="oninput" />
+                                                                <small class="text-success">-@PointsDiscount.ToString("C")</small>
+                                                            }
+                                                        </div>
+                                                    }
+                                                    @if (PointsDiscount > 0)
+                                                    {
+                                                        <div class="d-flex justify-content-between mb-1 text-success">
+                                                            <span>Points Discount:</span>
+                                                            <span>-@PointsDiscount.ToString("C")</span>
                                                         </div>
                                                     }
                                                     <div class="d-flex justify-content-between mb-1">
@@ -744,6 +787,9 @@
     private decimal _servicePrice;
     private string _paymentMethod = "Cash";
     private bool _isProcessingPayment;
+    private int _apptPointsToRedeem;
+    private int _apptCustomerPoints;
+    private string _apptCustomerTier = "Regular";
 
     // Pending Transaction (created when service starts)
     private TransactionResponse? _pendingTransaction;
@@ -771,8 +817,9 @@
             return serviceTotal + _checkoutProducts.Sum(p => p.Price * p.Quantity);
         }
     }
-    private decimal TaxAmount => SubtotalAmount * TaxRate;
-    private decimal TotalAmount => SubtotalAmount + TaxAmount;
+    private decimal PointsDiscount => Math.Min(_apptPointsToRedeem, _apptCustomerPoints);
+    private decimal TaxAmount => (SubtotalAmount - PointsDiscount) * TaxRate;
+    private decimal TotalAmount => (SubtotalAmount - PointsDiscount) + TaxAmount;
 
     // Helper class for checkout products
     private class CheckoutProduct
@@ -782,6 +829,8 @@
         public decimal Price { get; set; }
         public int Quantity { get; set; }
     }
+
+    [Parameter] public int AppointmentId { get; set; }
 
     protected override void OnInitialized()
     {
@@ -797,6 +846,15 @@
 
         await LoadLookups();
         await LoadAppointments();
+
+        // If a specific appointment was requested via /appointments/{id}, open its modal
+        if (AppointmentId > 0)
+        {
+            var target = _appointments.Items.FirstOrDefault(a => a.AppointmentId == AppointmentId)
+            ?? (AppointmentResponse?)await AppointmentService.GetAppointmentByIdAsync(AppointmentId);
+            if (target != null)
+                await OpenProgressModal(target);
+        }
     }
 
     private async Task LoadLookups()
@@ -1276,6 +1334,9 @@
         _selectedProductId = 0;
         _paymentMethod = "Cash";
         _showProductSection = false;
+        _apptPointsToRedeem = 0;
+        _apptCustomerPoints = 0;
+        _apptCustomerTier = "Regular";
 
         // Get service price using the correct ServiceId from full appointment data
         _servicePrice = 0;
@@ -1294,6 +1355,17 @@
 
         // Load products for add-ons
         _productLookup = await InventoryService.GetProductLookupAsync();
+
+        // Load customer loyalty info
+        if (_activeAppointment.CustomerId > 0)
+        {
+            var loyaltyCustomer = await CustomerService.GetCustomerByIdAsync(_activeAppointment.CustomerId);
+            if (loyaltyCustomer != null)
+            {
+                _apptCustomerPoints = loyaltyCustomer.LoyaltyPoints;
+                _apptCustomerTier = loyaltyCustomer.MembershipType;
+            }
+        }
 
         // Try to find an existing pending transaction for this appointment
         if (_pendingTransaction == null)
@@ -1373,6 +1445,17 @@
         _checkoutProducts.Remove(product);
     }
 
+    private void IncrementProductQty(CheckoutProduct product)
+    {
+        product.Quantity++;
+    }
+
+    private void DecrementProductQty(CheckoutProduct product)
+    {
+        if (product.Quantity > 1)
+            product.Quantity--;
+    }
+
     private async Task AddServiceToAppointment()
     {
         if (_activeAppointment == null || _addServiceId == 0) return;
@@ -1401,6 +1484,30 @@
         {
             _addServiceId = 0;
             _isAddingService = false;
+        }
+    }
+
+    private async Task RemoveServiceFromAppointment(int serviceItemId)
+    {
+        if (_activeAppointment == null) return;
+        try
+        {
+            var updated = await AppointmentService.RemoveServiceFromAppointmentAsync(_activeAppointment.AppointmentId,
+            serviceItemId);
+            if (updated != null)
+            {
+                _activeAppointment = updated;
+                _servicePrice = updated.TotalPrice;
+                ShowAlert("Service removed.", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Failed to remove service.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error removing service: {ex.Message}", Alert.AlertType.Error);
         }
     }
 
@@ -1444,6 +1551,7 @@
                 {
                     PaymentMethod = _paymentMethod,
                     DiscountAmount = 0,
+                    LoyaltyPointsToRedeem = _apptPointsToRedeem,
                     ProductItems = _checkoutProducts.Select(p => new CreateTransactionProductItemRequest
                     {
                         ProductId = p.ProductId,
@@ -1488,6 +1596,7 @@ new() { ServiceId = _activeAppointment.ServiceId, Quantity = 1, UnitPrice = _ser
                     AppointmentId = _activeAppointment.AppointmentId,
                     PaymentMethod = _paymentMethod,
                     DiscountAmount = 0,
+                    LoyaltyPointsToRedeem = _apptPointsToRedeem,
                     ServiceItems = serviceItems,
                     ProductItems = productItems
                 };

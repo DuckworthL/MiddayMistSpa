@@ -152,6 +152,21 @@ public class TransactionService : ITransactionService
         {
             discountTotal += transaction.Subtotal * (request.DiscountPercentage / 100);
         }
+
+        // Apply loyalty points redemption (1 point = ₱1 discount)
+        int pointsRedeemed = 0;
+        if (request.LoyaltyPointsToRedeem > 0)
+        {
+            if (request.LoyaltyPointsToRedeem > customer.LoyaltyPoints)
+                throw new InvalidOperationException(
+                    $"Customer only has {customer.LoyaltyPoints} loyalty points available");
+
+            decimal maxRedeemable = transaction.Subtotal - discountTotal;
+            decimal pointsValue = Math.Min(request.LoyaltyPointsToRedeem, maxRedeemable);
+            pointsRedeemed = (int)Math.Floor(pointsValue);
+            discountTotal += pointsRedeemed;
+        }
+
         transaction.DiscountAmount = discountTotal;
 
         // Calculate tax (on discounted amount)
@@ -174,6 +189,15 @@ public class TransactionService : ITransactionService
 
         // Earn loyalty points (1 point per ₱100 spent)
         EarnLoyaltyPoints(customer, transaction);
+
+        // Deduct redeemed points from customer balance
+        if (pointsRedeemed > 0)
+        {
+            DeductLoyaltyPoints(customer, pointsRedeemed,
+                DomainConstants.LoyaltyTransactionTypes.Redeem,
+                $"Redeemed {pointsRedeemed} pts on transaction {transaction.TransactionNumber}",
+                null);
+        }
 
         // Multi-currency: populate entity fields if client uses a non-PHP currency
         var clientCurrency = request.ClientCurrency?.Trim().ToUpperInvariant();
@@ -414,10 +438,28 @@ public class TransactionService : ITransactionService
         var serviceSubtotal = transaction.ServiceItems.Sum(si => si.TotalPrice);
         transaction.Subtotal = serviceSubtotal + productSubtotal;
 
+        // Load customer (needed for loyalty points)
+        var customer = await _context.Customers.FindAsync(transaction.CustomerId);
+
         // Apply discount
         decimal discountTotal = request.DiscountAmount;
         if (request.DiscountPercentage > 0)
             discountTotal += transaction.Subtotal * (request.DiscountPercentage / 100);
+
+        // Apply loyalty points redemption (1 point = ₱1 discount)
+        int pointsRedeemed = 0;
+        if (request.LoyaltyPointsToRedeem > 0 && customer != null)
+        {
+            if (request.LoyaltyPointsToRedeem > customer.LoyaltyPoints)
+                throw new InvalidOperationException(
+                    $"Customer only has {customer.LoyaltyPoints} loyalty points available");
+
+            decimal maxRedeemable = transaction.Subtotal - discountTotal;
+            decimal pointsValue = Math.Min(request.LoyaltyPointsToRedeem, maxRedeemable);
+            pointsRedeemed = (int)Math.Floor(pointsValue);
+            discountTotal += pointsRedeemed;
+        }
+
         transaction.DiscountAmount = discountTotal;
         transaction.DiscountPercentage = request.DiscountPercentage;
 
@@ -449,10 +491,18 @@ public class TransactionService : ITransactionService
         }
 
         // Earn loyalty points
-        var customer = await _context.Customers.FindAsync(transaction.CustomerId);
         if (customer != null)
         {
             EarnLoyaltyPoints(customer, transaction);
+
+            // Deduct redeemed points from customer balance
+            if (pointsRedeemed > 0)
+            {
+                DeductLoyaltyPoints(customer, pointsRedeemed,
+                    DomainConstants.LoyaltyTransactionTypes.Redeem,
+                    $"Redeemed {pointsRedeemed} pts on transaction {transaction.TransactionNumber}",
+                    null);
+            }
         }
 
         // Multi-currency

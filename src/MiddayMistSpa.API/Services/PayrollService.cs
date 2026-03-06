@@ -507,6 +507,92 @@ public class PayrollService : IPayrollService
         return results;
     }
 
+    public async Task<List<PayrollRecordResponse>> PreviewPayrollAsync(DateTime startDate, DateTime endDate, List<int>? employeeIds = null)
+    {
+        // Get employees
+        var employeesQuery = _context.Employees.Where(e => e.IsActive);
+        if (employeeIds != null && employeeIds.Any())
+            employeesQuery = employeesQuery.Where(e => employeeIds.Contains(e.EmployeeId));
+
+        var employees = await employeesQuery.ToListAsync();
+        var results = new List<PayrollRecordResponse>();
+        var payrollType = "Semi-Monthly";
+
+        foreach (var employee in employees)
+        {
+            var workDays = await CalculateWorkDaysAsync(employee.EmployeeId, startDate, endDate);
+            var commissionAndTips = await CalculateCommissionsAndTipsAsync(employee.EmployeeId, startDate, endDate);
+
+            // Build an in-memory record (NOT saved to DB)
+            var record = new PayrollRecord
+            {
+                EmployeeId = employee.EmployeeId,
+                DaysWorked = workDays.DaysWorked,
+                HoursWorked = workDays.HoursWorked,
+                OvertimeHours = workDays.OvertimeHours,
+                NightDifferentialHours = workDays.NightDifferentialHours
+            };
+
+            record.BasicSalary = CalculateBasicSalary(employee, workDays.DaysWorked, payrollType);
+            record.OvertimePay = CalculateOvertimePay(employee.DailyRate, workDays.OvertimeHours);
+            record.NightDifferentialPay = CalculateNightDifferentialPay(employee.DailyRate, workDays.NightDifferentialHours);
+            record.Commissions = commissionAndTips.Commissions;
+            record.Tips = commissionAndTips.Tips;
+
+            record.GrossPay = record.BasicSalary + record.OvertimePay + record.NightDifferentialPay +
+                record.HolidayPay + record.RestDayPay + record.Commissions + record.Tips +
+                record.RiceAllowance + record.LaundryAllowance + record.OtherAllowances;
+
+            // Calculate deductions in-memory
+            await CalculateAndApplyDeductions(record, employee.MonthlyBasicSalary, payrollType);
+
+            results.Add(new PayrollRecordResponse
+            {
+                PayrollRecordId = 0,
+                PayrollPeriodId = 0,
+                PeriodName = $"Preview: {startDate:MMM dd} - {endDate:MMM dd, yyyy}",
+                EmployeeId = employee.EmployeeId,
+                EmployeeCode = employee.EmployeeCode,
+                EmployeeName = $"{employee.FirstName} {employee.LastName}",
+                Position = employee.Position,
+                DaysWorked = record.DaysWorked,
+                HoursWorked = record.HoursWorked,
+                OvertimeHours = record.OvertimeHours,
+                NightDifferentialHours = record.NightDifferentialHours,
+                BasicSalary = record.BasicSalary,
+                OvertimePay = record.OvertimePay,
+                NightDifferentialPay = record.NightDifferentialPay,
+                HolidayPay = record.HolidayPay,
+                RestDayPay = record.RestDayPay,
+                Commissions = record.Commissions,
+                Tips = record.Tips,
+                RiceAllowance = record.RiceAllowance,
+                LaundryAllowance = record.LaundryAllowance,
+                OtherAllowances = record.OtherAllowances,
+                GrossPay = record.GrossPay,
+                SSSContribution = record.SSSContribution,
+                PhilHealthContribution = record.PhilHealthContribution,
+                PagIBIGContribution = record.PagIBIGContribution,
+                WithholdingTax = record.WithholdingTax,
+                Tardiness = record.Tardiness,
+                Absences = record.Absences,
+                CashAdvances = record.CashAdvances,
+                LoanDeductions = record.LoanDeductions,
+                OtherDeductions = record.OtherDeductions,
+                TotalDeductions = record.TotalDeductions,
+                SSSEmployerContribution = record.SSSEmployerContribution,
+                PhilHealthEmployerContribution = record.PhilHealthEmployerContribution,
+                PagIBIGEmployerContribution = record.PagIBIGEmployerContribution,
+                ECContribution = record.ECContribution,
+                NetPay = record.NetPay,
+                PaymentStatus = "Preview",
+                CreatedAt = PhilippineTime.Now
+            });
+        }
+
+        return results;
+    }
+
     public async Task<PayrollRecordResponse> RecalculatePayrollRecordAsync(int payrollRecordId)
     {
         var record = await _context.PayrollRecords

@@ -43,8 +43,9 @@
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body text-center">
                         <div class="display-6 fw-bold text-success">@_customers.Items.Count(c => c.MembershipType ==
-                                                        "Gold" || c.MembershipType == "Platinum")</div>
-                            <small class="text-muted">Premium Members</small>
+                                                        "Bronze" || c.MembershipType == "Silver" || c.MembershipType == "Gold" || c.MembershipType
+                                                        == "Platinum")</div>
+                            <small class="text-muted">Loyalty Members</small>
                         </div>
                     </div>
                 </div>
@@ -583,17 +584,19 @@
 
     private string GetMembershipBadgeClass(string membership) => membership switch
     {
+        "Bronze" => "bg-warning text-dark",
+        "Silver" => "bg-secondary text-white",
         "Gold" => "bg-warning text-dark",
         "Platinum" => "bg-info text-white",
-        "Silver" => "bg-secondary text-white",
         _ => "bg-light text-dark"
     };
 
     private string GetMembershipBgClass(string membership) => membership switch
     {
+        "Bronze" => "bg-warning",
+        "Silver" => "bg-secondary",
         "Gold" => "bg-warning",
         "Platinum" => "bg-info",
-        "Silver" => "bg-secondary",
         _ => "bg-light"
     };
 

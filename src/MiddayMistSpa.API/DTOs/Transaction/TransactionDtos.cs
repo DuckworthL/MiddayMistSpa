@@ -33,6 +33,9 @@ public class CreateTransactionRequest
     [Range(0, double.MaxValue)]
     public decimal? AmountTendered { get; set; } // For cash payments
 
+    [Range(0, int.MaxValue)]
+    public int LoyaltyPointsToRedeem { get; set; } = 0;
+
     // Multi-Currency support
     /// <summary>
     /// Client's preferred display currency (e.g. "USD", "EUR"). Defaults to "PHP" if omitted.
@@ -101,6 +104,7 @@ public class FinalizePendingTransactionRequest
 
     public string? ClientCurrency { get; set; }
     public string? ClientIPAddress { get; set; }
+    public int LoyaltyPointsToRedeem { get; set; } = 0;
 }
 
 public class VoidTransactionRequest

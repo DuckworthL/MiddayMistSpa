@@ -714,6 +714,9 @@ public interface IPayrollApiService
     Task<List<BonusResponse>> GetEmployeeBonusesAsync(int employeeId);
     Task<BonusResponse?> AddBonusAsync(CreateBonusRequest request);
     Task<(BonusResponse? Result, string? ErrorMessage)> AddBonusWithErrorAsync(CreateBonusRequest request);
+
+    // Payroll Preview
+    Task<List<PayrollRecordResponse>> PreviewPayrollAsync(DateTime startDate, DateTime endDate);
 }
 
 public class PayrollApiService : IPayrollApiService
@@ -815,6 +818,13 @@ public class PayrollApiService : IPayrollApiService
     public async Task<(BonusResponse? Result, string? ErrorMessage)> AddBonusWithErrorAsync(CreateBonusRequest request)
     {
         return await _apiClient.PostWithErrorAsync<CreateBonusRequest, BonusResponse>("api/payroll/bonuses", request);
+    }
+
+    public async Task<List<PayrollRecordResponse>> PreviewPayrollAsync(DateTime startDate, DateTime endDate)
+    {
+        var url = $"api/payroll/preview?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}";
+        var result = await _apiClient.GetAsync<List<PayrollRecordResponse>>(url);
+        return result ?? new List<PayrollRecordResponse>();
     }
 }
 

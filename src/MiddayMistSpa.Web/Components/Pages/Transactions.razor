@@ -234,7 +234,7 @@
                                 @* Customer Selection *@
                                 <div class="mb-3">
                                     <label class="form-label">Customer</label>
-                                    <select class="form-select" @bind="_saleForm.CustomerId">
+                                    <select class="form-select" @onchange="OnCustomerChanged">
                                         <option value="">Walk-in Customer</option>
                                         @foreach (var customer in _customerLookup)
                                         {
@@ -242,6 +242,29 @@
                                         }
                                     </select>
                                 </div>
+
+                                @* Loyalty Info Panel *@
+                                @if (_saleForm.CustomerId > 0)
+                                {
+                                    <div class="alert alert-info py-2 mb-3">
+                                        @if (_isLoadingCustomerInfo)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span> <small>Loading loyalty info...</small>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                <div>
+                                                    <i class="bi bi-star-fill me-1 text-warning"></i>
+                                                    <strong>@_selectedCustomerTier</strong> member &nbsp;|&nbsp;
+                                                    <i class="bi bi-gem me-1"></i>
+                                                    <strong>@_selectedCustomerPoints</strong> pts available
+                                                </div>
+                                                <small class="text-muted">1 pt = ₱1 discount</small>
+                                            </div>
+                                        }
+                                    </div>
+                                }
 
                                 @* Tabs for Services/Products *@
                                 <ul class="nav nav-tabs mb-3">
@@ -344,13 +367,30 @@
                                     </div>
 
                                     @* Discount *@
-                                    <div class="mb-3">
+                                    <div class="mb-2">
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text">Discount</span>
                                             <span class="input-group-text">₱</span>
                                             <input type="number" class="form-control" @bind="_discountAmount" min="0" step="0.01" />
                                         </div>
                                     </div>
+
+                                    @* Use Loyalty Points *@
+                                    @if (_saleForm.CustomerId > 0 && _selectedCustomerPoints > 0)
+                                    {
+                                        <div class="mb-3">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="bi bi-gem me-1"></i>Points</span>
+                                                <input type="number" class="form-control"
+                                                       placeholder="0"
+                                                       value="@_pointsToRedeem"
+                                                       @oninput="e => { if (int.TryParse(e.Value?.ToString(), out int v)) _pointsToRedeem = Math.Min(Math.Max(0, v), _selectedCustomerPoints); }"
+                                                       min="0" max="@_selectedCustomerPoints" step="1" />
+                                                <span class="input-group-text text-success">-₱@_pointsToRedeem</span>
+                                            </div>
+                                            <div class="form-text">Max @_selectedCustomerPoints pts (₱@_selectedCustomerPoints)</div>
+                                        </div>
+                                    }
 
                                     @* Totals *@
                                     <div class="border-top pt-3">
@@ -363,6 +403,13 @@
                                             <div class="d-flex justify-content-between mb-1 text-success">
                                                 <span>Discount:</span>
                                                 <span>-@_discountAmount.ToString("C")</span>
+                                            </div>
+                                        }
+                                        @if (_pointsToRedeem > 0)
+                                        {
+                                            <div class="d-flex justify-content-between mb-1 text-success">
+                                                <span><i class="bi bi-gem me-1"></i>Points (@_pointsToRedeem pts):</span>
+                                                <span>-₱@_pointsToRedeem</span>
                                             </div>
                                         }
                                         <div class="d-flex justify-content-between mb-3 h5">
@@ -566,6 +613,12 @@
     private decimal _discountAmount;
     private string _paymentMethod = "Cash";
 
+    // Loyalty Info (POS)
+    private int _selectedCustomerPoints = 0;
+    private string _selectedCustomerTier = "Regular";
+    private int _pointsToRedeem = 0;
+    private bool _isLoadingCustomerInfo = false;
+
     // Details Modal
     private bool _showDetailsModal;
     private TransactionResponse? _selectedTransaction;
@@ -708,10 +761,48 @@
         _discountAmount = 0;
         _paymentMethod = "Cash";
         _posSearchTerm = string.Empty;
+        _selectedCustomerPoints = 0;
+        _selectedCustomerTier = "Regular";
+        _pointsToRedeem = 0;
         _showSaleModal = true;
     }
 
-    private void CloseSaleModal() => _showSaleModal = false;
+    private async Task OnCustomerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int customerId) && customerId > 0)
+        {
+            _saleForm.CustomerId = customerId;
+            _isLoadingCustomerInfo = true;
+            _pointsToRedeem = 0;
+            try
+            {
+                var customer = await CustomerService.GetCustomerByIdAsync(customerId);
+                if (customer != null)
+                {
+                    _selectedCustomerPoints = customer.LoyaltyPoints;
+                    _selectedCustomerTier = customer.MembershipType;
+                }
+            }
+            catch { /* non-critical */ }
+            finally
+            {
+                _isLoadingCustomerInfo = false;
+            }
+        }
+        else
+        {
+            _saleForm.CustomerId = 0;
+            _selectedCustomerPoints = 0;
+            _selectedCustomerTier = "Regular";
+            _pointsToRedeem = 0;
+        }
+    }
+
+    private void CloseSaleModal()
+    {
+        _showSaleModal = false;
+        _pointsToRedeem = 0;
+    }
 
     private IEnumerable<LookupItem> GetFilteredServices()
     {
@@ -786,10 +877,11 @@
     {
         _cartItems.Clear();
         _discountAmount = 0;
+        _pointsToRedeem = 0;
     }
 
     private decimal GetSubtotal() => _cartItems.Sum(i => i.TotalPrice);
-    private decimal GetTotal() => Math.Max(0, GetSubtotal() - _discountAmount);
+    private decimal GetTotal() => Math.Max(0, GetSubtotal() - _discountAmount - _pointsToRedeem);
 
     private async Task CompleteSale()
     {
@@ -824,7 +916,8 @@
                 ServiceItems = serviceItems,
                 ProductItems = productItems,
                 DiscountAmount = _discountAmount,
-                PaymentMethod = _paymentMethod
+                PaymentMethod = _paymentMethod,
+                LoyaltyPointsToRedeem = _pointsToRedeem
             };
 
             var result = await TransactionService.CreateTransactionAsync(request);

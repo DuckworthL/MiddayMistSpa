@@ -44,6 +44,12 @@ public interface IPayrollService
     Task<TaxCalculationResponse> CalculateWithholdingTaxAsync(decimal taxableIncome);
 
     // ============================================================================
+    // Payroll Preview (no DB writes)
+    // ============================================================================
+
+    Task<List<PayrollRecordResponse>> PreviewPayrollAsync(DateTime startDate, DateTime endDate, List<int>? employeeIds = null);
+
+    // ============================================================================
     // Reports & Summaries
     // ============================================================================
 

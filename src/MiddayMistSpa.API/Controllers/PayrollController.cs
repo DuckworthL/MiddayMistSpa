@@ -321,6 +321,27 @@ public class PayrollController : ControllerBase
     }
 
     // ============================================================================
+    // Payroll Preview (read-only estimate)
+    // ============================================================================
+
+    [HttpGet("preview")]
+    [Authorize(Policy = "Permission:payroll.view")]
+    public async Task<ActionResult<List<PayrollRecordResponse>>> PreviewPayroll(
+        [FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+    {
+        try
+        {
+            var result = await _payrollService.PreviewPayrollAsync(startDate, endDate);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating payroll preview");
+            return StatusCode(500, new { error = "An error occurred while generating the payroll preview" });
+        }
+    }
+
+    // ============================================================================
     // Calculation Endpoints
     // ============================================================================
 

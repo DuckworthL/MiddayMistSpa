@@ -181,7 +181,7 @@
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-person"></i></span>
                                         <input type="text" class="form-control" placeholder="Search customer..." value="@_customerSearch"
-                                               @oninput="OnCustomerSearchInput" @onfocus="() => _showCustomerDropdown = true" />
+                                               @oninput="OnCustomerSearchInput" @onfocus="OnCustomerFocus" />
                                     </div>
                                     @if (_showCustomerDropdown && _filteredCustomers.Any())
                                     {
@@ -206,12 +206,32 @@
                                             <div>
                                                 <strong>@_selectedCustomer.FullName</strong>
                                                 <div class="small text-muted">@_selectedCustomer.PhoneNumber</div>
+                                                <div class="small">
+                                                    <span class="badge bg-warning text-dark me-1">@_selectedCustomer.MembershipType</span>
+                                                    <i class="bi bi-gem text-warning me-1" style="font-size:0.75rem"></i>
+                                                    <span class="fw-semibold">@_selectedCustomer.LoyaltyPoints pts</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <button class="btn btn-link text-danger btn-sm" @onclick="ClearCustomer">
                                             <i class="bi bi-x-lg"></i>
                                         </button>
                                     </div>
+
+                                    @* Use Loyalty Points *@
+                                    @if (_selectedCustomer.LoyaltyPoints > 0 && _cartItems.Any())
+                                    {
+                                        <div class="mt-2">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text"><i class="bi bi-gem me-1"></i>Redeem pts</span>
+                                                <input type="number" class="form-control" placeholder="0" value="@_pointsToRedeem"
+                                                       @oninput="e => { if (int.TryParse(e.Value?.ToString(), out int v)) _pointsToRedeem = Math.Min(Math.Max(0, v), _selectedCustomer.LoyaltyPoints); }"
+                                                       min="0" max="@_selectedCustomer.LoyaltyPoints" step="1" />
+                                                <span class="input-group-text text-success">-₱@_pointsToRedeem</span>
+                                            </div>
+                                            <div class="form-text">1 pt = ₱1 &nbsp;|&nbsp; Max: @_selectedCustomer.LoyaltyPoints pts</div>
+                                        </div>
+                                    }
                                 }
                             </div>
 
@@ -303,6 +323,13 @@
                                             <span>Discount (@_discountPercent%)</span>
                                             <span class="text-danger">-₱ @DiscountAmount.ToString("N2")</span>
                                         </div>
+                                        @if (PointsDiscount > 0)
+                                        {
+                                            <div class="summary-row">
+                                                <span><i class="bi bi-gem me-1"></i>Points (@_pointsToRedeem pts)</span>
+                                                <span class="text-danger">-₱ @PointsDiscount.ToString("N2")</span>
+                                            </div>
+                                        }
                                         <div class="summary-row">
                                             <span>VAT (12%)</span>
                                             <span>₱ @TaxAmount.ToString("N2")</span>
@@ -503,6 +530,9 @@
     private List<CustomerResponse> _filteredCustomers = new();
     private List<CustomerResponse> _customers = new();
 
+    // Loyalty (POS)
+    private int _pointsToRedeem = 0;
+
     // Appointments
     private List<AppointmentResponse> _appointments = new();
     private AppointmentResponse? _selectedAppointment;
@@ -540,7 +570,9 @@
     private const decimal TaxRate = 0.12m;
     private decimal Subtotal => _cartItems.Sum(x => x.Total);
     private decimal DiscountAmount => Subtotal * (_discountPercent / 100);
-    private decimal TaxableAmount => Subtotal - DiscountAmount;
+    private decimal PointsDiscount => _selectedCustomer != null ? Math.Min(_pointsToRedeem, _selectedCustomer.LoyaltyPoints)
+    : 0;
+    private decimal TaxableAmount => Subtotal - DiscountAmount - PointsDiscount;
     private decimal TaxAmount => TaxableAmount * TaxRate;
     private decimal GrandTotal => TaxableAmount + TaxAmount;
     private bool CanCheckout => _cartItems.Any() &&
@@ -769,6 +801,7 @@
         _selectedAppointment = null;
         _discountPercent = 0;
         _cashTendered = 0;
+        _pointsToRedeem = 0;
     }
 
     // ========================================================================
@@ -779,10 +812,20 @@
     {
         _customerSearch = e.Value?.ToString() ?? "";
         _showCustomerDropdown = true;
+        FilterCustomers();
+    }
 
+    private void OnCustomerFocus()
+    {
+        _showCustomerDropdown = true;
+        FilterCustomers();
+    }
+
+    private void FilterCustomers()
+    {
         if (string.IsNullOrWhiteSpace(_customerSearch))
         {
-            _filteredCustomers = new List<CustomerResponse>();
+            _filteredCustomers = _customers.Take(10).ToList();
         }
         else
         {
@@ -798,6 +841,7 @@
     private void SelectCustomer(CustomerResponse customer)
     {
         _selectedCustomer = customer;
+        _pointsToRedeem = 0;
         _showCustomerDropdown = false;
         _customerSearch = "";
         _filteredCustomers = new List<CustomerResponse>();
@@ -806,6 +850,7 @@
     private void ClearCustomer()
     {
         _selectedCustomer = null;
+        _pointsToRedeem = 0;
         if (_selectedAppointment != null)
         {
             DeselectAppointment();
@@ -918,6 +963,7 @@
                 AppointmentId = _selectedAppointment?.AppointmentId,
                 PaymentMethod = _paymentMethod,
                 DiscountAmount = DiscountAmount,
+                LoyaltyPointsToRedeem = _pointsToRedeem,
                 ServiceItems = serviceItems,
                 ProductItems = productItems,
                 AmountTendered = _paymentMethod == "Cash" && _cashTendered > 0 ? _cashTendered : null,

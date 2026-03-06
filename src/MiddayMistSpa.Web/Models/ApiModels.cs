@@ -622,6 +622,7 @@ public class CreateTransactionRequest
     public decimal TipAmount { get; set; } = 0;
     public string PaymentMethod { get; set; } = "Cash";
     public decimal? AmountTendered { get; set; }
+    public int LoyaltyPointsToRedeem { get; set; } = 0;
 
     // Multi-Currency
     public string? ClientCurrency { get; set; }
@@ -653,6 +654,7 @@ public class FinalizePendingTransactionRequest
     public decimal? AmountTendered { get; set; }
     public string? ClientCurrency { get; set; }
     public string? ClientIPAddress { get; set; }
+    public int LoyaltyPointsToRedeem { get; set; } = 0;
 }
 
 // =============================================================================
@@ -918,8 +920,12 @@ public class PayrollRecordResponse
     public decimal DaysWorked { get; set; }
     public decimal HoursWorked { get; set; }
     public decimal OvertimeHours { get; set; }
+    public decimal NightDifferentialHours { get; set; }
     public decimal BasicSalary { get; set; }
     public decimal OvertimePay { get; set; }
+    public decimal NightDifferentialPay { get; set; }
+    public decimal HolidayPay { get; set; }
+    public decimal RestDayPay { get; set; }
     public decimal Commissions { get; set; }
     public decimal Tips { get; set; }
     public decimal TotalAllowances { get; set; }
@@ -939,6 +945,7 @@ public class PayrollRecordResponse
     public decimal ECContribution { get; set; }
 
     public decimal NetPay { get; set; }
+    public string PaymentStatus { get; set; } = string.Empty;
 }
 
 public class CreatePayrollRecordRequest
