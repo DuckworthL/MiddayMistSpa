@@ -888,10 +888,17 @@
     private async Task LoadAppointments()
     {
         _isLoading = true;
-        _appointments = await AppointmentService.GetAppointmentsAsync(
-        date: _selectedDate, status: _statusFilter,
-        searchTerm: _searchTerm, includeArchived: _showArchived);
-        _isLoading = false;
+        StateHasChanged();
+        try
+        {
+            _appointments = await AppointmentService.GetAppointmentsAsync(
+            date: _selectedDate, status: _statusFilter,
+            searchTerm: _searchTerm, includeArchived: _showArchived);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private async Task ToggleArchived()

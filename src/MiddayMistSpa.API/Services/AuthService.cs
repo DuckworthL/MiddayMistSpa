@@ -698,4 +698,115 @@ public class AuthService : IAuthService
     }
 
     #endregion
+
+    // =========================================================================
+    // Password Reset
+    // =========================================================================
+
+    public async Task<DTOs.Auth.PasswordResetResponse> RequestPasswordResetAsync(string email)
+    {
+        // Always return success to avoid revealing whether the email exists
+        var users = await _unitOfWork.Users.FindAsync(u => u.Email == email && u.IsActive);
+        var user = users.FirstOrDefault();
+
+        if (user != null)
+        {
+            // Generate a 6-digit reset code
+            var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+            user.PasswordResetToken = code;
+            user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(30);
+            _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("Password reset requested for user {UserId}. Code generated.", user.UserId);
+        }
+
+        return new DTOs.Auth.PasswordResetResponse
+        {
+            Success = true,
+            Message = "If the email address is registered, a reset code has been generated. Please contact your administrator to obtain the code."
+        };
+    }
+
+    public async Task<DTOs.Auth.PasswordResetResponse> ResetPasswordAsync(DTOs.Auth.ResetPasswordRequest request)
+    {
+        if (request.NewPassword != request.ConfirmPassword)
+        {
+            return new DTOs.Auth.PasswordResetResponse { Success = false, Message = "Passwords do not match" };
+        }
+
+        var users = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email && u.IsActive);
+        var user = users.FirstOrDefault();
+
+        if (user == null || user.PasswordResetToken != request.Token
+            || !user.PasswordResetTokenExpiry.HasValue
+            || user.PasswordResetTokenExpiry.Value < DateTime.UtcNow)
+        {
+            return new DTOs.Auth.PasswordResetResponse { Success = false, Message = "Invalid or expired reset code" };
+        }
+
+        // Validate password policy
+        var (isValid, errors) = await ValidatePasswordPolicyAsync(request.NewPassword, user.UserId);
+        if (!isValid)
+        {
+            return new DTOs.Auth.PasswordResetResponse { Success = false, Message = string.Join("; ", errors) };
+        }
+
+        // Update password
+        var oldHash = user.PasswordHash;
+        user.PasswordHash = HashPassword(request.NewPassword);
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiry = null;
+        user.MustChangePassword = false;
+        user.PasswordExpiryDate = DateTime.UtcNow.AddDays(_passwordPolicy.PasswordExpirationDays);
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
+
+        // Add old password to history
+        var history = new PasswordHistory
+        {
+            UserId = user.UserId,
+            PasswordHash = oldHash,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _unitOfWork.PasswordHistories.AddAsync(history);
+
+        _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        await LogAuditAsync(user.UserId, "PasswordReset", "Users", user.UserId.ToString());
+
+        return new DTOs.Auth.PasswordResetResponse { Success = true, Message = "Password has been reset successfully" };
+    }
+
+    // =========================================================================
+    // Profile Update
+    // =========================================================================
+
+    public async Task<DTOs.Auth.UpdateProfileResponse> UpdateProfileAsync(int userId, DTOs.Auth.UpdateProfileRequest request)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null)
+            return new DTOs.Auth.UpdateProfileResponse { Success = false, Message = "User not found" };
+
+        // Check for email uniqueness if changed
+        if (!string.Equals(user.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email && u.UserId != userId);
+            if (existing.Any())
+                return new DTOs.Auth.UpdateProfileResponse { Success = false, Message = "Email is already in use" };
+        }
+
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        user.Email = request.Email;
+        user.PhoneNumber = request.PhoneNumber;
+
+        _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        await LogAuditAsync(userId, "ProfileUpdate", "Users", userId.ToString());
+
+        return new DTOs.Auth.UpdateProfileResponse { Success = true, Message = "Profile updated successfully" };
+    }
 }

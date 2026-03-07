@@ -59,25 +59,25 @@
                                 <div class="col-md-6">
                                     <label class="form-label">First Name</label>
                                     <InputText @bind-Value="_profileModel.FirstName" class="form-control"
-                                        disabled="@(!_isEditing)" />
+                                               disabled="@(!_isEditing)" />
                                     <ValidationMessage For="@(() => _profileModel.FirstName)" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Last Name</label>
                                     <InputText @bind-Value="_profileModel.LastName" class="form-control"
-                                        disabled="@(!_isEditing)" />
+                                               disabled="@(!_isEditing)" />
                                     <ValidationMessage For="@(() => _profileModel.LastName)" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Email</label>
                                     <InputText @bind-Value="_profileModel.Email" class="form-control"
-                                        disabled="@(!_isEditing)" />
+                                               disabled="@(!_isEditing)" />
                                     <ValidationMessage For="@(() => _profileModel.Email)" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Phone Number</label>
                                     <InputText @bind-Value="_profileModel.PhoneNumber" class="form-control"
-                                        disabled="@(!_isEditing)" />
+                                               disabled="@(!_isEditing)" />
                                 </div>
                             </div>
                             @if (_isEditing)
@@ -109,9 +109,9 @@
                                     <label class="form-label">Current Password</label>
                                     <div class="input-group">
                                         <InputText @bind-Value="_passwordModel.CurrentPassword"
-                                            type="@(_showCurrentPassword ? "text" : "password")" class="form-control" />
+                                                   type="@(_showCurrentPassword ? "text" : "password")" class="form-control" />
                                         <button type="button" class="btn btn-outline-secondary"
-                                            @onclick="() => _showCurrentPassword = !_showCurrentPassword">
+                                                @onclick="() => _showCurrentPassword = !_showCurrentPassword">
                                             <i class="bi @(_showCurrentPassword ? "bi-eye-slash" : "bi-eye")"></i>
                                         </button>
                                     </div>
@@ -121,9 +121,9 @@
                                     <label class="form-label">New Password</label>
                                     <div class="input-group">
                                         <InputText @bind-Value="_passwordModel.NewPassword"
-                                            type="@(_showNewPassword ? "text" : "password")" class="form-control" />
+                                                   type="@(_showNewPassword ? "text" : "password")" class="form-control" />
                                         <button type="button" class="btn btn-outline-secondary"
-                                            @onclick="() => _showNewPassword = !_showNewPassword">
+                                                @onclick="() => _showNewPassword = !_showNewPassword">
                                             <i class="bi @(_showNewPassword ? "bi-eye-slash" : "bi-eye")"></i>
                                         </button>
                                     </div>
@@ -133,9 +133,9 @@
                                     <label class="form-label">Confirm Password</label>
                                     <div class="input-group">
                                         <InputText @bind-Value="_passwordModel.ConfirmPassword"
-                                            type="@(_showConfirmPassword ? "text" : "password")" class="form-control" />
+                                                   type="@(_showConfirmPassword ? "text" : "password")" class="form-control" />
                                         <button type="button" class="btn btn-outline-secondary"
-                                            @onclick="() => _showConfirmPassword = !_showConfirmPassword">
+                                                @onclick="() => _showConfirmPassword = !_showConfirmPassword">
                                             <i class="bi @(_showConfirmPassword ? "bi-eye-slash" : "bi-eye")"></i>
                                         </button>
                                     </div>
@@ -190,7 +190,7 @@
                 <i class="bi bi-check-circle me-2"></i>
                 @_successMessage
                 <button type="button" class="btn-close btn-close-white ms-auto"
-                    @onclick="() => _successMessage = null"></button>
+                        @onclick="() => _successMessage = null"></button>
             </div>
         </div>
     </div>
@@ -204,7 +204,7 @@
                 <i class="bi bi-exclamation-circle me-2"></i>
                 @_errorMessage
                 <button type="button" class="btn-close btn-close-white ms-auto"
-                    @onclick="() => _errorMessage = null"></button>
+                        @onclick="() => _errorMessage = null"></button>
             </div>
         </div>
     </div>
@@ -356,17 +356,30 @@ new() { Icon = "bi-key", Color = "warning", Description = "Password changed", Ti
     {
         _isSaving = true;
         _errorMessage = null;
+        StateHasChanged();
 
         try
         {
-            // Profile updates are handled locally for now
-            // In a full implementation, this would call an API to update the user profile
-            await Task.CompletedTask;
-            _successMessage = "Profile updated successfully!";
-            _isEditing = false;
+            var request = new UpdateProfileRequest
+            {
+                FirstName = _profileModel.FirstName,
+                LastName = _profileModel.LastName,
+                Email = _profileModel.Email,
+                PhoneNumber = _profileModel.PhoneNumber
+            };
 
-            // Update displayed name
-            _userFullName = $"{_profileModel.FirstName} {_profileModel.LastName}";
+            var result = await ProfileService.UpdateProfileAsync(request);
+
+            if (result?.Success == true)
+            {
+                _successMessage = result.Message ?? "Profile updated successfully!";
+                _isEditing = false;
+                _userFullName = $"{_profileModel.FirstName} {_profileModel.LastName}";
+            }
+            else
+            {
+                _errorMessage = result?.Message ?? "Failed to update profile. Please try again.";
+            }
         }
         catch (Exception)
         {

@@ -45,6 +45,7 @@ public interface ITransactionService
     Task<DailySalesReportResponse> GetDailySalesReportAsync(DateTime date);
     Task<TransactionSalesReportResponse> GetSalesReportAsync(DateTime startDate, DateTime endDate);
     Task<CashierShiftReportResponse> GetCashierShiftReportAsync(int cashierId, DateTime date);
+    Task<TransactionStatsResponse> GetTransactionStatsAsync();
 
     // ============================================================================
     // Receipt

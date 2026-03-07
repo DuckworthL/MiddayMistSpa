@@ -34,6 +34,10 @@ public class User
     public DateTime PasswordExpiryDate { get; set; }
     public bool MustChangePassword { get; set; } = true;
 
+    // Password Reset
+    public string? PasswordResetToken { get; set; }
+    public DateTime? PasswordResetTokenExpiry { get; set; }
+
     // Timestamps
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

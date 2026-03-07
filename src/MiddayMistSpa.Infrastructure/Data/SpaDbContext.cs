@@ -84,6 +84,8 @@ public class SpaDbContext : DbContext
     public DbSet<ChartOfAccount> ChartOfAccounts => Set<ChartOfAccount>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
 
     // Configuration
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
@@ -123,6 +125,15 @@ public class SpaDbContext : DbContext
 
         // Apply all configurations from this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SpaDbContext).Assembly);
+
+        // Unique constraints on business keys
+        modelBuilder.Entity<MiddayMistSpa.Core.Entities.Accounting.Invoice>()
+            .HasIndex(e => e.InvoiceNumber)
+            .IsUnique();
+
+        modelBuilder.Entity<MiddayMistSpa.Core.Entities.Transaction.Transaction>()
+            .HasIndex(e => e.TransactionNumber)
+            .IsUnique();
 
         // Configure decimal precision for Philippine Peso (default 18,2)
         // Skip properties that already have explicit precision set by configurations (e.g., ExchangeRate at 18,6)

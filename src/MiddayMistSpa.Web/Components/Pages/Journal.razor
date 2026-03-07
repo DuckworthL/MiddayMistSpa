@@ -156,238 +156,239 @@
                                     <td>@entry.EntryDate.ToString("MMM dd, yyyy")</td>
                                     <td>@entry.Description</td>
                                     <td>
-                                        <span class="badge @GetReferenceTypeBadge(entry.ReferenceType)">@(entry.ReferenceType ?? "—")</span>
+                                        <span class="badge @GetReferenceTypeBadge(entry.ReferenceType)">@(entry.ReferenceType ??
+                                                                                                                            "—")</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetStatusBadge(entry.Status)">@entry.Status</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="text-primary">₱@entry.TotalDebit.ToString("N2")</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="text-secondary">₱@entry.TotalCredit.ToString("N2")</span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">@entry.CreatedByName</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-secondary" title="View"
+                                                        @onclick="() => ViewEntry(entry)">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-secondary" title="Edit"
+                                                        @onclick="() => EditEntry(entry)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                        @if (_entries.Any())
+                        {
+                            <tfoot class="bg-light">
+                                <tr class="fw-bold">
+                                    <td colspan="5" class="text-end">Totals:</td>
+                                    <td class="text-end text-primary">₱@_entries.Sum(e => e.TotalDebit).ToString("N2")</td>
+                                    <td class="text-end text-secondary">₱@_entries.Sum(e => e.TotalCredit).ToString("N2")</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        }
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @* Add/Edit Journal Entry Modal *@
+        <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Journal Entry" : "New Journal Entry")"
+               Size="Modal.ModalSize.Large">
+            <ChildContent>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" @bind="_entryForm.Date" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Reference</label>
+                        <input type="text" class="form-control" @bind="_entryForm.Reference"
+                               placeholder="e.g., INV-001, PO-123" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="_entryForm.Description"
+                               placeholder="Enter entry description" />
+                    </div>
+                </div>
+
+                <hr class="my-4" />
+
+                <h6 class="mb-3">Entry Lines</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Account</th>
+                                <th style="width: 150px;">Debit (₱)</th>
+                                <th style="width: 150px;">Credit (₱)</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in _entryLines)
+                            {
+                                <tr>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="line.Account">
+                                            <option value="">Select Account...</option>
+                                            <option value="Cash">Cash</option>
+                                            <option value="Bank">Bank</option>
+                                            <option value="Accounts Receivable">Accounts Receivable</option>
+                                            <option value="Accounts Payable">Accounts Payable</option>
+                                            <option value="Service Revenue">Service Revenue</option>
+                                            <option value="Product Sales">Product Sales</option>
+                                            <option value="Salaries Expense">Salaries Expense</option>
+                                            <option value="Rent Expense">Rent Expense</option>
+                                            <option value="Utilities Expense">Utilities Expense</option>
+                                            <option value="Supplies Expense">Supplies Expense</option>
+                                        </select>
                                     </td>
                                     <td>
-                                        <span class="badge @GetStatusBadge(entry.Status)">@entry.Status</span>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="text-primary">₱@entry.TotalDebit.ToString("N2")</span>
-                                    </td>
-                                    <td class="text-end">
-                                        <span class="text-secondary">₱@entry.TotalCredit.ToString("N2")</span>
+                                        <input type="number" class="form-control form-control-sm" @bind="line.Debit" min="0"
+                                               step="0.01" />
                                     </td>
                                     <td>
-                                        <small class="text-muted">@entry.CreatedByName</small>
+                                        <input type="number" class="form-control form-control-sm" @bind="line.Credit" min="0"
+                                               step="0.01" />
                                     </td>
-                                    <td class="text-center">
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-secondary" title="View"
-                                                    @onclick="() => ViewEntry(entry)">
-                                                <i class="bi bi-eye"></i>
-                                            </button>
-                                            <button class="btn btn-outline-secondary" title="Edit"
-                                                    @onclick="() => EditEntry(entry)">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                        </div>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(line)">
+                                            <i class="bi bi-x"></i>
+                                        </button>
                                     </td>
                                 </tr>
                             }
-                        }
-                    </tbody>
-                    @if (_entries.Any())
-                    {
-                        <tfoot class="bg-light">
-                            <tr class="fw-bold">
-                                <td colspan="5" class="text-end">Totals:</td>
-                                <td class="text-end text-primary">₱@_entries.Sum(e => e.TotalDebit).ToString("N2")</td>
-                                <td class="text-end text-secondary">₱@_entries.Sum(e => e.TotalCredit).ToString("N2")</td>
-                                <td colspan="2"></td>
-                            </tr>
-                        </tfoot>
-                    }
-                </table>
-            </div>
-        </div>
-    </div>
-
-    @* Add/Edit Journal Entry Modal *@
-    <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Journal Entry" : "New Journal Entry")"
-           Size="Modal.ModalSize.Large">
-        <ChildContent>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Date <span class="text-danger">*</span></label>
-                    <input type="date" class="form-control" @bind="_entryForm.Date" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Reference</label>
-                    <input type="text" class="form-control" @bind="_entryForm.Reference"
-                           placeholder="e.g., INV-001, PO-123" />
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Description <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" @bind="_entryForm.Description"
-                           placeholder="Enter entry description" />
-                </div>
-            </div>
-
-            <hr class="my-4" />
-
-            <h6 class="mb-3">Entry Lines</h6>
-            <div class="table-responsive">
-                <table class="table table-sm">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Account</th>
-                            <th style="width: 150px;">Debit (₱)</th>
-                            <th style="width: 150px;">Credit (₱)</th>
-                            <th style="width: 50px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var line in _entryLines)
-                        {
+                        </tbody>
+                        <tfoot>
                             <tr>
                                 <td>
-                                    <select class="form-select form-select-sm" @bind="line.Account">
-                                        <option value="">Select Account...</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Bank">Bank</option>
-                                        <option value="Accounts Receivable">Accounts Receivable</option>
-                                        <option value="Accounts Payable">Accounts Payable</option>
-                                        <option value="Service Revenue">Service Revenue</option>
-                                        <option value="Product Sales">Product Sales</option>
-                                        <option value="Salaries Expense">Salaries Expense</option>
-                                        <option value="Rent Expense">Rent Expense</option>
-                                        <option value="Utilities Expense">Utilities Expense</option>
-                                        <option value="Supplies Expense">Supplies Expense</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control form-control-sm" @bind="line.Debit" min="0"
-                                           step="0.01" />
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control form-control-sm" @bind="line.Credit" min="0"
-                                           step="0.01" />
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(line)">
-                                        <i class="bi bi-x"></i>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="AddLine">
+                                        <i class="bi bi-plus me-1"></i> Add Line
                                     </button>
                                 </td>
+                                <td class="text-end fw-bold">₱@_entryLines.Sum(l => l.Debit).ToString("N2")</td>
+                                <td class="text-end fw-bold">₱@_entryLines.Sum(l => l.Credit).ToString("N2")</td>
+                                <td></td>
                             </tr>
-                        }
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="AddLine">
-                                    <i class="bi bi-plus me-1"></i> Add Line
-                                </button>
-                            </td>
-                            <td class="text-end fw-bold">₱@_entryLines.Sum(l => l.Debit).ToString("N2")</td>
-                            <td class="text-end fw-bold">₱@_entryLines.Sum(l => l.Credit).ToString("N2")</td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+                        </tfoot>
+                    </table>
+                </div>
 
-            @if (_entryLines.Sum(l => l.Debit) != _entryLines.Sum(l => l.Credit))
-            {
-                <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    <span>Debits and credits must be equal. Difference: ₱@Math.Abs(_entryLines.Sum(l => l.Debit) -
-                                                                    _entryLines.Sum(l => l.Credit)).ToString("N2")</span>
-                    </div>
-                }
-            </ChildContent>
-            <FooterContent>
-                <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Cancel</button>
-                <button type="button" class="btn btn-primary" @onclick="SaveEntry"
-                        disabled="@(_isSaving || _entryLines.Sum(l => l.Debit) != _entryLines.Sum(l => l.Credit))">
-                    @if (_isSaving)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
-                    }
-                    <i class="bi bi-check-lg me-1"></i> Save Entry
-                </button>
-            </FooterContent>
-        </Modal>
-
-        @* View Journal Entry Detail Modal *@
-        <Modal @bind-IsVisible="_showViewModal" Title="Journal Entry Details" Size="Modal.ModalSize.Large">
-            <ChildContent>
-                @if (_viewEntry != null)
+                @if (_entryLines.Sum(l => l.Debit) != _entryLines.Sum(l => l.Credit))
                 {
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Entry Number</label>
-                            <div class="fw-bold text-primary">@_viewEntry.EntryNumber</div>
+                    <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span>Debits and credits must be equal. Difference: ₱@Math.Abs(_entryLines.Sum(l => l.Debit) -
+                                                                            _entryLines.Sum(l => l.Credit)).ToString("N2")</span>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Date</label>
-                            <div class="fw-medium">@_viewEntry.EntryDate.ToString("MMM dd, yyyy")</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-muted small">Status</label>
-                            <div><span class="badge @GetStatusBadge(_viewEntry.Status)">@_viewEntry.Status</span></div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Description</label>
-                            <div>@(_viewEntry.Description ?? "—")</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">Reference Type</label>
-                            <div>@(_viewEntry.ReferenceType ?? "—")</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label text-muted small">Reference ID</label>
-                            <div>@(_viewEntry.ReferenceId ?? "—")</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Created By</label>
-                            <div>@_viewEntry.CreatedByName</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-muted small">Created At</label>
-                            <div>@_viewEntry.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
-                        </div>
-                    </div>
+                    }
+                </ChildContent>
+                <FooterContent>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveEntry"
+                            disabled="@(_isSaving || _entryLines.Sum(l => l.Debit) != _entryLines.Sum(l => l.Credit))">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-check-lg me-1"></i> Save Entry
+                    </button>
+                </FooterContent>
+            </Modal>
 
-                    <h6 class="mb-3">Entry Lines</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Account Code</th>
-                                    <th>Account Name</th>
-                                    <th>Description</th>
-                                    <th class="text-end">Debit (₱)</th>
-                                    <th class="text-end">Credit (₱)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var line in _viewEntry.Lines)
-                                {
+            @* View Journal Entry Detail Modal *@
+            <Modal @bind-IsVisible="_showViewModal" Title="Journal Entry Details" Size="Modal.ModalSize.Large">
+                <ChildContent>
+                    @if (_viewEntry != null)
+                    {
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">Entry Number</label>
+                                <div class="fw-bold text-primary">@_viewEntry.EntryNumber</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">Date</label>
+                                <div class="fw-medium">@_viewEntry.EntryDate.ToString("MMM dd, yyyy")</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small">Status</label>
+                                <div><span class="badge @GetStatusBadge(_viewEntry.Status)">@_viewEntry.Status</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Description</label>
+                                <div>@(_viewEntry.Description ?? "—")</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">Reference Type</label>
+                                <div>@(_viewEntry.ReferenceType ?? "—")</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small">Reference ID</label>
+                                <div>@(_viewEntry.ReferenceId ?? "—")</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Created By</label>
+                                <div>@_viewEntry.CreatedByName</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Created At</label>
+                                <div>@_viewEntry.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3">Entry Lines</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
                                     <tr>
-                                        <td><code>@line.AccountCode</code></td>
-                                        <td>@line.AccountName</td>
-                                        <td class="text-muted">@(line.Description ?? "—")</td>
-                                        <td class="text-end">@(line.DebitAmount > 0 ? $"₱{line.DebitAmount:N2}" : "")</td>
-                                        <td class="text-end">@(line.CreditAmount > 0 ? $"₱{line.CreditAmount:N2}" : "")</td>
+                                        <th>Account Code</th>
+                                        <th>Account Name</th>
+                                        <th>Description</th>
+                                        <th class="text-end">Debit (₱)</th>
+                                        <th class="text-end">Credit (₱)</th>
                                     </tr>
-                                }
-                            </tbody>
-                            <tfoot class="table-light fw-bold">
-                                <tr>
-                                    <td colspan="3" class="text-end">Totals:</td>
-                                    <td class="text-end">₱@_viewEntry.TotalDebit.ToString("N2")</td>
-                                    <td class="text-end">₱@_viewEntry.TotalCredit.ToString("N2")</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                }
-            </ChildContent>
-            <FooterContent>
-                <button type="button" class="btn btn-secondary" @onclick="() => _showViewModal = false">Close</button>
-            </FooterContent>
-        </Modal>
-    </AuthorizedPage>
+                                </thead>
+                                <tbody>
+                                    @foreach (var line in _viewEntry.Lines)
+                                    {
+                                        <tr>
+                                            <td><code>@line.AccountCode</code></td>
+                                            <td>@line.AccountName</td>
+                                            <td class="text-muted">@(line.Description ?? "—")</td>
+                                            <td class="text-end">@(line.DebitAmount > 0 ? $"₱{line.DebitAmount:N2}" : "")</td>
+                                            <td class="text-end">@(line.CreditAmount > 0 ? $"₱{line.CreditAmount:N2}" : "")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="3" class="text-end">Totals:</td>
+                                        <td class="text-end">₱@_viewEntry.TotalDebit.ToString("N2")</td>
+                                        <td class="text-end">₱@_viewEntry.TotalCredit.ToString("N2")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                </ChildContent>
+                <FooterContent>
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showViewModal = false">Close</button>
+                </FooterContent>
+            </Modal>
+        </AuthorizedPage>
 
 @code {
     private bool _isLoading = true;
@@ -410,11 +411,11 @@
     private List<ChartOfAccountResponse> _accounts = new();
 
     private IEnumerable<JournalEntryResponse> FilteredEntries => _entries.Where(e =>
-        (string.IsNullOrEmpty(_searchTerm) ||
-            (e.EntryNumber?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (e.Description?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (e.CreatedByName?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)) &&
-        (string.IsNullOrEmpty(_accountFilter) || MatchesAccountFilter(e))
+    (string.IsNullOrEmpty(_searchTerm) ||
+    (e.EntryNumber?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    (e.Description?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    (e.CreatedByName?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)) &&
+    (string.IsNullOrEmpty(_accountFilter) || MatchesAccountFilter(e))
     );
 
     private bool MatchesAccountFilter(JournalEntryResponse entry)
@@ -424,13 +425,14 @@
         {
             "cash" => entry.Lines.Any(l => l.AccountName?.Contains("Cash", StringComparison.OrdinalIgnoreCase) == true),
             "bank" => entry.Lines.Any(l => l.AccountName?.Contains("Bank", StringComparison.OrdinalIgnoreCase) == true),
-            "receivables" => entry.Lines.Any(l => l.AccountName?.Contains("Receivable", StringComparison.OrdinalIgnoreCase) == true),
+            "receivables" => entry.Lines.Any(l => l.AccountName?.Contains("Receivable", StringComparison.OrdinalIgnoreCase) ==
+            true),
             "payables" => entry.Lines.Any(l => l.AccountName?.Contains("Payable", StringComparison.OrdinalIgnoreCase) == true),
             "revenue" => entry.Lines.Any(l => l.AccountName?.Contains("Revenue", StringComparison.OrdinalIgnoreCase) == true ||
-                                               l.AccountName?.Contains("Income", StringComparison.OrdinalIgnoreCase) == true ||
-                                               l.AccountName?.Contains("Sales", StringComparison.OrdinalIgnoreCase) == true),
+            l.AccountName?.Contains("Income", StringComparison.OrdinalIgnoreCase) == true ||
+            l.AccountName?.Contains("Sales", StringComparison.OrdinalIgnoreCase) == true),
             "expenses" => entry.Lines.Any(l => l.AccountName?.Contains("Expense", StringComparison.OrdinalIgnoreCase) == true ||
-                                               l.AccountName?.Contains("Cost", StringComparison.OrdinalIgnoreCase) == true),
+            l.AccountName?.Contains("Cost", StringComparison.OrdinalIgnoreCase) == true),
             _ => true
         };
     }
@@ -449,6 +451,7 @@
     private async Task LoadData()
     {
         _isLoading = true;
+        StateHasChanged();
         try
         {
             var (startDate, endDate) = GetDateRange();
@@ -467,10 +470,15 @@
             _totalEntries = response.TotalCount;
             _totalPages = response.TotalPages;
 
-            // Calculate summary stats
-            _monthEntries = _entries.Count;
-            _totalDebits = _entries.Sum(e => e.TotalDebit);
-            _totalCredits = _entries.Sum(e => e.TotalCredit);
+            // Load summary stats from server (computed from full dataset)
+            var summary = await AccountingService.GetJournalSummaryAsync();
+            if (summary != null)
+            {
+                _totalEntries = summary.TotalEntries;
+                _monthEntries = summary.MonthEntries;
+                _totalDebits = summary.TotalDebits;
+                _totalCredits = summary.TotalCredits;
+            }
 
             // Load accounts for dropdown
             _accounts = await AccountingService.GetAccountsHierarchyAsync();
@@ -480,12 +488,15 @@
             Console.WriteLine($"Error loading journal entries: {ex.Message}");
             _entries = new List<JournalEntryResponse>();
         }
-        _isLoading = false;
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private (DateTime start, DateTime end) GetDateRange()
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         return _dateFilter switch
         {
             "today" => (today, today),
@@ -500,7 +511,7 @@
     private void ShowAddModal()
     {
         _isEditing = false;
-        _entryForm = new JournalEntryForm { Date = DateTime.Today };
+        _entryForm = new JournalEntryForm { Date = PhilippineTime.Today };
         _entryLines = new List<JournalLine>
 {
 new(),
@@ -595,7 +606,7 @@ new()
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("MiddayMist Spa - General Journal");
             sb.AppendLine($"Period: {startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy}");
-            sb.AppendLine($"Generated: {DateTime.Now:MMM dd, yyyy hh:mm tt}");
+            sb.AppendLine($"Generated: {PhilippineTime.Now:MMM dd, yyyy hh:mm tt}");
             sb.AppendLine();
             sb.AppendLine("Entry #,Date,Description,Reference Type,Account Code,Account Name,Debit,Credit,Status");
             foreach (var entry in _entries.OrderByDescending(e => e.EntryDate))
@@ -618,7 +629,8 @@ new()
             sb.AppendLine($"Totals,,,,,{_entries.Sum(e => e.TotalDebit):F2},{_entries.Sum(e => e.TotalCredit):F2},");
             var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
             var base64 = Convert.ToBase64String(bytes);
-            await JSRuntime.InvokeVoidAsync("downloadFile", $"Journal_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.csv", "text/csv", base64);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Journal_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.csv", "text/csv",
+            base64);
         }
         catch (Exception ex)
         {
@@ -648,7 +660,7 @@ new()
 
     private class JournalEntryForm
     {
-        public DateTime Date { get; set; } = DateTime.Today;
+        public DateTime Date { get; set; } = PhilippineTime.Today;
         public string Description { get; set; } = "";
         public string Reference { get; set; } = "";
     }

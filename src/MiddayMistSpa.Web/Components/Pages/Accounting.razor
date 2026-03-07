@@ -521,7 +521,7 @@ new() { Name = "Accounts Payable", Balance = summary?.AccountsPayable ?? 0, Icon
 
     private (DateTime startDate, DateTime endDate) GetDateRange(string period)
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         return period switch
         {
             "today" => (today, today),

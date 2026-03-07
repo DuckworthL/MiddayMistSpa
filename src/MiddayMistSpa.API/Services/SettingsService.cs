@@ -21,7 +21,7 @@ public class SettingsService : ISettingsService
     // System role codes that cannot be deleted
     private static readonly HashSet<string> SystemRoleCodes = new()
     {
-        "SUPERADMIN", "ADMIN", "RECEPTIONIST", "THERAPIST", "HR", "INVENTORY", "ACCOUNTANT"
+        "SUPERADMIN", "ADMIN", "RECEPTIONIST", "THERAPIST", "HR", "INVENTORY", "ACCOUNTANT", "SALES_LEDGER"
     };
 
     // Default role icons
@@ -33,7 +33,8 @@ public class SettingsService : ISettingsService
         ["Therapist"] = "bi-person-heart",
         ["HR"] = "bi-people",
         ["Inventory"] = "bi-box-seam",
-        ["Accountant"] = "bi-calculator"
+        ["Accountant"] = "bi-calculator",
+        ["Sales Ledger"] = "bi-journal-text"
     };
 
     public SettingsService(SpaDbContext context, ILogger<SettingsService> logger)
@@ -712,6 +713,17 @@ public class SettingsService : ISettingsService
             "accounting.view", "accounting.manage",
             "payroll.view", "payroll.manage",
             "pos.access",
+            "reports.view", "reports.export",
+            "timeattendance.view",
+            "notifications.view"
+        },
+        "Sales Ledger" => new HashSet<string>
+        {
+            "dashboard.view",
+            "pos.access",
+            "customers.view",
+            "services.view",
+            "accounting.view",
             "reports.view", "reports.export",
             "timeattendance.view",
             "notifications.view"

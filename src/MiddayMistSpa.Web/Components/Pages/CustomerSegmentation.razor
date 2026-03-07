@@ -1027,14 +1027,9 @@
 
         try
         {
-            // Load current status and segments
-            var statusTask = SegmentationService.GetClusteringStatusAsync();
-            var segmentsTask = SegmentationService.GetAllSegmentsAsync();
-
-            await Task.WhenAll(statusTask, segmentsTask);
-
-            _clusteringStatus = await statusTask;
-            _segments = await segmentsTask;
+            // Load sequentially to avoid DbContext concurrency issues in production
+            _clusteringStatus = await SegmentationService.GetClusteringStatusAsync();
+            _segments = await SegmentationService.GetAllSegmentsAsync();
         }
         catch (Exception ex)
         {

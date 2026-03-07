@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using MiddayMistSpa.Core;
 
 namespace MiddayMistSpa.Web.Models;
 
@@ -303,8 +304,8 @@ public class AppointmentResponse
     public DateTime UpdatedAt { get; set; }
 
     // Computed (for UI convenience)
-    public bool IsToday => AppointmentDate.Date == DateTime.Today;
-    public bool IsUpcoming => AppointmentDate.Date >= DateTime.Today && Status != "Cancelled" && Status != "Completed";
+    public bool IsToday => AppointmentDate.Date == PhilippineTime.Today;
+    public bool IsUpcoming => AppointmentDate.Date >= PhilippineTime.Today && Status != "Cancelled" && Status != "Completed";
     public bool CanBeRescheduled => Status is "Scheduled" or "Confirmed";
     public bool CanBeCancelled => Status is "Scheduled" or "Confirmed";
 
@@ -613,7 +614,7 @@ public class TransactionProductItem
 
 public class CreateTransactionRequest
 {
-    public int CustomerId { get; set; }
+    public int? CustomerId { get; set; }
     public int? AppointmentId { get; set; }
     public List<CreateTransactionServiceItemRequest> ServiceItems { get; set; } = new();
     public List<CreateTransactionProductItemRequest> ProductItems { get; set; } = new();
@@ -1562,6 +1563,16 @@ public class IncomeRecordResponse
     public string Category { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Status { get; set; } = string.Empty;
+    public List<IncomeLineItemResponse> LineItems { get; set; } = new();
+}
+
+public class IncomeLineItemResponse
+{
+    public string ItemName { get; set; } = string.Empty;
+    public string ItemType { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalPrice { get; set; }
 }
 
 public class CreateIncomeRequest
@@ -1605,6 +1616,7 @@ public class CreateInvoiceRequest
     public int CustomerId { get; set; }
     public DateTime InvoiceDate { get; set; }
     public DateTime DueDate { get; set; }
+    public string? Notes { get; set; }
     public List<CreateInvoiceLineRequest> Lines { get; set; } = new();
 }
 
@@ -1648,6 +1660,90 @@ public class RevenueStreamItem
     public string Stream { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal Percentage { get; set; }
+}
+
+// ============================================================================
+// Sub-page Summary Models
+// ============================================================================
+
+public class ExpenseSummaryResponse
+{
+    public decimal MonthTotal { get; set; }
+    public decimal LastMonthTotal { get; set; }
+    public decimal YtdTotal { get; set; }
+    public int PendingCount { get; set; }
+}
+
+public class IncomeSummaryResponse
+{
+    public decimal MonthTotal { get; set; }
+    public decimal ServicesRevenue { get; set; }
+    public decimal ProductSales { get; set; }
+    public decimal YtdTotal { get; set; }
+}
+
+public class JournalSummaryResponse
+{
+    public int TotalEntries { get; set; }
+    public int MonthEntries { get; set; }
+    public decimal TotalDebits { get; set; }
+    public decimal TotalCredits { get; set; }
+}
+
+public class CustomerStatsResponse
+{
+    public int TotalCustomers { get; set; }
+    public int LoyaltyMembers { get; set; }
+    public int ActiveCount { get; set; }
+    public int AtRiskCount { get; set; }
+}
+
+public class TransactionStatsResponse
+{
+    public decimal TodaySales { get; set; }
+    public int TodayCount { get; set; }
+    public decimal AverageTransaction { get; set; }
+    public decimal PendingPayments { get; set; }
+}
+
+// =============================================================================
+// Transaction Sales Report Models
+// =============================================================================
+
+public class TransactionSalesReportResponse
+{
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public int TotalTransactions { get; set; }
+    public decimal GrossSales { get; set; }
+    public decimal TotalDiscounts { get; set; }
+    public decimal TotalTax { get; set; }
+    public decimal TotalTips { get; set; }
+    public decimal TotalRefunds { get; set; }
+    public decimal NetSales { get; set; }
+    public decimal ServiceRevenue { get; set; }
+    public decimal ProductRevenue { get; set; }
+    public decimal TotalCommissions { get; set; }
+    public decimal AverageTransactionValue { get; set; }
+    public Dictionary<string, decimal> ByPaymentMethod { get; set; } = new();
+    public List<TopServiceReportItem> TopServices { get; set; } = new();
+    public List<TopProductReportItem> TopProducts { get; set; } = new();
+}
+
+public class TopServiceReportItem
+{
+    public int ServiceId { get; set; }
+    public string ServiceName { get; set; } = string.Empty;
+    public int QuantitySold { get; set; }
+    public decimal Revenue { get; set; }
+}
+
+public class TopProductReportItem
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public int QuantitySold { get; set; }
+    public decimal Revenue { get; set; }
 }
 
 // =============================================================================
@@ -1916,6 +2012,26 @@ public class ChangePasswordResponse
     public bool Success { get; set; }
     public string? Message { get; set; }
     public List<string>? ValidationErrors { get; set; }
+}
+
+public class PasswordResetResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+public class UpdateProfileRequest
+{
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+}
+
+public class UpdateProfileResponse
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
 }
 
 // ============================================================================

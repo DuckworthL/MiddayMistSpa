@@ -4,6 +4,7 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using MiddayMistSpa.API.DTOs.Customer;
 using MiddayMistSpa.API.DTOs.Report;
+using MiddayMistSpa.Core;
 using MiddayMistSpa.Core.Interfaces;
 
 namespace MiddayMistSpa.API.Services;
@@ -63,7 +64,6 @@ public class ExportService : IExportService
     private const string CompanyEmail = "info@middaymistspa.com";
 
     // Brand colors
-    private static readonly string PrimaryColor = "#2E7D6F";
     private static readonly string HeaderBgColor = "#2E7D6F";
 
     public ExportService(IUnitOfWork unitOfWork, ILogger<ExportService> logger, IWebHostEnvironment env)
@@ -71,8 +71,10 @@ public class ExportService : IExportService
         _unitOfWork = unitOfWork;
         _logger = logger;
 
-        // QuestPDF Community License
-        QuestPDF.Settings.License = LicenseType.Community;
+        // QuestPDF Community License — wrapped in try/catch because the native
+        // QuestPdfSkia library may not be available on shared hosting (MonsterASP.NET)
+        try { QuestPDF.Settings.License = LicenseType.Community; }
+        catch (Exception ex) { _logger.LogWarning(ex, "QuestPDF init failed — PDF exports will be unavailable"); }
 
         // Try to find logo
         _logoPath = Path.Combine(env.ContentRootPath, "..", "MiddayMistSpa.Web", "wwwroot", "images", "logo.png");
@@ -126,7 +128,7 @@ public class ExportService : IExportService
                             .FontSize(9).FontColor(Colors.Grey.Darken1);
                     }
 
-                    col.Item().AlignRight().Text($"Generated: {DateTime.Now:MMM dd, yyyy hh:mm tt}")
+                    col.Item().AlignRight().Text($"Generated: {PhilippineTime.Now:MMM dd, yyyy hh:mm tt}")
                         .FontSize(8).FontColor(Colors.Grey.Medium);
 
                     if (!string.IsNullOrEmpty(generatedBy))
@@ -468,7 +470,7 @@ public class ExportService : IExportService
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"Sales Report — {CompanyName}");
         sb.AppendLine($"Period: {startDate:MMM dd yyyy} to {endDate:MMM dd yyyy}");
-        sb.AppendLine($"Generated: {DateTime.Now:MMM dd yyyy hh:mm tt}");
+        sb.AppendLine($"Generated: {PhilippineTime.Now:MMM dd yyyy hh:mm tt}");
         sb.AppendLine();
         sb.AppendLine($"Gross Sales,{data.GrossSales:N2}");
         sb.AppendLine($"Discounts,{data.Discounts:N2}");
@@ -832,7 +834,7 @@ public class ExportService : IExportService
 
     public Task<ExportResponse> ExportInventoryReportAsync(InventoryReportResponse data, string format, string? generatedBy = null)
     {
-        var now = DateTime.Now;
+        var now = PhilippineTime.Now;
         if (format.Equals("CSV", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(ExportInventoryCsv(data));
         if (format.Equals("Excel", StringComparison.OrdinalIgnoreCase))
@@ -917,7 +919,7 @@ public class ExportService : IExportService
 
         return new ExportResponse
         {
-            FileName = $"Inventory_Report_{DateTime.Now:yyyyMMdd}.pdf",
+            FileName = $"Inventory_Report_{PhilippineTime.Now:yyyyMMdd}.pdf",
             ContentType = "application/pdf",
             FileContent = pdf.GeneratePdf()
         };
@@ -953,14 +955,14 @@ public class ExportService : IExportService
         }
 
         ws.Columns().AdjustToContents();
-        return WorkbookToResponse(wb, $"Inventory_Report_{DateTime.Now:yyyyMMdd}");
+        return WorkbookToResponse(wb, $"Inventory_Report_{PhilippineTime.Now:yyyyMMdd}");
     }
 
     private ExportResponse ExportInventoryCsv(InventoryReportResponse data)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"Inventory Report — {CompanyName}");
-        sb.AppendLine($"Generated: {DateTime.Now:MMM dd yyyy hh:mm tt}");
+        sb.AppendLine($"Generated: {PhilippineTime.Now:MMM dd yyyy hh:mm tt}");
         sb.AppendLine();
         sb.AppendLine("Product,Category,Stock,Reorder Level,Unit Price,Total Value,Status");
         if (data.Products != null)
@@ -970,7 +972,7 @@ public class ExportService : IExportService
                 sb.AppendLine($"\"{p.ProductName}\",\"{p.Category}\",{p.CurrentStock},{p.ReorderLevel},{p.SellingPrice:N2},{p.StockValue:N2},{status}");
             }
 
-        return CsvToResponse(sb, $"Inventory_Report_{DateTime.Now:yyyyMMdd}");
+        return CsvToResponse(sb, $"Inventory_Report_{PhilippineTime.Now:yyyyMMdd}");
     }
 
     // ========================================================================
@@ -1592,7 +1594,7 @@ public class ExportService : IExportService
         if (startDate.HasValue && endDate.HasValue)
             ws.Cell(3, 1).Value = $"Period: {startDate.Value:MMMM dd, yyyy} — {endDate.Value:MMMM dd, yyyy}";
         else
-            ws.Cell(3, 1).Value = $"Generated: {DateTime.Now:MMMM dd, yyyy hh:mm tt}";
+            ws.Cell(3, 1).Value = $"Generated: {PhilippineTime.Now:MMMM dd, yyyy hh:mm tt}";
 
         ws.Cell(3, 1).Style.Font.FontColor = XLColor.Gray;
     }
@@ -1651,7 +1653,7 @@ public class ExportService : IExportService
         ClusteringPerformanceMetrics? metrics,
         string? generatedBy)
     {
-        var now = DateTime.Now;
+        var now = PhilippineTime.Now;
         var pdf = Document.Create(doc =>
         {
             doc.Page(page =>
@@ -1819,7 +1821,7 @@ public class ExportService : IExportService
         List<(string SegmentName, List<CustomerListResponse> Customers)> segmentCustomers,
         ClusteringPerformanceMetrics? metrics)
     {
-        var now = DateTime.Now;
+        var now = PhilippineTime.Now;
         using var wb = new XLWorkbook();
 
         // ── Summary Sheet ──────────────────────────────────────────────────

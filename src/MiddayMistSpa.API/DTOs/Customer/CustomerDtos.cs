@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MiddayMistSpa.API.DTOs.Customer;
 
 #region Customer DTOs
@@ -258,7 +260,9 @@ public record CustomerSearchRequest
     public string? Segment { get; init; }
     public bool? HasAllergies { get; init; }
     public bool? IsActive { get; init; }
+    [Range(1, int.MaxValue)]
     public int Page { get; init; } = 1;
+    [Range(1, 100)]
     public int PageSize { get; init; } = 20;
     public string? SortBy { get; init; }
     public bool SortDescending { get; init; }
@@ -274,6 +278,18 @@ public record SegmentExportRequest
     public string Format { get; init; } = "PDF";
     /// <summary>Optional: filter to a specific segment name. Null = export all.</summary>
     public string? SegmentName { get; init; }
+}
+
+#endregion
+
+#region Stats
+
+public class CustomerStatsResponse
+{
+    public int TotalCustomers { get; set; }
+    public int LoyaltyMembers { get; set; }
+    public int ActiveCount { get; set; }
+    public int AtRiskCount { get; set; }
 }
 
 #endregion

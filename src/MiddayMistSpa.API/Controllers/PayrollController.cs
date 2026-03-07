@@ -117,6 +117,26 @@ public class PayrollController : ControllerBase
         }
     }
 
+    [HttpPost("periods/{id}/reopen")]
+    [Authorize(Policy = "Permission:payroll.manage")]
+    public async Task<ActionResult<PayrollPeriodResponse>> ReopenPayrollPeriod(int id)
+    {
+        try
+        {
+            var result = await _payrollService.ReopenPayrollPeriodAsync(id);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reopening payroll period {PayrollPeriodId}", id);
+            return StatusCode(500, new { error = "An error occurred while reopening the payroll period" });
+        }
+    }
+
     [HttpDelete("periods/{id}")]
     [Authorize(Policy = "Permission:payroll.manage")]
     public async Task<ActionResult> DeletePayrollPeriod(int id)

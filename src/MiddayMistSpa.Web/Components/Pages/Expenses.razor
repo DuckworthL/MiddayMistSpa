@@ -225,11 +225,48 @@
             </div>
         </div>
     }
+
+    @if (_showDetailModal && _selectedExpense != null)
+    {
+        <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Expense Details</h5>
+                        <button type="button" class="btn-close" @onclick="() => _showDetailModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Entry #</dt>
+                            <dd class="col-sm-8">@_selectedExpense.EntryNumber</dd>
+                            <dt class="col-sm-4">Date</dt>
+                            <dd class="col-sm-8">@_selectedExpense.Date.ToString("MMM dd, yyyy")</dd>
+                            <dt class="col-sm-4">Description</dt>
+                            <dd class="col-sm-8">@(_selectedExpense.Description ?? "—")</dd>
+                            <dt class="col-sm-4">Vendor</dt>
+                            <dd class="col-sm-8">@(_selectedExpense.Vendor ?? "—")</dd>
+                            <dt class="col-sm-4">Category</dt>
+                            <dd class="col-sm-8">@_selectedExpense.Category</dd>
+                            <dt class="col-sm-4">Amount</dt>
+                            <dd class="col-sm-8 fw-bold text-danger">₱@_selectedExpense.Amount.ToString("N2")</dd>
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8"><span class="badge @GetStatusBadge(_selectedExpense.Status)">@_selectedExpense.Status</span></dd>
+                            <dt class="col-sm-4">Created By</dt>
+                            <dd class="col-sm-8">@_selectedExpense.CreatedByName</dd>
+                        </dl>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="() => _showDetailModal = false">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </AuthorizedPage>
 
 @code {
-    private List<string> _categories = new() { "Supplies & Products", "Payroll", "Rent", "Utilities", "Marketing",
-"Equipment", "Maintenance", "Insurance", "Taxes", "Other" };
+    private List<string> _categories = new() { "Salary Expense", "Cost of Goods Sold", "Supplies Expense",
+"Rent Expense", "Utilities Expense", "Other" };
 
     private List<ExpenseResponse> _expenses = new();
     private List<ChartOfAccountResponse> _accounts = new();
@@ -249,6 +286,8 @@
     private int _totalPages = 1;
 
     private bool _showModal = false;
+    private bool _showDetailModal = false;
+    private ExpenseResponse? _selectedExpense;
     private ExpenseFormModel _formModel = new();
 
     protected override void OnInitialized()
@@ -259,6 +298,7 @@
     private async Task LoadData()
     {
         _isLoading = true;
+        StateHasChanged();
         try
         {
             var response = await AccountingService.GetExpensesAsync(
@@ -270,12 +310,15 @@
             _expenses = response.Items;
             _totalPages = response.TotalPages;
 
-            // Calculate summary stats
-            _monthTotal = _expenses.Where(e => e.Date.Month == DateTime.Today.Month && e.Date.Year == DateTime.Today.Year).Sum(e =>
-            e.Amount);
-            _lastMonthTotal = _expenses.Where(e => e.Date.Month == DateTime.Today.AddMonths(-1).Month).Sum(e => e.Amount);
-            _ytdTotal = _expenses.Where(e => e.Date.Year == DateTime.Today.Year).Sum(e => e.Amount);
-            _pendingCount = _expenses.Count(e => e.Status == "Pending");
+            // Load summary stats from server (computed from full dataset)
+            var summary = await AccountingService.GetExpenseSummaryAsync();
+            if (summary != null)
+            {
+                _monthTotal = summary.MonthTotal;
+                _lastMonthTotal = summary.LastMonthTotal;
+                _ytdTotal = summary.YtdTotal;
+                _pendingCount = summary.PendingCount;
+            }
 
             // Load accounts for dropdown
             _accounts = await AccountingService.GetAccountsHierarchyAsync();
@@ -285,7 +328,10 @@
             Console.WriteLine($"Error loading expenses: {ex.Message}");
             _expenses = new List<ExpenseResponse>();
         }
-        _isLoading = false;
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private IEnumerable<ExpenseResponse> FilteredExpenses => _expenses.Where(e =>
@@ -306,13 +352,14 @@
 
     private void ShowAddModal()
     {
-        _formModel = new ExpenseFormModel { Date = DateTime.Now };
+        _formModel = new ExpenseFormModel { Date = PhilippineTime.Now };
         _showModal = true;
     }
 
     private void ViewExpense(ExpenseResponse expense)
     {
-        // TODO: Show detail view
+        _selectedExpense = expense;
+        _showDetailModal = true;
     }
 
     private void CloseModal() => _showModal = false;
@@ -351,7 +398,7 @@
             var fromLabel = _dateFrom?.ToString("MMM dd, yyyy") ?? "All";
             var toLabel = _dateTo?.ToString("MMM dd, yyyy") ?? "Present";
             sb.AppendLine($"Period: {fromLabel} to {toLabel}");
-            sb.AppendLine($"Generated: {DateTime.Now:MMM dd, yyyy hh:mm tt}");
+            sb.AppendLine($"Generated: {PhilippineTime.Now:MMM dd, yyyy hh:mm tt}");
             sb.AppendLine();
             sb.AppendLine("Entry #,Date,Description,Vendor,Category,Amount,Status,Created By");
             foreach (var e in _expenses.OrderByDescending(e => e.Date))
@@ -363,7 +410,7 @@
             sb.AppendLine($"Total Expenses,,,,,{_expenses.Sum(e => e.Amount):F2},,");
             var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
             var base64 = Convert.ToBase64String(bytes);
-            await JSRuntime.InvokeVoidAsync("downloadFile", $"Expenses_{DateTime.Now:yyyyMMdd}.csv", "text/csv", base64);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Expenses_{PhilippineTime.Now:yyyyMMdd}.csv", "text/csv", base64);
         }
         catch (Exception ex)
         {
@@ -373,7 +420,7 @@
 
     private class ExpenseFormModel
     {
-        public DateTime Date { get; set; } = DateTime.Now;
+        public DateTime Date { get; set; } = PhilippineTime.Now;
         public string Description { get; set; } = "";
         public string? Vendor { get; set; }
         public int ExpenseAccountId { get; set; }

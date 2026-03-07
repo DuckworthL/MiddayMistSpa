@@ -50,6 +50,14 @@ public class CustomersController : ControllerBase
         }
     }
 
+    [HttpGet("stats")]
+    [Authorize(Policy = "Permission:customers.view")]
+    public async Task<ActionResult<CustomerStatsResponse>> GetCustomerStats()
+    {
+        var result = await _customerService.GetCustomerStatsAsync();
+        return Ok(result);
+    }
+
     /// <summary>
     /// Get customer by ID
     /// </summary>

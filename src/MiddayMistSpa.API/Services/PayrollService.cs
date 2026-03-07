@@ -167,6 +167,25 @@ public class PayrollService : IPayrollService
         return (await GetPayrollPeriodByIdAsync(payrollPeriodId))!;
     }
 
+    public async Task<PayrollPeriodResponse> ReopenPayrollPeriodAsync(int payrollPeriodId)
+    {
+        var period = await _context.PayrollPeriods
+            .FirstOrDefaultAsync(p => p.PayrollPeriodId == payrollPeriodId)
+            ?? throw new InvalidOperationException("Payroll period not found");
+
+        if (period.Status == "Draft")
+            throw new InvalidOperationException("Payroll period is already in Draft status");
+
+        period.Status = "Draft";
+        period.UpdatedAt = PhilippineTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Payroll period {PeriodId} reopened to Draft status", payrollPeriodId);
+
+        return (await GetPayrollPeriodByIdAsync(payrollPeriodId))!;
+    }
+
     public async Task<PayrollPeriodResponse> FinalizePayrollPeriodAsync(int payrollPeriodId, int finalizedByUserId)
     {
         var period = await _context.PayrollPeriods

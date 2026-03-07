@@ -291,11 +291,12 @@ public class ReportingService : IReportingService
             .ToListAsync();
 
         return transactions
-            .GroupBy(t => t.CustomerId)
+            .Where(t => t.CustomerId.HasValue)
+            .GroupBy(t => t.CustomerId!.Value)
             .Select(g => new TopCustomer
             {
                 CustomerId = g.Key,
-                CustomerName = g.First().Customer != null ? $"{g.First().Customer.FirstName} {g.First().Customer.LastName}" : "Unknown",
+                CustomerName = g.First().Customer != null ? $"{g.First().Customer!.FirstName} {g.First().Customer!.LastName}" : "Unknown",
                 VisitCount = g.Count(),
                 TotalSpent = g.Sum(t => t.TotalAmount),
                 LoyaltyPoints = g.First().Customer?.LoyaltyPoints ?? 0
@@ -781,11 +782,12 @@ public class ReportingService : IReportingService
             .ToListAsync();
 
         var topCustomers = transactions
-            .GroupBy(t => t.CustomerId)
+            .Where(t => t.CustomerId.HasValue)
+            .GroupBy(t => t.CustomerId!.Value)
             .Select(g => new TopCustomerDetail
             {
                 CustomerId = g.Key,
-                CustomerName = g.First().Customer != null ? $"{g.First().Customer.FirstName} {g.First().Customer.LastName}" : "Unknown",
+                CustomerName = g.First().Customer != null ? $"{g.First().Customer!.FirstName} {g.First().Customer!.LastName}" : "Unknown",
                 Email = g.First().Customer?.Email,
                 MembershipTier = g.First().Customer?.MembershipType ?? "Regular",
                 TotalVisits = g.Count(),

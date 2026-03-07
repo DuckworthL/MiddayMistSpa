@@ -517,7 +517,7 @@
             var all = await InventoryService.GetProductsAsync(page: 1, pageSize: 9999, isActive: true);
             _totalProductCount = all.TotalCount;
             _lowStockCount = all.Items.Count(p => p.QuantityInStock > 0 && p.ReorderLevel > 0 && p.QuantityInStock <=
-p.ReorderLevel);
+            p.ReorderLevel);
             _outOfStockCount = all.Items.Count(p => p.QuantityInStock == 0);
             _totalValue = all.Items.Sum(p => p.QuantityInStock * p.UnitCost);
         }
@@ -593,7 +593,7 @@ p.ReorderLevel);
         try
         {
             var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("inventory",
-_exportFormat, DateTime.Today.AddYears(-1), DateTime.Today);
+            _exportFormat, PhilippineTime.Today.AddYears(-1), PhilippineTime.Today);
             if (fileContent != null && fileName != null)
             {
                 var base64 = Convert.ToBase64String(fileContent);

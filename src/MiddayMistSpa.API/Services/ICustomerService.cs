@@ -56,4 +56,10 @@ public interface ICustomerService
     Task<List<CustomerListResponse>> GetExpiringMembershipsAsync(int daysAhead = 30);
 
     #endregion
+
+    #region Stats
+
+    Task<CustomerStatsResponse> GetCustomerStatsAsync();
+
+    #endregion
 }

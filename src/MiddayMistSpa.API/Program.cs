@@ -1,5 +1,7 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MiddayMistSpa.API.Services;
@@ -52,6 +54,7 @@ builder.Services.AddScoped<ITimeAttendanceService, TimeAttendanceService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IAccountingService, AccountingService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IClusteringService, ClusteringService>();
 builder.Services.AddScoped<ICurrencyService, CurrencyService>();
 builder.Services.AddScoped<IExportService, ExportService>();
@@ -130,7 +133,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("SuperAdmin"));
     options.AddPolicy("AdminOrAbove", policy => policy.RequireRole("SuperAdmin", "Admin"));
     options.AddPolicy("AllStaff", policy => policy.RequireRole(
-        "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales"));
+        "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales Ledger"));
 
     // Permission-based policies — driven by Roles & Permissions settings
     // Appointments
@@ -211,6 +214,52 @@ builder.Services.AddCors(options =>
 // =============================================================================
 builder.Services.AddHttpContextAccessor();
 
+// =============================================================================
+// RATE LIMITING - Protect against brute force & abuse
+// =============================================================================
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Strict limiter for auth endpoints (login, forgot-password, reset-password, 2fa)
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    // General limiter for all API endpoints
+    options.AddFixedWindowLimiter("api", opt =>
+    {
+        opt.PermitLimit = 60;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    // Global fallback: per-IP limiter
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync(
+            """{"error":"Too many requests. Please try again later."}""",
+            cancellationToken);
+    };
+});
+
 var app = builder.Build();
 
 // =============================================================================
@@ -237,6 +286,9 @@ app.UseHttpsRedirection();
 
 // CORS must be before Authentication/Authorization
 app.UseCors("AllowWebApp");
+
+// Rate limiting — after CORS, before Auth
+app.UseRateLimiter();
 
 // Authentication & Authorization
 app.UseAuthentication();

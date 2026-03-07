@@ -14,6 +14,7 @@ public interface IPayrollService
     Task<PagedResponse<PayrollPeriodListResponse>> SearchPayrollPeriodsAsync(PayrollPeriodSearchRequest request);
     Task<PayrollPeriodResponse> UpdatePayrollPeriodAsync(int payrollPeriodId, UpdatePayrollPeriodRequest request);
     Task<PayrollPeriodResponse> FinalizePayrollPeriodAsync(int payrollPeriodId, int finalizedByUserId);
+    Task<PayrollPeriodResponse> ReopenPayrollPeriodAsync(int payrollPeriodId);
     Task<bool> DeletePayrollPeriodAsync(int payrollPeriodId);
 
     // ============================================================================

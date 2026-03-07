@@ -271,6 +271,7 @@
     private async Task LoadNotifications()
     {
         _isLoading = true;
+        StateHasChanged();
         try
         {
             _notifications = await NotificationService.GetMyNotificationsAsync(false);
@@ -280,7 +281,10 @@
             Console.WriteLine($"Error loading notifications: {ex.Message}");
             _notifications = new List<NotificationResponse>();
         }
-        _isLoading = false;
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private void SetFilter(string filter)

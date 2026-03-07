@@ -126,7 +126,7 @@ if (!builder.Environment.IsDevelopment())
         options.AddPolicy("SuperAdminOnly", policy => policy.RequireRole("SuperAdmin"));
         options.AddPolicy("AdminOrAbove", policy => policy.RequireRole("SuperAdmin", "Admin"));
         options.AddPolicy("AllStaff", policy => policy.RequireRole(
-            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales"));
+            "SuperAdmin", "Admin", "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales Ledger"));
 
         // Permission-based policies
         options.AddPolicy("Permission:appointments.view", policy => policy.Requirements.Add(new MiddayMistSpa.API.Services.PermissionRequirement("appointments.view")));
@@ -174,12 +174,28 @@ if (!builder.Environment.IsDevelopment())
 }
 
 // Configure HttpClient for API communication
-builder.Services.AddHttpClient("SpaApi", client =>
+InProcessHandler? inProcessHandler = null;
+if (!builder.Environment.IsDevelopment())
 {
-    var baseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5286";
-    client.BaseAddress = new Uri(baseUrl);
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-});
+    // Production: route API calls through the in-process middleware pipeline
+    // to avoid HTTP loopback issues on MonsterASP.NET shared hosting
+    inProcessHandler = new InProcessHandler();
+    builder.Services.AddHttpClient("SpaApi", client =>
+    {
+        client.BaseAddress = new Uri("http://localhost");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    }).ConfigurePrimaryHttpMessageHandler(() => inProcessHandler)
+      .SetHandlerLifetime(Timeout.InfiniteTimeSpan);
+}
+else
+{
+    builder.Services.AddHttpClient("SpaApi", client =>
+    {
+        var baseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5286";
+        client.BaseAddress = new Uri(baseUrl);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
+}
 
 // Register Blazor API Services (shared between dev/prod)
 builder.Services.AddScoped<IApiClient, ApiClient>();
@@ -197,13 +213,18 @@ builder.Services.AddScoped<ITimeAttendanceApiService, TimeAttendanceApiService>(
 builder.Services.AddScoped<IReportsApiService, ReportsApiService>();
 builder.Services.AddScoped<INotificationApiService, NotificationApiService>();
 builder.Services.AddScoped<IAccountingApiService, AccountingApiService>();
-builder.Services.AddScoped<ICustomerSegmentationService, CustomerSegmentationService>();
 builder.Services.AddScoped<IProfileApiService, ProfileApiService>();
 builder.Services.AddScoped<IShiftApiService, ShiftApiService>();
 builder.Services.AddScoped<ICurrencyApiService, CurrencyApiService>();
 builder.Services.AddScoped<ITwoFactorApiService, TwoFactorApiService>();
 builder.Services.AddScoped<ICaptchaApiService, CaptchaApiService>();
 builder.Services.AddScoped<ISettingsApiService, SettingsApiService>();
+
+// Customer Segmentation: use direct service calls in production (bypass HTTP loopback)
+if (!builder.Environment.IsDevelopment())
+    builder.Services.AddScoped<ICustomerSegmentationService, DirectCustomerSegmentationService>();
+else
+    builder.Services.AddScoped<ICustomerSegmentationService, CustomerSegmentationService>();
 
 var app = builder.Build();
 
@@ -234,6 +255,21 @@ if (!app.Environment.IsDevelopment())
 // =============================================================================
 // MIDDLEWARE PIPELINE
 // =============================================================================
+// Production: wire InProcessHandler to the middleware pipeline so all
+// HttpClient calls are processed in-process (no network loopback)
+if (!app.Environment.IsDevelopment() && inProcessHandler != null)
+{
+    app.Use(next =>
+    {
+        inProcessHandler.Configure(next, app.Services.GetRequiredService<IServiceScopeFactory>());
+        return next;
+    });
+    // Explicit UseRouting so the captured 'next' pipeline includes endpoint routing.
+    // The framework adds implicit UseRouting BEFORE this point, so without this,
+    // the in-process pipeline would never match controller endpoints.
+    app.UseRouting();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -242,7 +278,9 @@ if (!app.Environment.IsDevelopment())
     // app.UseHttpsRedirection();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found");
+// Only apply status code pages for non-API routes (API routes should return JSON errors, not HTML)
+app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/api"), branch =>
+    branch.UseStatusCodePagesWithReExecute("/not-found"));
 app.UseStaticFiles();
 
 // Production: Add authentication/authorization middleware for API

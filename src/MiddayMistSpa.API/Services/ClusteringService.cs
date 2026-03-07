@@ -121,7 +121,7 @@ public class ClusteringService : IClusteringService
         var segmentedCustomers = await _context.Customers
             .CountAsync(c => c.IsActive && c.CustomerSegment != null);
 
-        var lastAnalysis = segments.Max(s => s.LastAnalysisDate);
+        var lastAnalysis = segments.Any() ? segments.Max(s => s.LastAnalysisDate) : null;
 
         return new ClusteringStatusResponse
         {

@@ -9,7 +9,7 @@ public class Transaction
 {
     public int TransactionId { get; set; }
     public string TransactionNumber { get; set; } = string.Empty;
-    public int CustomerId { get; set; }
+    public int? CustomerId { get; set; }
     public int? AppointmentId { get; set; } // Links to appointment if checkout after service
 
     // Amounts (in PHP)
@@ -55,7 +55,7 @@ public class Transaction
     public bool IsRefunded => PaymentStatus == "Refunded";
 
     // Navigation properties
-    public virtual Customer.Customer Customer { get; set; } = null!;
+    public virtual Customer.Customer? Customer { get; set; }
     public virtual Appointment.Appointment? Appointment { get; set; }
     public virtual User Cashier { get; set; } = null!;
     public virtual User? VoidedByUser { get; set; }

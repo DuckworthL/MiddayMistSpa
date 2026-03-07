@@ -195,6 +195,14 @@ public class TransactionsController : ControllerBase
     // Reports & Dashboard
     // ============================================================================
 
+    [HttpGet("stats")]
+    [Authorize(Policy = "Permission:pos.access")]
+    public async Task<ActionResult<TransactionStatsResponse>> GetTransactionStats()
+    {
+        var result = await _transactionService.GetTransactionStatsAsync();
+        return Ok(result);
+    }
+
     [HttpGet("dashboard")]
     [Authorize(Policy = "Permission:pos.access")]
     public async Task<ActionResult<POSDashboardResponse>> GetPOSDashboard([FromQuery] DateTime? date)

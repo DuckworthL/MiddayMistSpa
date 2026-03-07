@@ -67,6 +67,12 @@ public class RolePermissionService : IRolePermissionService
             "/employees", "/shifts", "/inventory", "/transactions", "/accounting", "/accounting/income",
             "/accounting/expenses", "/accounting/invoices", "/accounting/journal",
             "/payroll", "/time-attendance", "/reports", "/settings", "/profile", "/notifications"
+        },
+        ["Sales Ledger"] = new HashSet<string>
+        {
+            "/", "/transactions", "/customers", "/customers/segmentation", "/services",
+            "/accounting", "/accounting/income", "/accounting/invoices",
+            "/reports", "/time-attendance", "/profile", "/notifications"
         }
     };
 

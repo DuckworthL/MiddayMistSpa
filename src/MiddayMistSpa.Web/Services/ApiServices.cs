@@ -1,3 +1,4 @@
+using MiddayMistSpa.Core;
 using MiddayMistSpa.Web.Models;
 
 namespace MiddayMistSpa.Web.Services;
@@ -133,6 +134,7 @@ public interface ICustomerApiService
     Task<bool> DeleteCustomerAsync(int id);
     Task<List<LookupItem>> SearchCustomersAsync(string query);
     Task<List<LookupItem>> GetCustomerLookupAsync();
+    Task<CustomerStatsResponse?> GetCustomerStatsAsync();
 }
 
 public class CustomerApiService : ICustomerApiService
@@ -195,6 +197,11 @@ public class CustomerApiService : ICustomerApiService
     {
         var result = await _apiClient.GetAsync<List<LookupItem>>("api/customers/lookup");
         return result ?? new List<LookupItem>();
+    }
+
+    public async Task<CustomerStatsResponse?> GetCustomerStatsAsync()
+    {
+        return await _apiClient.GetAsync<CustomerStatsResponse>("api/customers/stats");
     }
 }
 
@@ -593,6 +600,8 @@ public interface ITransactionApiService
     Task<TransactionResponse?> FinalizePendingTransactionAsync(int transactionId, FinalizePendingTransactionRequest request);
     Task<bool> RefundTransactionAsync(int id);
     Task<decimal> GetTodayRevenueAsync();
+    Task<TransactionStatsResponse?> GetTransactionStatsAsync();
+    Task<TransactionSalesReportResponse?> GetTransactionSalesReportAsync(DateTime startDate, DateTime endDate);
 }
 
 public class TransactionApiService : ITransactionApiService
@@ -683,8 +692,18 @@ public class TransactionApiService : ITransactionApiService
     public async Task<decimal> GetTodayRevenueAsync()
     {
         // Use transactions list and sum completed transactions for today
-        var result = await _apiClient.GetAsync<PagedResponse<TransactionResponse>>($"api/transactions?startDate={DateTime.Today:yyyy-MM-dd}&endDate={DateTime.Today:yyyy-MM-dd}&pageSize=1000");
+        var result = await _apiClient.GetAsync<PagedResponse<TransactionResponse>>($"api/transactions?startDate={PhilippineTime.Today:yyyy-MM-dd}&endDate={PhilippineTime.Today:yyyy-MM-dd}&pageSize=1000");
         return result?.Items?.Where(t => t.PaymentStatus == "Completed").Sum(t => t.TotalAmount) ?? 0;
+    }
+
+    public async Task<TransactionStatsResponse?> GetTransactionStatsAsync()
+    {
+        return await _apiClient.GetAsync<TransactionStatsResponse>("api/transactions/stats");
+    }
+
+    public async Task<TransactionSalesReportResponse?> GetTransactionSalesReportAsync(DateTime startDate, DateTime endDate)
+    {
+        return await _apiClient.GetAsync<TransactionSalesReportResponse>($"api/transactions/reports/sales?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
     }
 }
 
@@ -701,6 +720,7 @@ public interface IPayrollApiService
     Task<PayrollPeriodResponse?> CreatePayrollPeriodAsync(CreatePayrollPeriodRequest request);
     Task<PayrollPeriodResponse?> FinalizePayrollPeriodAsync(int id);
     Task<(PayrollPeriodResponse? Result, string? ErrorMessage)> FinalizePayrollPeriodWithErrorAsync(int id);
+    Task<PayrollPeriodResponse?> ReopenPayrollPeriodAsync(int id);
 
     // Payroll Records
     Task<PagedResponse<PayrollRecordResponse>> GetPayrollRecordsAsync(int periodId, int page = 1, int pageSize = 50);
@@ -763,6 +783,11 @@ public class PayrollApiService : IPayrollApiService
     public async Task<(PayrollPeriodResponse? Result, string? ErrorMessage)> FinalizePayrollPeriodWithErrorAsync(int id)
     {
         return await _apiClient.PostWithErrorAsync<object, PayrollPeriodResponse>($"api/payroll/periods/{id}/finalize", new { });
+    }
+
+    public async Task<PayrollPeriodResponse?> ReopenPayrollPeriodAsync(int id)
+    {
+        return await _apiClient.PostAsync<object, PayrollPeriodResponse>($"api/payroll/periods/{id}/reopen", new { });
     }
 
     public async Task<PagedResponse<PayrollRecordResponse>> GetPayrollRecordsAsync(int periodId, int page = 1, int pageSize = 50)
@@ -848,6 +873,7 @@ public interface ITimeAttendanceApiService
     Task<AttendanceRecordResponse?> StartBreakAsync(int employeeId);
     Task<AttendanceRecordResponse?> EndBreakAsync(int employeeId);
     Task<AttendanceSummaryResponse?> GetAttendanceSummaryAsync(int employeeId, DateTime startDate, DateTime endDate);
+    Task<AttendanceRecordResponse?> ApproveAttendanceAsync(int attendanceId);
 
     // Time Off / Leave
     Task<PagedResponse<TimeOffResponse>> GetTimeOffRequestsAsync(int? employeeId = null, string? status = null, int page = 1, int pageSize = 20);
@@ -950,6 +976,11 @@ public class TimeAttendanceApiService : ITimeAttendanceApiService
     public async Task<TimeOffResponse?> CreateTimeOffRequestAsync(CreateTimeOffRequest request)
     {
         return await _apiClient.PostAsync<CreateTimeOffRequest, TimeOffResponse>("api/time-attendance/time-off", request);
+    }
+
+    public async Task<AttendanceRecordResponse?> ApproveAttendanceAsync(int attendanceId)
+    {
+        return await _apiClient.PostAsync<object, AttendanceRecordResponse>($"api/time-attendance/attendance/{attendanceId}/approve", new { });
     }
 
     public async Task<TimeOffResponse?> ApproveTimeOffAsync(int id)
@@ -1150,9 +1181,16 @@ public interface IAccountingApiService
     Task<PagedResponse<InvoiceResponse>> GetInvoicesAsync(string? status = null, int? customerId = null, int page = 1, int pageSize = 20);
     Task<InvoiceResponse?> GetInvoiceByIdAsync(int id);
     Task<InvoiceResponse?> CreateInvoiceAsync(CreateInvoiceRequest request);
+    Task<InvoiceResponse?> UpdateInvoiceStatusAsync(int id, string status);
+    Task<InvoiceResponse?> RecordInvoicePaymentAsync(int id, decimal amount);
 
     // Summary
     Task<AccountingSummaryResponse?> GetAccountingSummaryAsync(DateTime? startDate = null, DateTime? endDate = null);
+
+    // Sub-page Summaries
+    Task<ExpenseSummaryResponse?> GetExpenseSummaryAsync();
+    Task<IncomeSummaryResponse?> GetIncomeSummaryAsync();
+    Task<JournalSummaryResponse?> GetJournalSummaryAsync();
 }
 
 public class AccountingApiService : IAccountingApiService
@@ -1310,6 +1348,16 @@ public class AccountingApiService : IAccountingApiService
         return await _apiClient.PostAsync<CreateInvoiceRequest, InvoiceResponse>("api/accounting/invoices", request);
     }
 
+    public async Task<InvoiceResponse?> UpdateInvoiceStatusAsync(int id, string status)
+    {
+        return await _apiClient.PostAsync<object, InvoiceResponse>($"api/accounting/invoices/{id}/status", new { Status = status });
+    }
+
+    public async Task<InvoiceResponse?> RecordInvoicePaymentAsync(int id, decimal amount)
+    {
+        return await _apiClient.PostAsync<object, InvoiceResponse>($"api/accounting/invoices/{id}/payment", new { Amount = amount });
+    }
+
     // Summary
     public async Task<AccountingSummaryResponse?> GetAccountingSummaryAsync(DateTime? startDate = null, DateTime? endDate = null)
     {
@@ -1319,6 +1367,22 @@ public class AccountingApiService : IAccountingApiService
         if (endDate.HasValue) queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
         if (queryParams.Any()) url += "?" + string.Join("&", queryParams);
         return await _apiClient.GetAsync<AccountingSummaryResponse>(url);
+    }
+
+    // Sub-page Summaries
+    public async Task<ExpenseSummaryResponse?> GetExpenseSummaryAsync()
+    {
+        return await _apiClient.GetAsync<ExpenseSummaryResponse>("api/accounting/expenses/summary");
+    }
+
+    public async Task<IncomeSummaryResponse?> GetIncomeSummaryAsync()
+    {
+        return await _apiClient.GetAsync<IncomeSummaryResponse>("api/accounting/income/summary");
+    }
+
+    public async Task<JournalSummaryResponse?> GetJournalSummaryAsync()
+    {
+        return await _apiClient.GetAsync<JournalSummaryResponse>("api/accounting/journal-entries/summary");
     }
 }
 
@@ -1348,8 +1412,11 @@ public class CustomerSegmentationService : ICustomerSegmentationService
 
     public async Task<ClusteringResultResponse?> RunDbscanAnalysisAsync(DbscanParametersRequest parameters)
     {
-        return await _apiClient.PostAsync<DbscanParametersRequest, ClusteringResultResponse>(
+        var (result, error) = await _apiClient.PostWithErrorAsync<DbscanParametersRequest, ClusteringResultResponse>(
             "api/customers/segments/analyze", parameters);
+        if (result == null && error != null)
+            return new ClusteringResultResponse { Success = false, Message = $"Analysis failed: {error}" };
+        return result;
     }
 
     public async Task<ClusteringStatusResponse?> GetClusteringStatusAsync()
@@ -1397,6 +1464,7 @@ public class CustomerSegmentationService : ICustomerSegmentationService
 public interface IProfileApiService
 {
     Task<ChangePasswordResponse?> ChangePasswordAsync(ChangePasswordRequest request);
+    Task<UpdateProfileResponse?> UpdateProfileAsync(UpdateProfileRequest request);
 }
 
 public class ProfileApiService : IProfileApiService
@@ -1412,6 +1480,12 @@ public class ProfileApiService : IProfileApiService
     {
         return await _apiClient.PostAsync<ChangePasswordRequest, ChangePasswordResponse>(
             "api/auth/change-password", request);
+    }
+
+    public async Task<UpdateProfileResponse?> UpdateProfileAsync(UpdateProfileRequest request)
+    {
+        return await _apiClient.PutAsync<UpdateProfileRequest, UpdateProfileResponse>(
+            "api/auth/profile", request);
     }
 }
 

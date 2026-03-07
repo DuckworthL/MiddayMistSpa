@@ -25,6 +25,7 @@ public interface IAccountingService
     Task CreateRefundJournalEntryAsync(int transactionId, int refundId, decimal refundAmount, string refundMethod, string reason, int userId);
     Task CreatePayrollJournalEntryAsync(int payrollPeriodId, int userId);
     Task CreatePurchaseOrderJournalEntryAsync(int purchaseOrderId, int userId);
+    Task CreateInvoicePaymentIncomeAsync(int invoiceId, decimal paymentAmount, int userId);
 
     // Financial Reports
     Task<TrialBalanceResponse> GetTrialBalanceAsync(DateTime asOfDate);
@@ -40,4 +41,9 @@ public interface IAccountingService
 
     // Dashboard/Summary
     Task<AccountingSummaryResponse> GetAccountingSummaryAsync(DateTime startDate, DateTime endDate);
+
+    // Sub-page Summaries
+    Task<ExpenseSummaryResponse> GetExpenseSummaryAsync();
+    Task<IncomeSummaryResponse> GetIncomeSummaryAsync();
+    Task<JournalSummaryResponse> GetJournalSummaryAsync();
 }

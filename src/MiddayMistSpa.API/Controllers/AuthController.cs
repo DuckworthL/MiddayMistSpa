@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MiddayMistSpa.API.DTOs.Auth;
 using MiddayMistSpa.API.Services;
 
@@ -9,6 +11,7 @@ namespace MiddayMistSpa.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[EnableRateLimiting("api")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -33,6 +36,7 @@ public class AuthController : ControllerBase
     /// <returns>JWT token and user info on success</returns>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
@@ -100,6 +104,7 @@ public class AuthController : ControllerBase
     /// <returns>New JWT token pair</returns>
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
@@ -299,6 +304,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("2fa/validate")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponse>> Validate2FA([FromBody] TwoFactorValidateRequest request)
@@ -378,4 +384,41 @@ public class AuthController : ControllerBase
     }
 
     #endregion
+
+    // =========================================================================
+    // PROFILE UPDATE ENDPOINT
+    // =========================================================================
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<ActionResult<UpdateProfileResponse>> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _authService.UpdateProfileAsync(userId.Value, request);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    // =========================================================================
+    // PASSWORD RESET ENDPOINTS
+    // =========================================================================
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    public async Task<ActionResult<PasswordResetResponse>> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var result = await _authService.RequestPasswordResetAsync(request.Email);
+        return Ok(result);
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    public async Task<ActionResult<PasswordResetResponse>> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        var result = await _authService.ResetPasswordAsync(request);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
 }

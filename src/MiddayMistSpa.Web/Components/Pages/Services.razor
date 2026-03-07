@@ -423,13 +423,20 @@
     private async Task LoadServices()
     {
         _isLoading = true;
-        _services = await ServiceApiService.GetServicesAsync(
-        page: 1,
-        pageSize: 100,
-        search: _searchTerm,
-        categoryId: _categoryFilter,
-        isActive: _statusFilter);
-        _isLoading = false;
+        StateHasChanged();
+        try
+        {
+            _services = await ServiceApiService.GetServicesAsync(
+            page: 1,
+            pageSize: 100,
+            search: _searchTerm,
+            categoryId: _categoryFilter,
+            isActive: _statusFilter);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private List<ServiceResponse> GetServicesByCategory(int? categoryId)

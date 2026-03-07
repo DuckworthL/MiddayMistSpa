@@ -59,6 +59,7 @@ public interface ITimeAttendanceService
     Task<List<AttendanceRecordDto>> GetAttendanceRecordsAsync(int? employeeId = null, DateTime? date = null);
     Task<List<LiveAttendanceStatusDto>> GetLiveStatusAsync();
     Task<AttendanceRecordDto> CreateManualEntryAsync(ManualAttendanceRequest request, int createdByUserId);
+    Task<AttendanceRecordDto> ApproveAttendanceRecordAsync(int attendanceId, int approvedByUserId);
 
     // ============================================================================
     // Attendance Summary & Reports

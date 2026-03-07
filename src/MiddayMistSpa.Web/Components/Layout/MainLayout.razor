@@ -20,11 +20,11 @@
             <div class="d-flex align-items-center gap-3">
                 @* Mobile menu toggle *@
                 <button class="btn btn-link text-dark d-lg-none menu-toggle" @onclick="ToggleSidebar"
-                    title="Toggle Menu">
+                        title="Toggle Menu">
                     <i class="bi @(sidebarExpanded ? "bi-x-lg" : "bi-list") fs-4"></i>
                 </button>
                 @{
-                    var currentDate = DateTime.Now.ToString("dddd, MMMM dd, yyyy");
+                    var currentDate = PhilippineTime.Now.ToString("dddd, MMMM dd, yyyy");
                 }
                 <span class="text-muted small d-none d-md-inline">@currentDate</span>
             </div>
@@ -32,13 +32,12 @@
                 @* Notification Bell *@
                 <div class="dropdown">
                     <button class="btn btn-link text-dark position-relative" type="button" data-bs-toggle="dropdown"
-                        @onclick="LoadNotifications"
-                        title="Notifications" style="overflow: visible;">
+                            @onclick="LoadNotifications" title="Notifications" style="overflow: visible;">
                         <i class="bi bi-bell fs-5"></i>
                         @if (_unreadCount > 0)
                         {
                             <span class="badge rounded-pill bg-danger"
-                                style="font-size: 0.55rem; position: absolute; top: -2px; right: -6px; min-width: 18px;">
+                                  style="font-size: 0.55rem; position: absolute; top: -2px; right: -6px; min-width: 18px;">
                                 @(_unreadCount > 99 ? "99+" : _unreadCount.ToString())
                             </span>
                         }
@@ -60,10 +59,10 @@
                             {
                                 <li>
                                     <a class="dropdown-item d-flex gap-2 py-2 @(!n.IsRead ? "fw-semibold" : "")"
-                                       href="@(n.ActionUrl ?? "/notifications")"
-                                       @onclick="() => MarkAsRead(n)"
-                                       @onclick:preventDefault="@(n.ActionUrl == null)">
-                                        <i class="bi @GetNotificationIcon(n.Category) @GetNotificationIconColor(n.Category)"></i>
+                                           href="@(n.ActionUrl ?? "/notifications")" @onclick="() => MarkAsRead(n)"
+                                           @onclick:preventDefault="@(n.ActionUrl == null)">
+                                        <i
+                                        class="bi @GetNotificationIcon(n.Category) @GetNotificationIconColor(n.Category)"></i>
                                         <div>
                                             <div class="small @(!n.IsRead ? "fw-medium" : "")">@n.Title</div>
                                             <div class="small text-muted">@n.TimeAgo</div>
@@ -93,9 +92,9 @@
                 @* User Dropdown *@
                 <div class="dropdown">
                     <button class="btn btn-link text-dark dropdown-toggle d-flex align-items-center gap-2" type="button"
-                        data-bs-toggle="dropdown">
+                            data-bs-toggle="dropdown">
                         <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-                            style="width: 32px; height: 32px;">
+                             style="width: 32px; height: 32px;">
                             <i class="bi bi-person"></i>
                         </div>
                         <span class="d-none d-md-inline">@GetDisplayName()</span>

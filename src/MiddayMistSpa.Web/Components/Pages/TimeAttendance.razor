@@ -60,7 +60,7 @@
                             </button>
                             <button class="btn btn-outline-secondary" @onclick="GoToCurrentWeek">This Week</button>
                             <button class="btn btn-outline-secondary" @onclick="NextWeek"
-                                    disabled="@(_weekEnd >= DateTime.Today)">
+                                    disabled="@(_weekEnd >= PhilippineTime.Today)">
                                 <i class="bi bi-chevron-right"></i>
                             </button>
                         </div>
@@ -268,7 +268,7 @@
                             </thead>
                             <tbody>
                                 @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e =>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
                                 {
                                     <tr>
                                         <td>@entry.Date.ToString("ddd, MMM dd")</td>
@@ -370,7 +370,7 @@
                 </div>
 
                 <div class="text-center py-4">
-                    <div class="h1 mb-3">@DateTime.Now.ToString("h:mm:ss tt")</div>
+                    <div class="h1 mb-3">@PhilippineTime.Now.ToString("h:mm:ss tt")</div>
                     @if (_selectedEmployeeStatus.IsClockedIn)
                     {
                         <div class="d-flex justify-content-center gap-3">
@@ -421,7 +421,7 @@
             <div class="mb-3">
                 <label class="form-label">Date *</label>
                 @{
-                    var maxDate = DateTime.Today.ToString("yyyy-MM-dd");
+                    var maxDate = PhilippineTime.Today.ToString("yyyy-MM-dd");
                 }
                 <input type="date" class="form-control" @bind="_manualEntry.Date" max="@maxDate" />
             </div>
@@ -559,7 +559,7 @@ RolePermissionService.HasPermission("timeattendance.manage");
 
     private void SetCurrentWeek()
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         var diff = (int)today.DayOfWeek - (int)DayOfWeek.Monday;
         if (diff < 0) diff += 7;
         _weekStart = today.AddDays(-diff);
@@ -668,7 +668,7 @@ RolePermissionService.HasPermission("timeattendance.manage");
             _onBreakCount = _liveStatus.Count(s => s.Status == "OnBreak");
             _clockedOutCount = _liveStatus.Count(s => s.Status == "ClockedOut");
             _notYetInCount = _liveStatus.Count(s => s.Status == "NotYetIn");
-            _todayHours = _timeEntries.Where(e => e.Date == DateTime.Today).Sum(e => e.TotalHours);
+            _todayHours = _timeEntries.Where(e => e.Date == PhilippineTime.Today).Sum(e => e.TotalHours);
         }
         catch (Exception ex)
         {
@@ -729,6 +729,7 @@ RolePermissionService.HasPermission("timeattendance.manage");
         .Where(a => a.ClockIn.HasValue) // Only include records with clock-in
         .Select(a => new TimeEntryViewModel
         {
+            AttendanceId = a.AttendanceId,
             EmployeeId = a.EmployeeId,
             EmployeeName = a.EmployeeName,
             Date = a.Date,
@@ -850,7 +851,7 @@ RolePermissionService.HasPermission("timeattendance.manage");
             var result = await TimeAttendanceService.StartBreakAsync(_clockForm.EmployeeId);
             if (result != null)
             {
-                ShowAlert($"Break started at {DateTime.Now:h:mm tt}", Alert.AlertType.Info);
+                ShowAlert($"Break started at {PhilippineTime.Now:h:mm tt}", Alert.AlertType.Info);
                 await LoadTimeData();
             }
             else
@@ -894,7 +895,7 @@ RolePermissionService.HasPermission("timeattendance.manage");
     // Manual Entry Modal
     private void ShowManualEntryModal()
     {
-        _manualEntry = new ManualEntryFormModel { Date = DateTime.Today };
+        _manualEntry = new ManualEntryFormModel { Date = PhilippineTime.Today };
         _showManualEntryModal = true;
     }
 
@@ -962,9 +963,23 @@ RolePermissionService.HasPermission("timeattendance.manage");
 
     private async Task ApproveEntry(TimeEntryViewModel entry)
     {
-        entry.IsApproved = true;
-        ShowAlert("Time entry approved.", Alert.AlertType.Success);
-        await Task.CompletedTask;
+        try
+        {
+            var result = await TimeAttendanceService.ApproveAttendanceAsync(entry.AttendanceId);
+            if (result != null)
+            {
+                entry.IsApproved = true;
+                ShowAlert("Time entry approved.", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Failed to approve time entry.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception)
+        {
+            ShowAlert("Error approving time entry.", Alert.AlertType.Error);
+        }
     }
 
     private async Task ExportTimesheet()
@@ -1029,6 +1044,7 @@ base64);
 
     private class TimeEntryViewModel
     {
+        public int AttendanceId { get; set; }
         public int EmployeeId { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
         public DateTime Date { get; set; }
@@ -1038,7 +1054,7 @@ base64);
         public bool IsApproved { get; set; }
         public decimal TotalHours => ClockOut.HasValue
         ? (decimal)(ClockOut.Value - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours
-        : (decimal)(DateTime.Now.TimeOfDay - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours;
+        : (decimal)(PhilippineTime.Now.TimeOfDay - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours;
     }
 
     private class ClockFormModel

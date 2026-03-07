@@ -1,19 +1,27 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MiddayMistSpa.API.DTOs.Employee;
 
 #region Employee DTOs
 
 public record CreateEmployeeRequest
 {
+    [Required, MaxLength(100)]
     public string FirstName { get; init; } = string.Empty;
+    [Required, MaxLength(100)]
     public string LastName { get; init; } = string.Empty;
+    [MaxLength(100)]
     public string? MiddleName { get; init; }
     public DateTime DateOfBirth { get; init; }
+    [Required, MaxLength(20)]
     public string Gender { get; init; } = string.Empty;
+    [MaxLength(20)]
     public string? CivilStatus { get; init; }
     public string? Address { get; init; }
     public string? City { get; init; }
     public string? Province { get; init; }
     public string? PostalCode { get; init; }
+    [Required, MaxLength(20)]
     public string PhoneNumber { get; init; } = string.Empty;
     public string? Email { get; init; }
     public string? EmergencyContactName { get; init; }
@@ -26,12 +34,17 @@ public record CreateEmployeeRequest
     public string? TINNumber { get; init; }
 
     // Employment Details
+    [Required, MaxLength(100)]
     public string Position { get; init; } = string.Empty;
     public string? Department { get; init; }
     public DateTime HireDate { get; init; }
+    [MaxLength(20)]
     public string EmploymentType { get; init; } = "Regular";
+    [Range(0, double.MaxValue)]
     public decimal DailyRate { get; init; }
+    [Range(0, double.MaxValue)]
     public decimal MonthlyBasicSalary { get; init; }
+    [MaxLength(20)]
     public string PayrollType { get; init; } = "Semi-Monthly";
 
     // Therapist Specific

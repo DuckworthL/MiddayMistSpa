@@ -776,4 +776,27 @@ public class CustomerService : ICustomerService
     };
 
     #endregion
+
+    #region Stats
+
+    public async Task<CustomerStatsResponse> GetCustomerStatsAsync()
+    {
+        var today = PhilippineTime.Today;
+        var activeThreshold = today.AddDays(-30);
+        var atRiskThreshold = today.AddDays(-90);
+
+        var activeCustomers = _context.Customers.Where(c => c.IsActive);
+
+        var membershipTypes = new[] { "Bronze", "Silver", "Gold", "Platinum" };
+
+        return new CustomerStatsResponse
+        {
+            TotalCustomers = await activeCustomers.CountAsync(),
+            LoyaltyMembers = await activeCustomers.CountAsync(c => membershipTypes.Contains(c.MembershipType)),
+            ActiveCount = await activeCustomers.CountAsync(c => c.LastVisitDate >= activeThreshold),
+            AtRiskCount = await activeCustomers.CountAsync(c => c.LastVisitDate != null && c.LastVisitDate < atRiskThreshold)
+        };
+    }
+
+    #endregion
 }

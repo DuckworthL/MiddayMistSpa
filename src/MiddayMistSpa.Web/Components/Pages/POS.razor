@@ -615,7 +615,7 @@
             _appointmentsLoading = true;
 
             // Load appointments for today that are in active statuses (exclude Completed to prevent duplicate transactions)
-            var result = await AppointmentService.GetAppointmentsAsync(1, 100, DateTime.Today);
+            var result = await AppointmentService.GetAppointmentsAsync(1, 100, PhilippineTime.Today);
             if (result?.Items != null)
             {
                 _appointments = result.Items
@@ -955,11 +955,9 @@
                 UnitPrice = null
             }).ToList();
 
-            var customerId = _selectedCustomer?.CustomerId ?? 1;
-
             var transaction = new CreateTransactionRequest
             {
-                CustomerId = customerId,
+                CustomerId = _selectedCustomer?.CustomerId,
                 AppointmentId = _selectedAppointment?.AppointmentId,
                 PaymentMethod = _paymentMethod,
                 DiscountAmount = DiscountAmount,

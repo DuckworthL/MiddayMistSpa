@@ -34,7 +34,7 @@
             <div class="col-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body text-center">
-                        <div class="display-6 fw-bold text-primary">@_customers.TotalCount</div>
+                        <div class="display-6 fw-bold text-primary">@_customerStats.TotalCustomers</div>
                         <small class="text-muted">Total Customers</small>
                     </div>
                 </div>
@@ -42,333 +42,330 @@
             <div class="col-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body text-center">
-                        <div class="display-6 fw-bold text-success">@_customers.Items.Count(c => c.MembershipType ==
-                                                        "Bronze" || c.MembershipType == "Silver" || c.MembershipType == "Gold" || c.MembershipType
-                                                        == "Platinum")</div>
-                            <small class="text-muted">Loyalty Members</small>
-                        </div>
+                        <div class="display-6 fw-bold text-success">@_customerStats.LoyaltyMembers</div>
+                        <small class="text-muted">Loyalty Members</small>
                     </div>
                 </div>
-                <div class="col-6 col-lg-3">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body text-center">
-                            <div class="display-6 fw-bold text-info">@_customers.Items.Count(c => c.LastVisitDate >=
-                                                            DateTime.Today.AddDays(-30))</div>
-                                <small class="text-muted">Active (30 days)</small>
-                            </div>
-                        </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 fw-bold text-info">@_customerStats.ActiveCount</div>
+                        <small class="text-muted">Active (30 days)</small>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body text-center">
-                                <div class="display-6 fw-bold text-warning">@_customers.Items.Where(c => c.LastVisitDate <
-                                                                DateTime.Today.AddDays(-90)).Count()</div>
-                                    <small class="text-muted">At-Risk</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    @* Filters *@
-                    <div class="card border-0 shadow-sm mb-4">
-                        <div class="card-body">
-                            <div class="row g-3 align-items-end">
-                                <div class="col-12 col-md-4">
-                                    <SearchInput @bind-Value="_searchQuery" Placeholder="Search by name, phone, or email..."
-                                                 OnSearch="OnSearch" />
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <label class="form-label small text-muted">Membership</label>
-                                    <select class="form-select" @onchange="OnMembershipFilterChange">
-                                        <option value="">All Memberships</option>
-                                        <option value="Regular">Regular</option>
-                                        <option value="Bronze">Bronze</option>
-                                        <option value="Silver">Silver</option>
-                                        <option value="Gold">Gold</option>
-                                        <option value="Platinum">Platinum</option>
-                                    </select>
-                                </div>
-                                <div class="col-12 col-md-2 ms-auto d-flex gap-2">
-                                    <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
-                                        <option value="PDF">PDF</option>
-                                        <option value="Excel">Excel</option>
-                                        <option value="CSV">CSV</option>
-                                    </select>
-                                    <button class="btn btn-outline-secondary" @onclick="ExportCustomers" disabled="@_isExporting">
-                                        @if (_isExporting)
-                                        {
-                                            <span class="spinner-border spinner-border-sm me-1"></span>
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-download me-1"></i>
-                                        }
-                                        Export
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    @if (_isLoading)
-                    {
-                        <LoadingSpinner Message="Loading customers..." />
-                    }
-                    else
-                    {
-                        @* Customers Table *@
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Customer</th>
-                                                <th>Contact</th>
-                                                <th>Membership</th>
-                                                <th>Visits</th>
-                                                <th>Total Spent</th>
-                                                <th>Last Visit</th>
-                                                <th class="text-end">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @if (_customers.Items.Any())
-                                            {
-                                                @foreach (var customer in _customers.Items)
-                                                {
-                                                    <tr>
-                                                        <td>
-                                                            <div class="d-flex align-items-center">
-                                                                <div class="rounded-circle d-flex align-items-center justify-content-center me-2 @GetMembershipBgClass(customer.MembershipType)"
-                                                                     style="width: 40px; height: 40px;">
-                                                                    @(GetInitials(customer.FirstName, customer.LastName))
-                                                                </div>
-                                                                <div>
-                                                                    <div class="fw-medium">
-                                                                        @customer.FullName
-                                                                        @if (!string.IsNullOrEmpty(customer.Allergies))
-                                                                        {
-                                                                            <i class="bi bi-exclamation-triangle-fill text-danger ms-1"
-                                                                               title="Has allergies: @customer.Allergies"></i>
-                                                                        }
-                                                                    </div>
-                                                                    <small class="text-muted">@customer.CustomerCode</small>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div><i class="bi bi-phone me-1 text-muted"></i> @customer.PhoneNumber</div>
-                                                            @if (!string.IsNullOrEmpty(customer.Email))
-                                                            {
-                                                                <div><i class="bi bi-envelope me-1 text-muted"></i> @customer.Email</div>
-                                                            }
-                                                        </td>
-                                                        <td>
-                                                            <StatusBadge Status="@customer.MembershipType" />
-                                                            <div class="small text-muted">@customer.LoyaltyPoints pts</div>
-                                                        </td>
-                                                        <td>
-                                                            <span class="fw-medium">@customer.TotalVisits</span>
-                                                        </td>
-                                                        <td>
-                                                            <span class="fw-medium">₱@customer.TotalSpent.ToString("N0")</span>
-                                                        </td>
-                                                        <td>
-                                                            @if (customer.LastVisitDate.HasValue)
-                                                            {
-                                                                <span class="@GetLastVisitClass(customer.LastVisitDate.Value)">
-                                                                    @customer.LastVisitDate.Value.ToString("MMM dd, yyyy")
-                                                                </span>
-                                                            }
-                                                            else
-                                                            {
-                                                                <span class="text-muted">Never</span>
-                                                            }
-                                                        </td>
-                                                        <td class="text-end">
-                                                            <div class="btn-group btn-group-sm">
-                                                                <a href="/customers/@customer.CustomerId" class="btn btn-outline-primary"
-                                                                       title="View Profile">
-                                                                    <i class="bi bi-eye"></i>
-                                                                </a>
-                                                                <a href="/appointments/new?customerId=@customer.CustomerId"
-                                                                       class="btn btn-outline-success" title="Book Appointment">
-                                                                    <i class="bi bi-calendar-plus"></i>
-                                                                </a>
-                                                                @if (_canEdit)
-                                                                {
-                                                                    <button class="btn btn-outline-secondary"
-                                                                            @onclick="() => EditCustomer(customer)" title="Edit">
-                                                                        <i class="bi bi-pencil"></i>
-                                                                    </button>
-                                                                }
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                }
-                                            }
-                                            else
-                                            {
-                                                <tr>
-                                                    <td colspan="7" class="text-center py-5">
-                                                        <i class="bi bi-people display-4 text-muted"></i>
-                                                        <p class="text-muted mt-2">No customers found</p>
-                                                        @if (_canCreate)
-                                                        {
-                                                            <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
-                                                                <i class="bi bi-plus me-1"></i> Add First Customer
-                                                            </button>
-                                                        }
-                                                    </td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            @if (_customers.TotalPages > 1)
-                            {
-                                <div class="card-footer bg-white border-0">
-                                    <Pagination CurrentPage="_currentPage" TotalCount="_customers.TotalCount" PageSize="_pageSize"
-                                                OnPageChanged="OnPageChanged" />
-                                </div>
-                            }
-                        </div>
-                    }
                 </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <div class="display-6 fw-bold text-warning">@_customerStats.AtRiskCount</div>
+                        <small class="text-muted">At-Risk</small>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                @* Add/Edit Customer Modal *@
-                <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Customer" : "Add New Customer")"
-                       Size="Modal.ModalSize.Large">
-                    <ChildContent>
-                        <EditForm EditContext="_editContext" OnValidSubmit="SaveCustomer">
-                            <DataAnnotationsValidator />
-
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <h6 class="text-muted mb-3">Personal Information</h6>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">First Name *</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.FirstName" />
-                                    <ValidationMessage For="() => _formModel.FirstName" class="text-danger small" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Last Name *</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.LastName" />
-                                    <ValidationMessage For="() => _formModel.LastName" class="text-danger small" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Phone Number *</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.PhoneNumber"
-                                               placeholder="+63 9XX XXX XXXX" />
-                                    <ValidationMessage For="() => _formModel.PhoneNumber" class="text-danger small" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Email</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.Email" type="email" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Date of Birth</label>
-                                    <InputDate class="form-control" @bind-Value="_formModel.DateOfBirth" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Gender</label>
-                                    <InputSelect class="form-select" @bind-Value="_formModel.Gender">
-                                        <option value="">Select Gender</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Other">Other</option>
-                                    </InputSelect>
-                                </div>
-
-                                <div class="col-12 mt-4">
-                                    <h6 class="text-muted mb-3">
-                                        <i class="bi bi-exclamation-triangle text-danger me-1"></i>
-                                        Medical & Preferences (Important)
-                                    </h6>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label text-danger">Allergies</label>
-                                    <InputTextArea class="form-control" @bind-Value="_formModel.Allergies" rows="2"
-                                                   placeholder="List any allergies (e.g., nuts, essential oils, latex)..." />
-                                    <small class="text-muted">This will be displayed prominently to staff</small>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Special Requests / Notes</label>
-                                    <InputTextArea class="form-control" @bind-Value="_formModel.SpecialRequests" rows="2"
-                                                   placeholder="Any special preferences or requirements..." />
-                                </div>
-
-                                <div class="col-12 mt-4">
-                                    <h6 class="text-muted mb-3">
-                                        <i class="bi bi-person-lines-fill me-1"></i>
-                                        Emergency Contact
-                                    </h6>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Contact Name</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.EmergencyContactName"
-                                               placeholder="Full name" />
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Contact Phone</label>
-                                    <InputText class="form-control" @bind-Value="_formModel.EmergencyContactPhone"
-                                               placeholder="+63 9XX XXX XXXX" />
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Relationship</label>
-                                    <InputSelect class="form-select" @bind-Value="_formModel.EmergencyContactRelationship">
-                                        <option value="">Select</option>
-                                        <option value="Spouse">Spouse</option>
-                                        <option value="Parent">Parent</option>
-                                        <option value="Sibling">Sibling</option>
-                                        <option value="Child">Child</option>
-                                        <option value="Friend">Friend</option>
-                                        <option value="Other">Other</option>
-                                    </InputSelect>
-                                </div>
-
-                                <div class="col-12 mt-4">
-                                    <h6 class="text-muted mb-3">
-                                        <i class="bi bi-chat-dots me-1"></i>
-                                        Communication Preferences
-                                    </h6>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Preferred Channel</label>
-                                    <InputSelect class="form-select" @bind-Value="_formModel.PreferredCommunicationChannel">
-                                        <option value="Email">Email</option>
-                                        <option value="None">None</option>
-                                    </InputSelect>
-                                </div>
-                            </div>
-                        </EditForm>
-                    </ChildContent>
-                    <FooterContent>
-                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-                        <button type="button" class="btn btn-primary" @onclick="SubmitCustomerForm" disabled="@_isSaving">
-                            @if (_isSaving)
+        @* Filters *@
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <SearchInput @bind-Value="_searchQuery" Placeholder="Search by name, phone, or email..."
+                                     OnSearch="OnSearch" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small text-muted">Membership</label>
+                        <select class="form-select" @onchange="OnMembershipFilterChange">
+                            <option value="">All Memberships</option>
+                            <option value="Regular">Regular</option>
+                            <option value="Bronze">Bronze</option>
+                            <option value="Silver">Silver</option>
+                            <option value="Gold">Gold</option>
+                            <option value="Platinum">Platinum</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2 ms-auto d-flex gap-2">
+                        <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
+                            <option value="PDF">PDF</option>
+                            <option value="Excel">Excel</option>
+                            <option value="CSV">CSV</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" @onclick="ExportCustomers" disabled="@_isExporting">
+                            @if (_isExporting)
                             {
                                 <span class="spinner-border spinner-border-sm me-1"></span>
                             }
-                            @(_isEditing ? "Update" : "Create") Customer
+                            else
+                            {
+                                <i class="bi bi-download me-1"></i>
+                            }
+                            Export
                         </button>
-                    </FooterContent>
-                </Modal>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                @* Alert *@
-                @if (!string.IsNullOrEmpty(_alertMessage))
+        @if (_isLoading)
+        {
+            <LoadingSpinner Message="Loading customers..." />
+        }
+        else
+        {
+            @* Customers Table *@
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Contact</th>
+                                    <th>Membership</th>
+                                    <th>Visits</th>
+                                    <th>Total Spent</th>
+                                    <th>Last Visit</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_customers.Items.Any())
+                                {
+                                    @foreach (var customer in _customers.Items)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle d-flex align-items-center justify-content-center me-2 @GetMembershipBgClass(customer.MembershipType)"
+                                                         style="width: 40px; height: 40px;">
+                                                        @(GetInitials(customer.FirstName, customer.LastName))
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium">
+                                                            @customer.FullName
+                                                            @if (!string.IsNullOrEmpty(customer.Allergies))
+                                                            {
+                                                                <i class="bi bi-exclamation-triangle-fill text-danger ms-1"
+                                                                   title="Has allergies: @customer.Allergies"></i>
+                                                            }
+                                                        </div>
+                                                        <small class="text-muted">@customer.CustomerCode</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div><i class="bi bi-phone me-1 text-muted"></i> @customer.PhoneNumber</div>
+                                                @if (!string.IsNullOrEmpty(customer.Email))
+                                                {
+                                                    <div><i class="bi bi-envelope me-1 text-muted"></i> @customer.Email</div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <StatusBadge Status="@customer.MembershipType" />
+                                                <div class="small text-muted">@customer.LoyaltyPoints pts</div>
+                                            </td>
+                                            <td>
+                                                <span class="fw-medium">@customer.TotalVisits</span>
+                                            </td>
+                                            <td>
+                                                <span class="fw-medium">₱@customer.TotalSpent.ToString("N0")</span>
+                                            </td>
+                                            <td>
+                                                @if (customer.LastVisitDate.HasValue)
+                                                {
+                                                    <span class="@GetLastVisitClass(customer.LastVisitDate.Value)">
+                                                        @customer.LastVisitDate.Value.ToString("MMM dd, yyyy")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">Never</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="/customers/@customer.CustomerId" class="btn btn-outline-primary"
+                                                           title="View Profile">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    <a href="/appointments/new?customerId=@customer.CustomerId"
+                                                           class="btn btn-outline-success" title="Book Appointment">
+                                                        <i class="bi bi-calendar-plus"></i>
+                                                    </a>
+                                                    @if (_canEdit)
+                                                    {
+                                                        <button class="btn btn-outline-secondary"
+                                                                @onclick="() => EditCustomer(customer)" title="Edit">
+                                                            <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="7" class="text-center py-5">
+                                            <i class="bi bi-people display-4 text-muted"></i>
+                                            <p class="text-muted mt-2">No customers found</p>
+                                            @if (_canCreate)
+                                            {
+                                                <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
+                                                    <i class="bi bi-plus me-1"></i> Add First Customer
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if (_customers.TotalPages > 1)
                 {
-                    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
-                        <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+                    <div class="card-footer bg-white border-0">
+                        <Pagination CurrentPage="_currentPage" TotalCount="_customers.TotalCount" PageSize="_pageSize"
+                                    OnPageChanged="OnPageChanged" />
                     </div>
                 }
-            </AuthorizedPage>
+            </div>
+        }
+    </div>
+
+    @* Add/Edit Customer Modal *@
+    <Modal @bind-IsVisible="_showModal" Title="@(_isEditing ? "Edit Customer" : "Add New Customer")"
+           Size="Modal.ModalSize.Large">
+        <ChildContent>
+            <EditForm EditContext="_editContext" OnValidSubmit="SaveCustomer">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <h6 class="text-muted mb-3">Personal Information</h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">First Name *</label>
+                        <InputText class="form-control" @bind-Value="_formModel.FirstName" />
+                        <ValidationMessage For="() => _formModel.FirstName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Last Name *</label>
+                        <InputText class="form-control" @bind-Value="_formModel.LastName" />
+                        <ValidationMessage For="() => _formModel.LastName" class="text-danger small" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone Number *</label>
+                        <InputText class="form-control" @bind-Value="_formModel.PhoneNumber"
+                                   placeholder="+63 9XX XXX XXXX" />
+                        <ValidationMessage For="() => _formModel.PhoneNumber" class="text-danger small" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Email" type="email" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Date of Birth</label>
+                        <InputDate class="form-control" @bind-Value="_formModel.DateOfBirth" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Gender</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.Gender">
+                            <option value="">Select Gender</option>
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                            <option value="Other">Other</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-exclamation-triangle text-danger me-1"></i>
+                            Medical & Preferences (Important)
+                        </h6>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-danger">Allergies</label>
+                        <InputTextArea class="form-control" @bind-Value="_formModel.Allergies" rows="2"
+                                       placeholder="List any allergies (e.g., nuts, essential oils, latex)..." />
+                        <small class="text-muted">This will be displayed prominently to staff</small>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Special Requests / Notes</label>
+                        <InputTextArea class="form-control" @bind-Value="_formModel.SpecialRequests" rows="2"
+                                       placeholder="Any special preferences or requirements..." />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-person-lines-fill me-1"></i>
+                            Emergency Contact
+                        </h6>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Contact Name</label>
+                        <InputText class="form-control" @bind-Value="_formModel.EmergencyContactName"
+                                   placeholder="Full name" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Contact Phone</label>
+                        <InputText class="form-control" @bind-Value="_formModel.EmergencyContactPhone"
+                                   placeholder="+63 9XX XXX XXXX" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Relationship</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.EmergencyContactRelationship">
+                            <option value="">Select</option>
+                            <option value="Spouse">Spouse</option>
+                            <option value="Parent">Parent</option>
+                            <option value="Sibling">Sibling</option>
+                            <option value="Child">Child</option>
+                            <option value="Friend">Friend</option>
+                            <option value="Other">Other</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-chat-dots me-1"></i>
+                            Communication Preferences
+                        </h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Preferred Channel</label>
+                        <InputSelect class="form-select" @bind-Value="_formModel.PreferredCommunicationChannel">
+                            <option value="Email">Email</option>
+                            <option value="None">None</option>
+                        </InputSelect>
+                    </div>
+                </div>
+            </EditForm>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SubmitCustomerForm" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                @(_isEditing ? "Update" : "Create") Customer
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Alert *@
+    @if (!string.IsNullOrEmpty(_alertMessage))
+    {
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+            <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+        </div>
+    }
+</AuthorizedPage>
 
 @code {
     private PagedResponse<CustomerResponse> _customers = new();
+    private CustomerStatsResponse _customerStats = new();
     private bool _isLoading = true;
 
     // Permission flags
@@ -412,8 +409,16 @@
         _canDelete = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("customers.delete");
 
         _isLoading = true;
-        _customers = await CustomerService.GetCustomersAsync(_currentPage, _pageSize, _searchQuery, _membershipFilter);
-        _isLoading = false;
+        StateHasChanged();
+        try
+        {
+            _customers = await CustomerService.GetCustomersAsync(_currentPage, _pageSize, _searchQuery, _membershipFilter);
+            _customerStats = await CustomerService.GetCustomerStatsAsync() ?? new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private async Task OnSearch(string query)
@@ -556,7 +561,7 @@
         StateHasChanged();
         try
         {
-            var endDate = DateTime.Today;
+            var endDate = PhilippineTime.Today;
             var startDate = endDate.AddMonths(-3);
             var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync("customer",
             _exportFormat, startDate, endDate);
@@ -602,7 +607,7 @@
 
     private string GetLastVisitClass(DateTime lastVisit)
     {
-        var daysSince = (DateTime.Today - lastVisit.Date).Days;
+        var daysSince = (PhilippineTime.Today - lastVisit.Date).Days;
         return daysSince switch
         {
             <= 30 => "text-success",

@@ -72,11 +72,9 @@
                     <div class="col-md-2">
                         <select class="form-select" @bind="_sourceFilter">
                             <option value="">All Sources</option>
-                            <option value="Services">Services</option>
-                            <option value="Products">Products</option>
-                            <option value="Membership">Membership</option>
-                            <option value="Gift Cards">Gift Cards</option>
-                            <option value="Other">Other</option>
+                            <option value="Service Revenue">Service Revenue</option>
+                            <option value="Product Sales Revenue">Product Sales</option>
+                            <option value="Other Income">Other</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -230,6 +228,72 @@
             </div>
         </div>
     }
+
+    @if (_showDetailModal && _selectedIncome != null)
+    {
+        <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Income Details</h5>
+                        <button type="button" class="btn-close" @onclick="() => _showDetailModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <dl class="row mb-3">
+                            <dt class="col-sm-4">Entry #</dt>
+                            <dd class="col-sm-8">@_selectedIncome.EntryNumber</dd>
+                            <dt class="col-sm-4">Date</dt>
+                            <dd class="col-sm-8">@_selectedIncome.Date.ToString("MMM dd, yyyy")</dd>
+                            <dt class="col-sm-4">Customer</dt>
+                            <dd class="col-sm-8">@(_selectedIncome.Customer ?? "Walk-in")</dd>
+                            <dt class="col-sm-4">Category</dt>
+                            <dd class="col-sm-8"><span class="badge @GetSourceBadge(_selectedIncome.Category)">@_selectedIncome.Category</span></dd>
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8"><span class="badge bg-success">@_selectedIncome.Status</span></dd>
+                        </dl>
+
+                        @if (_selectedIncome.LineItems.Any())
+                        {
+                            <h6 class="fw-semibold mb-2">Items</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-3">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Type</th>
+                                            <th class="text-center">Qty</th>
+                                            <th class="text-end">Unit Price</th>
+                                            <th class="text-end">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in _selectedIncome.LineItems)
+                                        {
+                                            <tr>
+                                                <td>@item.ItemName</td>
+                                                <td><span class="badge @(item.ItemType == "Service" ? "bg-success" : "bg-info") bg-opacity-75">@item.ItemType</span></td>
+                                                <td class="text-center">@(item.Quantity == Math.Floor(item.Quantity) ? ((int)item.Quantity).ToString() : item.Quantity.ToString("N1"))</td>
+                                                <td class="text-end">₱@item.UnitPrice.ToString("N2")</td>
+                                                <td class="text-end">₱@item.TotalPrice.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                            <span class="fw-semibold fs-5">Total Amount</span>
+                            <span class="fw-bold fs-5 text-success">₱@_selectedIncome.Amount.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="() => _showDetailModal = false">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </AuthorizedPage>
 
 @code {
@@ -251,6 +315,8 @@
     private int _totalPages = 1;
 
     private bool _showModal = false;
+    private bool _showDetailModal = false;
+    private IncomeRecordResponse? _selectedIncome;
     private IncomeFormModel _formModel = new();
 
     protected override void OnInitialized()
@@ -261,6 +327,7 @@
     private async Task LoadData()
     {
         _isLoading = true;
+        StateHasChanged();
         try
         {
             var response = await AccountingService.GetIncomeRecordsAsync(
@@ -272,12 +339,15 @@
             _incomeRecords = response.Items;
             _totalPages = response.TotalPages;
 
-            // Calculate summary stats
-            _monthTotal = _incomeRecords.Where(i => i.Date.Month == DateTime.Today.Month && i.Date.Year ==
-            DateTime.Today.Year).Sum(i => i.Amount);
-            _servicesRevenue = _incomeRecords.Where(i => i.Category == "Services").Sum(i => i.Amount);
-            _productSales = _incomeRecords.Where(i => i.Category == "Products").Sum(i => i.Amount);
-            _ytdTotal = _incomeRecords.Where(i => i.Date.Year == DateTime.Today.Year).Sum(i => i.Amount);
+            // Load summary stats from server (computed from full dataset)
+            var summary = await AccountingService.GetIncomeSummaryAsync();
+            if (summary != null)
+            {
+                _monthTotal = summary.MonthTotal;
+                _servicesRevenue = summary.ServicesRevenue;
+                _productSales = summary.ProductSales;
+                _ytdTotal = summary.YtdTotal;
+            }
 
             // Load accounts for dropdown
             _accounts = await AccountingService.GetAccountsHierarchyAsync();
@@ -287,7 +357,10 @@
             Console.WriteLine($"Error loading income records: {ex.Message}");
             _incomeRecords = new List<IncomeRecordResponse>();
         }
-        _isLoading = false;
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private IEnumerable<IncomeRecordResponse> FilteredIncome => _incomeRecords.Where(i =>
@@ -301,10 +374,9 @@
 
     private string GetSourceBadge(string source) => source switch
     {
-        "Services" => "bg-success",
-        "Products" => "bg-info",
-        "Membership" => "bg-primary",
-        "Gift Cards" => "bg-warning text-dark",
+        "Service Revenue" => "bg-success",
+        "Product Sales Revenue" => "bg-info",
+        "Other Income" => "bg-warning text-dark",
         _ => "bg-secondary"
     };
 
@@ -312,14 +384,15 @@
     {
         _formModel = new IncomeFormModel
         {
-            Date = DateTime.Now
+            Date = PhilippineTime.Now
         };
         _showModal = true;
     }
 
     private void ViewIncome(IncomeRecordResponse income)
     {
-        // TODO: View details
+        _selectedIncome = income;
+        _showDetailModal = true;
     }
 
     private async Task SaveIncome()
@@ -356,7 +429,7 @@
             var fromLabel = _dateFrom?.ToString("MMM dd, yyyy") ?? "All";
             var toLabel = _dateTo?.ToString("MMM dd, yyyy") ?? "Present";
             sb.AppendLine($"Period: {fromLabel} to {toLabel}");
-            sb.AppendLine($"Generated: {DateTime.Now:MMM dd, yyyy hh:mm tt}");
+            sb.AppendLine($"Generated: {PhilippineTime.Now:MMM dd, yyyy hh:mm tt}");
             sb.AppendLine();
             sb.AppendLine("Entry #,Date,Description,Customer,Category,Amount,Status");
             foreach (var r in _incomeRecords.OrderByDescending(r => r.Date))
@@ -368,7 +441,7 @@
             sb.AppendLine($"Total Income,,,,,,{_incomeRecords.Sum(r => r.Amount):F2}");
             var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
             var base64 = Convert.ToBase64String(bytes);
-            await JSRuntime.InvokeVoidAsync("downloadFile", $"Income_{DateTime.Now:yyyyMMdd}.csv", "text/csv", base64);
+            await JSRuntime.InvokeVoidAsync("downloadFile", $"Income_{PhilippineTime.Now:yyyyMMdd}.csv", "text/csv", base64);
         }
         catch (Exception ex)
         {
@@ -378,7 +451,7 @@
 
     private class IncomeFormModel
     {
-        public DateTime Date { get; set; } = DateTime.Now;
+        public DateTime Date { get; set; } = PhilippineTime.Now;
         public string Description { get; set; } = "";
         public string? CustomerName { get; set; }
         public int RevenueAccountId { get; set; }

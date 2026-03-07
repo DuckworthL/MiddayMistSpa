@@ -39,10 +39,14 @@ public class TransactionService : ITransactionService
             (request.ProductItems == null || request.ProductItems.Count == 0))
             throw new InvalidOperationException("Transaction must contain at least one service or product item");
 
-        // Validate customer
-        var customer = await _context.Customers.FindAsync(request.CustomerId);
-        if (customer == null)
-            throw new InvalidOperationException("Customer not found");
+        // Validate customer (optional for walk-in)
+        Customer? customer = null;
+        if (request.CustomerId.HasValue && request.CustomerId.Value > 0)
+        {
+            customer = await _context.Customers.FindAsync(request.CustomerId.Value);
+            if (customer == null)
+                throw new InvalidOperationException("Customer not found");
+        }
 
         // Validate appointment if provided
         if (request.AppointmentId.HasValue)
@@ -53,7 +57,7 @@ public class TransactionService : ITransactionService
         }
 
         // Validate discount cap against membership tier
-        if (request.DiscountPercentage > 0)
+        if (request.DiscountPercentage > 0 && customer != null)
         {
             var tierDiscount = DomainConstants.MembershipTiers.GetTierDiscount(customer.MembershipType) * 100;
             if (request.DiscountPercentage > tierDiscount && tierDiscount > 0)
@@ -155,7 +159,7 @@ public class TransactionService : ITransactionService
 
         // Apply loyalty points redemption (1 point = ₱1 discount)
         int pointsRedeemed = 0;
-        if (request.LoyaltyPointsToRedeem > 0)
+        if (request.LoyaltyPointsToRedeem > 0 && customer != null)
         {
             if (request.LoyaltyPointsToRedeem > customer.LoyaltyPoints)
                 throw new InvalidOperationException(
@@ -188,10 +192,13 @@ public class TransactionService : ITransactionService
         }
 
         // Earn loyalty points (1 point per ₱100 spent)
-        EarnLoyaltyPoints(customer, transaction);
+        if (customer != null)
+        {
+            EarnLoyaltyPoints(customer, transaction);
+        }
 
         // Deduct redeemed points from customer balance
-        if (pointsRedeemed > 0)
+        if (pointsRedeemed > 0 && customer != null)
         {
             DeductLoyaltyPoints(customer, pointsRedeemed,
                 DomainConstants.LoyaltyTransactionTypes.Redeem,
@@ -667,7 +674,7 @@ public class TransactionService : ITransactionService
             var term = request.SearchTerm.ToLower();
             query = query.Where(t =>
                 t.TransactionNumber.ToLower().Contains(term) ||
-                (t.Customer.FirstName + " " + t.Customer.LastName).ToLower().Contains(term));
+                (t.Customer != null && (t.Customer.FirstName + " " + t.Customer.LastName).ToLower().Contains(term)));
         }
 
         if (request.CustomerId.HasValue)
@@ -701,8 +708,8 @@ public class TransactionService : ITransactionService
                 ? query.OrderByDescending(t => t.TotalAmount)
                 : query.OrderBy(t => t.TotalAmount),
             "customer" => request.SortDescending
-                ? query.OrderByDescending(t => t.Customer.LastName)
-                : query.OrderBy(t => t.Customer.LastName),
+                ? query.OrderByDescending(t => t.Customer != null ? t.Customer.LastName : "")
+                : query.OrderBy(t => t.Customer != null ? t.Customer.LastName : ""),
             "number" => request.SortDescending
                 ? query.OrderByDescending(t => t.TransactionNumber)
                 : query.OrderBy(t => t.TransactionNumber),
@@ -719,7 +726,7 @@ public class TransactionService : ITransactionService
             {
                 TransactionId = t.TransactionId,
                 TransactionNumber = t.TransactionNumber,
-                CustomerName = t.Customer.FirstName + " " + t.Customer.LastName,
+                CustomerName = t.Customer != null ? t.Customer.FirstName + " " + t.Customer.LastName : "Walk-in",
                 TotalAmount = t.TotalAmount,
                 PaymentMethod = t.PaymentMethod,
                 PaymentStatus = t.PaymentStatus,
@@ -795,74 +802,84 @@ public class TransactionService : ITransactionService
 
     public async Task<TransactionResponse> VoidTransactionAsync(int transactionId, VoidTransactionRequest request, int voidedById)
     {
-        var transaction = await _context.Transactions
-            .Include(t => t.ProductItems)
-                .ThenInclude(pi => pi.Product)
-            .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
-
-        if (transaction == null)
-            throw new InvalidOperationException("Transaction not found");
-
-        if (transaction.PaymentStatus == "Voided")
-            throw new InvalidOperationException("Transaction is already voided");
-
-        // Restore product stock with audit trail
-        foreach (var item in transaction.ProductItems)
+        using var dbTransaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            var quantityBefore = item.Product.CurrentStock;
-            item.Product.CurrentStock += item.Quantity;
-            item.Product.UpdatedAt = DateTime.UtcNow;
+            var transaction = await _context.Transactions
+                .Include(t => t.ProductItems)
+                    .ThenInclude(pi => pi.Product)
+                .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
 
-            _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
+            if (transaction == null)
+                throw new InvalidOperationException("Transaction not found");
+
+            if (transaction.PaymentStatus == "Voided")
+                throw new InvalidOperationException("Transaction is already voided");
+
+            // Restore product stock with audit trail
+            foreach (var item in transaction.ProductItems)
             {
-                ProductId = item.ProductId,
-                AdjustmentType = "Return to Stock",
-                QuantityBefore = quantityBefore,
-                QuantityChange = item.Quantity,
-                QuantityAfter = item.Product.CurrentStock,
-                Reason = $"Void: {request.Reason}",
-                ReferenceNumber = transaction.TransactionNumber,
-                AdjustedBy = voidedById,
-                CreatedAt = DateTime.UtcNow
-            });
-        }
+                var quantityBefore = item.Product.CurrentStock;
+                item.Product.CurrentStock += item.Quantity;
+                item.Product.UpdatedAt = DateTime.UtcNow;
 
-        // Void the transaction
-        var wasPaid = transaction.PaymentStatus == "Paid";
-        transaction.PaymentStatus = "Voided";
-        transaction.VoidedAt = DateTime.UtcNow;
-        transaction.VoidedBy = voidedById;
-        transaction.VoidReason = request.Reason;
-
-        // Reverse loyalty points and customer stats if already paid
-        if (wasPaid)
-        {
-            var customer = await _context.Customers.FindAsync(transaction.CustomerId);
-            if (customer != null)
-            {
-                if (transaction.LoyaltyPointsEarned > 0)
+                _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
                 {
-                    DeductLoyaltyPoints(customer, transaction.LoyaltyPointsEarned,
-                        DomainConstants.LoyaltyTransactionTypes.Adjust,
-                        $"Voided transaction {transaction.TransactionNumber}",
-                        transaction.TransactionId);
-                }
-                customer.TotalSpent = Math.Max(0, customer.TotalSpent - transaction.TotalAmount);
-                customer.TotalVisits = Math.Max(0, customer.TotalVisits - 1);
-
-                // Recalculate LastVisitDate from most recent non-voided transaction
-                var lastValidTransaction = await _context.Transactions
-                    .Where(t => t.CustomerId == customer.CustomerId
-                        && t.TransactionId != transaction.TransactionId
-                        && t.PaymentStatus != "Voided")
-                    .OrderByDescending(t => t.CreatedAt)
-                    .FirstOrDefaultAsync();
-                customer.LastVisitDate = lastValidTransaction?.CreatedAt;
-                customer.UpdatedAt = DateTime.UtcNow;
+                    ProductId = item.ProductId,
+                    AdjustmentType = "Return to Stock",
+                    QuantityBefore = quantityBefore,
+                    QuantityChange = item.Quantity,
+                    QuantityAfter = item.Product.CurrentStock,
+                    Reason = $"Void: {request.Reason}",
+                    ReferenceNumber = transaction.TransactionNumber,
+                    AdjustedBy = voidedById,
+                    CreatedAt = DateTime.UtcNow
+                });
             }
-        }
 
-        await _context.SaveChangesAsync();
+            // Void the transaction
+            var wasPaid = transaction.PaymentStatus == "Paid";
+            transaction.PaymentStatus = "Voided";
+            transaction.VoidedAt = DateTime.UtcNow;
+            transaction.VoidedBy = voidedById;
+            transaction.VoidReason = request.Reason;
+
+            // Reverse loyalty points and customer stats if already paid
+            if (wasPaid)
+            {
+                var customer = await _context.Customers.FindAsync(transaction.CustomerId);
+                if (customer != null)
+                {
+                    if (transaction.LoyaltyPointsEarned > 0)
+                    {
+                        DeductLoyaltyPoints(customer, transaction.LoyaltyPointsEarned,
+                            DomainConstants.LoyaltyTransactionTypes.Adjust,
+                            $"Voided transaction {transaction.TransactionNumber}",
+                            transaction.TransactionId);
+                    }
+                    customer.TotalSpent = Math.Max(0, customer.TotalSpent - transaction.TotalAmount);
+                    customer.TotalVisits = Math.Max(0, customer.TotalVisits - 1);
+
+                    // Recalculate LastVisitDate from most recent non-voided transaction
+                    var lastValidTransaction = await _context.Transactions
+                        .Where(t => t.CustomerId == customer.CustomerId
+                            && t.TransactionId != transaction.TransactionId
+                            && t.PaymentStatus != "Voided")
+                        .OrderByDescending(t => t.CreatedAt)
+                        .FirstOrDefaultAsync();
+                    customer.LastVisitDate = lastValidTransaction?.CreatedAt;
+                    customer.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
+        }
+        catch
+        {
+            await dbTransaction.RollbackAsync();
+            throw;
+        }
 
         var result = await GetTransactionByIdAsync(transactionId);
         return result!;
@@ -874,122 +891,131 @@ public class TransactionService : ITransactionService
 
     public async Task<RefundResponse> ProcessRefundAsync(int transactionId, CreateRefundRequest request, int approvedById, int processedById)
     {
-        var transaction = await _context.Transactions
-            .Include(t => t.Refunds)
-            .Include(t => t.ProductItems)
-                .ThenInclude(pi => pi.Product)
-            .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
-
-        if (transaction == null)
-            throw new InvalidOperationException("Transaction not found");
-
-        if (transaction.PaymentStatus != "Paid")
-            throw new InvalidOperationException("Can only refund paid transactions");
-
-        // Validate refund amount
-        var totalRefunded = transaction.Refunds.Sum(r => r.RefundAmount);
-        var maxRefundable = transaction.TotalAmount - totalRefunded;
-
-        if (request.RefundAmount > maxRefundable)
-            throw new InvalidOperationException($"Refund amount exceeds maximum refundable: {maxRefundable:C}");
-
-        var refund = new Refund
+        using var dbTransaction = await _context.Database.BeginTransactionAsync();
+        Refund refund;
+        try
         {
-            TransactionId = transactionId,
-            RefundAmount = request.RefundAmount,
-            RefundMethod = request.RefundMethod,
-            RefundType = request.RefundType,
-            Reason = request.Reason,
-            ApprovedBy = approvedById,
-            ProcessedBy = processedById,
-            RefundDate = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow
-        };
+            var transaction = await _context.Transactions
+                .Include(t => t.Refunds)
+                .Include(t => t.ProductItems)
+                    .ThenInclude(pi => pi.Product)
+                .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
 
-        _context.Refunds.Add(refund);
+            if (transaction == null)
+                throw new InvalidOperationException("Transaction not found");
 
-        // Update transaction status if fully refunded
-        var isFullRefund = request.RefundType == "Full" || request.RefundAmount >= maxRefundable;
-        if (isFullRefund)
-        {
-            transaction.PaymentStatus = "Refunded";
-        }
+            if (transaction.PaymentStatus != "Paid")
+                throw new InvalidOperationException("Can only refund paid transactions");
 
-        // Restore product stock on refund with audit trail
-        if (isFullRefund && (request.ProductItems == null || !request.ProductItems.Any()))
-        {
-            // Full refund without specific items: restore all product stock
-            foreach (var item in transaction.ProductItems)
+            // Validate refund amount
+            var totalRefunded = transaction.Refunds.Sum(r => r.RefundAmount);
+            var maxRefundable = transaction.TotalAmount - totalRefunded;
+
+            if (request.RefundAmount > maxRefundable)
+                throw new InvalidOperationException($"Refund amount exceeds maximum refundable: {maxRefundable:C}");
+
+            refund = new Refund
             {
-                var qtyBefore = item.Product.CurrentStock;
-                item.Product.CurrentStock += item.Quantity;
-                item.Product.UpdatedAt = DateTime.UtcNow;
+                TransactionId = transactionId,
+                RefundAmount = request.RefundAmount,
+                RefundMethod = request.RefundMethod,
+                RefundType = request.RefundType,
+                Reason = request.Reason,
+                ApprovedBy = approvedById,
+                ProcessedBy = processedById,
+                RefundDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
+            _context.Refunds.Add(refund);
+
+            // Update transaction status if fully refunded
+            var isFullRefund = request.RefundType == "Full" || request.RefundAmount >= maxRefundable;
+            if (isFullRefund)
+            {
+                transaction.PaymentStatus = "Refunded";
+            }
+
+            // Restore product stock on refund with audit trail
+            if (isFullRefund && (request.ProductItems == null || !request.ProductItems.Any()))
+            {
+                foreach (var item in transaction.ProductItems)
                 {
-                    ProductId = item.ProductId,
-                    AdjustmentType = "Return to Stock",
-                    QuantityBefore = qtyBefore,
-                    QuantityChange = item.Quantity,
-                    QuantityAfter = item.Product.CurrentStock,
-                    Reason = $"Full refund: {request.Reason}",
-                    ReferenceNumber = transaction.TransactionNumber,
-                    AdjustedBy = processedById,
-                    CreatedAt = DateTime.UtcNow
-                });
+                    var qtyBefore = item.Product.CurrentStock;
+                    item.Product.CurrentStock += item.Quantity;
+                    item.Product.UpdatedAt = DateTime.UtcNow;
+
+                    _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
+                    {
+                        ProductId = item.ProductId,
+                        AdjustmentType = "Return to Stock",
+                        QuantityBefore = qtyBefore,
+                        QuantityChange = item.Quantity,
+                        QuantityAfter = item.Product.CurrentStock,
+                        Reason = $"Full refund: {request.Reason}",
+                        ReferenceNumber = transaction.TransactionNumber,
+                        AdjustedBy = processedById,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
             }
-        }
-        else if (request.ProductItems != null && request.ProductItems.Any())
-        {
-            // Specific items being refunded: restore only those
-            foreach (var refundItem in request.ProductItems)
+            else if (request.ProductItems != null && request.ProductItems.Any())
             {
-                var txnItem = transaction.ProductItems
-                    .FirstOrDefault(pi => pi.ProductId == refundItem.ProductId);
-                if (txnItem == null)
-                    throw new InvalidOperationException($"Product {refundItem.ProductId} not found in this transaction");
-
-                if (refundItem.Quantity > txnItem.Quantity)
-                    throw new InvalidOperationException(
-                        $"Refund quantity ({refundItem.Quantity}) exceeds sold quantity ({(int)txnItem.Quantity}) for product {txnItem.Product.ProductName}");
-
-                var qtyBefore = txnItem.Product.CurrentStock;
-                txnItem.Product.CurrentStock += refundItem.Quantity;
-                txnItem.Product.UpdatedAt = DateTime.UtcNow;
-
-                _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
+                foreach (var refundItem in request.ProductItems)
                 {
-                    ProductId = refundItem.ProductId,
-                    AdjustmentType = "Return to Stock",
-                    QuantityBefore = qtyBefore,
-                    QuantityChange = refundItem.Quantity,
-                    QuantityAfter = txnItem.Product.CurrentStock,
-                    Reason = $"Partial refund: {request.Reason}",
-                    ReferenceNumber = transaction.TransactionNumber,
-                    AdjustedBy = processedById,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-        }
+                    var txnItem = transaction.ProductItems
+                        .FirstOrDefault(pi => pi.ProductId == refundItem.ProductId);
+                    if (txnItem == null)
+                        throw new InvalidOperationException($"Product {refundItem.ProductId} not found in this transaction");
 
-        // Deduct loyalty points proportional to refund amount
-        var customer = await _context.Customers.FindAsync(transaction.CustomerId);
-        if (customer != null)
-        {
-            var pointsToRemove = (int)(request.RefundAmount / 100) * DomainConstants.LoyaltyConfig.DefaultPointsPerHundredPesos;
-            if (pointsToRemove > 0)
+                    if (refundItem.Quantity > txnItem.Quantity)
+                        throw new InvalidOperationException(
+                            $"Refund quantity ({refundItem.Quantity}) exceeds sold quantity ({(int)txnItem.Quantity}) for product {txnItem.Product.ProductName}");
+
+                    var qtyBefore = txnItem.Product.CurrentStock;
+                    txnItem.Product.CurrentStock += refundItem.Quantity;
+                    txnItem.Product.UpdatedAt = DateTime.UtcNow;
+
+                    _context.StockAdjustments.Add(new MiddayMistSpa.Core.Entities.Inventory.StockAdjustment
+                    {
+                        ProductId = refundItem.ProductId,
+                        AdjustmentType = "Return to Stock",
+                        QuantityBefore = qtyBefore,
+                        QuantityChange = refundItem.Quantity,
+                        QuantityAfter = txnItem.Product.CurrentStock,
+                        Reason = $"Partial refund: {request.Reason}",
+                        ReferenceNumber = transaction.TransactionNumber,
+                        AdjustedBy = processedById,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            // Deduct loyalty points proportional to refund amount
+            var customer = await _context.Customers.FindAsync(transaction.CustomerId);
+            if (customer != null)
             {
-                DeductLoyaltyPoints(customer, pointsToRemove,
-                    DomainConstants.LoyaltyTransactionTypes.Adjust,
-                    $"Refund on transaction {transaction.TransactionNumber}",
-                    transaction.TransactionId);
+                var pointsToRemove = (int)(request.RefundAmount / 100) * DomainConstants.LoyaltyConfig.DefaultPointsPerHundredPesos;
+                if (pointsToRemove > 0)
+                {
+                    DeductLoyaltyPoints(customer, pointsToRemove,
+                        DomainConstants.LoyaltyTransactionTypes.Adjust,
+                        $"Refund on transaction {transaction.TransactionNumber}",
+                        transaction.TransactionId);
+                }
+                customer.TotalSpent = Math.Max(0, customer.TotalSpent - request.RefundAmount);
             }
-            customer.TotalSpent = Math.Max(0, customer.TotalSpent - request.RefundAmount);
+
+            await _context.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
+        }
+        catch
+        {
+            await dbTransaction.RollbackAsync();
+            throw;
         }
 
-        await _context.SaveChangesAsync();
-
-        // Auto-create reversing journal entry for the refund
+        // Auto-create reversing journal entry for the refund (outside transaction - non-critical)
         try
         {
             await _accountingService.CreateRefundJournalEntryAsync(
@@ -1069,7 +1095,7 @@ public class TransactionService : ITransactionService
             {
                 TransactionId = t.TransactionId,
                 TransactionNumber = t.TransactionNumber,
-                CustomerName = t.Customer.FirstName + " " + t.Customer.LastName,
+                CustomerName = t.Customer != null ? t.Customer.FirstName + " " + t.Customer.LastName : "Walk-in",
                 TotalAmount = t.TotalAmount,
                 PaymentMethod = t.PaymentMethod,
                 PaymentStatus = t.PaymentStatus,
@@ -1302,8 +1328,8 @@ public class TransactionService : ITransactionService
             TransactionNumber = transaction.TransactionNumber,
             TransactionDate = transaction.TransactionDate,
             BusinessName = "MiddayMist Spa",
-            CustomerName = $"{transaction.Customer.FirstName} {transaction.Customer.LastName}",
-            MembershipType = transaction.Customer.MembershipType,
+            CustomerName = transaction.Customer != null ? $"{transaction.Customer.FirstName} {transaction.Customer.LastName}" : "Walk-in",
+            MembershipType = transaction.Customer?.MembershipType ?? "Standard",
             Subtotal = transaction.Subtotal,
             DiscountAmount = transaction.DiscountAmount,
             TaxAmount = transaction.TaxAmount,
@@ -1314,7 +1340,7 @@ public class TransactionService : ITransactionService
             ChangeAmount = transaction.ChangeAmount,
             CashierName = $"{transaction.Cashier.FirstName} {transaction.Cashier.LastName}",
             LoyaltyPointsEarned = transaction.LoyaltyPointsEarned,
-            LoyaltyPointsBalance = transaction.Customer.LoyaltyPoints,
+            LoyaltyPointsBalance = transaction.Customer?.LoyaltyPoints ?? 0,
             ThankYouMessage = "Thank you for visiting MiddayMist Spa! We hope to see you again soon."
         };
 
@@ -1481,8 +1507,8 @@ public class TransactionService : ITransactionService
             CustomerId = transaction.CustomerId,
             CustomerName = transaction.Customer != null
                 ? $"{transaction.Customer.FirstName} {transaction.Customer.LastName}"
-                : "Unknown",
-            MembershipType = transaction.Customer?.MembershipType ?? "Regular",
+                : "Walk-in",
+            MembershipType = transaction.Customer?.MembershipType ?? "Standard",
             AppointmentId = transaction.AppointmentId,
             Subtotal = transaction.Subtotal,
             DiscountAmount = transaction.DiscountAmount,
@@ -1558,6 +1584,30 @@ public class TransactionService : ITransactionService
                 RefundDate = r.RefundDate
             }).ToList(),
             CreatedAt = transaction.CreatedAt
+        };
+    }
+
+    public async Task<TransactionStatsResponse> GetTransactionStatsAsync()
+    {
+        var today = PhilippineTime.Today;
+        var tomorrow = today.AddDays(1);
+
+        var todayPaid = _context.Transactions
+            .Where(t => t.TransactionDate >= today && t.TransactionDate < tomorrow && t.PaymentStatus == "Paid");
+
+        var todaySales = await todayPaid.SumAsync(t => (decimal?)t.TotalAmount) ?? 0;
+        var todayCount = await todayPaid.CountAsync();
+
+        var pendingPayments = await _context.Transactions
+            .Where(t => t.PaymentStatus == "Pending")
+            .SumAsync(t => (decimal?)t.TotalAmount) ?? 0;
+
+        return new TransactionStatsResponse
+        {
+            TodaySales = todaySales,
+            TodayCount = todayCount,
+            AverageTransaction = todayCount > 0 ? todaySales / todayCount : 0,
+            PendingPayments = pendingPayments
         };
     }
 }

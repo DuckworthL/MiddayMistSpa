@@ -675,7 +675,7 @@ public class InventoryService : IInventoryService
             ?? throw new InvalidOperationException($"Supplier with ID {request.SupplierId} not found");
 
         // Generate PO number
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         var todayCount = await _context.PurchaseOrders
             .CountAsync(po => po.CreatedAt.Date == today);
         var poNumber = $"PO-{today:yyyyMMdd}-{(todayCount + 1):D3}";

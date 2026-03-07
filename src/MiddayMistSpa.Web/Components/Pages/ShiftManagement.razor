@@ -365,9 +365,10 @@
                                         @for (int d = 0; d < 7; d++)
                                         {
                                             var date = _availWeekStart.AddDays(d);
-                                            <th class="text-center avail-header @(date == DateTime.Today ? "today-header" : "")">
+                                            <th
+                                                class="text-center avail-header @(date == PhilippineTime.Today ? "today-header" : "")">
                                                 <div class="small text-muted">@date.ToString("ddd")</div>
-                                                <div class="@(date == DateTime.Today ? "fw-bold text-primary" : "")">
+                                                <div class="@(date == PhilippineTime.Today ? "fw-bold text-primary" : "")">
                                                     @date.ToString("MMM dd")</div>
                                                 </th>
                                             }
@@ -384,7 +385,7 @@
                                                     {
                                                         var date = _availWeekStart.AddDays(d);
                                                         var avail = group.Value.FirstOrDefault(a => a.Date.Date == date.Date);
-                                                        <td class="text-center avail-cell @(date == DateTime.Today ? "today-col" : "")">
+                                                        <td class="text-center avail-cell @(date == PhilippineTime.Today ? "today-col" : "")">
                                                             @if (avail != null)
                                                             {
                                                                 <div class="avail-badge @GetAvailabilityClass(avail.Status)"
@@ -737,6 +738,7 @@
         _canManage = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("shifts.manage");
 
         _isLoading = true;
+        StateHasChanged();
         try
         {
             var empResult = await EmployeeService.GetEmployeesAsync(page: 1, pageSize: 200, activeOnly: true);

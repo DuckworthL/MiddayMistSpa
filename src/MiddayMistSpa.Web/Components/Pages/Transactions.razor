@@ -666,7 +666,7 @@
             _serviceLookup = await servicesTask;
             _productLookup = await productsTask;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _alertMessage = "Failed to load lookup data. Some features may not work correctly.";
             _alertType = Alert.AlertType.Error;
@@ -676,6 +676,7 @@
     private async Task LoadTransactions()
     {
         _isLoading = true;
+        StateHasChanged();
         try
         {
             _transactions = await TransactionService.GetTransactionsAsync(
@@ -685,7 +686,7 @@
             endDate: _endDate,
             status: _statusFilter);
 
-            CalculateStats();
+            await LoadStats();
         }
         catch (Exception ex)
         {
@@ -699,14 +700,16 @@
         }
     }
 
-    private void CalculateStats()
+    private async Task LoadStats()
     {
-        var todayTxns = _transactions.Items.Where(t => t.TransactionDate.Date == PhilippineTime.Today && t.PaymentStatus ==
-        "Paid");
-        _todaySales = todayTxns.Sum(t => t.TotalAmount);
-        _todayCount = todayTxns.Count();
-        _averageTransaction = _todayCount > 0 ? _todaySales / _todayCount : 0;
-        _pendingPayments = _transactions.Items.Where(t => t.PaymentStatus == "Pending").Sum(t => t.TotalAmount);
+        var stats = await TransactionService.GetTransactionStatsAsync();
+        if (stats != null)
+        {
+            _todaySales = stats.TodaySales;
+            _todayCount = stats.TodayCount;
+            _averageTransaction = stats.AverageTransaction;
+            _pendingPayments = stats.PendingPayments;
+        }
     }
 
     private async Task OnPageChanged(int page)

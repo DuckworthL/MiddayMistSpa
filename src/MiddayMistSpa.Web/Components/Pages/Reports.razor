@@ -436,8 +436,8 @@
 @code {
     private bool _isLoading = true;
     private string _selectedPeriod = "month";
-    private DateTime _customStart = DateTime.Today.AddMonths(-1);
-    private DateTime _customEnd = DateTime.Today;
+    private DateTime _customStart = PhilippineTime.Today.AddMonths(-1);
+    private DateTime _customEnd = PhilippineTime.Today;
     private string _chartView = "daily";
 
     private string _exportFormat = "PDF";
@@ -477,8 +477,8 @@
     private bool _showCustomReportModal;
     private string _customReportType = "sales";
     private string _customReportFormat = "PDF";
-    private DateTime _customReportStart = DateTime.Today.AddMonths(-1);
-    private DateTime _customReportEnd = DateTime.Today;
+    private DateTime _customReportStart = PhilippineTime.Today.AddMonths(-1);
+    private DateTime _customReportEnd = PhilippineTime.Today;
 
     // Alert
     private string _alertMessage = string.Empty;
@@ -639,7 +639,7 @@
 
     private (DateTime startDate, DateTime endDate) GetDateRange()
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         return _selectedPeriod switch
         {
             "today" => (today, today),
@@ -739,8 +739,16 @@
                 customerReport.NewCustomers;
             }
 
-            _appointmentStats = GenerateAppointmentStats();
-            _topProducts = GenerateTopProducts();
+            _appointmentStats = BuildAppointmentStats(dashboard?.Appointments);
+
+            // Load top products from transaction sales report
+            var txnSalesReport = await TransactionService.GetTransactionSalesReportAsync(startDate, endDate);
+            _topProducts = txnSalesReport?.TopProducts?.Select(p => new TopProductItem
+            {
+                Name = p.ProductName,
+                UnitsSold = p.QuantitySold,
+                Revenue = p.Revenue
+            }).ToList() ?? new();
 
             _availableReports = new List<ReportItem>
 {
@@ -773,26 +781,19 @@ new() { Id = "custom", Name = "Custom Report", Description = "Build your own rep
         return parts.Length > 0 ? parts[0][0].ToString().ToUpper() : "?";
     }
 
-    private List<AppointmentStatusItem> GenerateAppointmentStats()
+    private List<AppointmentStatusItem> BuildAppointmentStats(AppointmentsSummary? appts)
     {
-        return new List<AppointmentStatusItem>
-{
-new() { Name = "Completed", Count = 289, Percentage = 84.5m, BadgeClass = "bg-success" },
-new() { Name = "Cancelled", Count = 28, Percentage = 8.2m, BadgeClass = "bg-danger" },
-new() { Name = "No Show", Count = 15, Percentage = 4.4m, BadgeClass = "bg-warning" },
-new() { Name = "Rescheduled", Count = 10, Percentage = 2.9m, BadgeClass = "bg-info" },
-};
-    }
+        if (appts == null) return new();
 
-    private List<TopProductItem> GenerateTopProducts()
-    {
-        return new List<TopProductItem>
-{
-new() { Name = "Lavender Essential Oil", UnitsSold = 45, Revenue = 1125 },
-new() { Name = "Organic Face Cream", UnitsSold = 32, Revenue = 1600 },
-new() { Name = "Massage Candle Set", UnitsSold = 28, Revenue = 840 },
-new() { Name = "Bath Salt Collection", UnitsSold = 24, Revenue = 480 },
-};
+        var total = appts.Completed + appts.Cancelled + appts.NoShow + appts.Scheduled + appts.InProgress;
+        if (total == 0) return new();
+
+        var stats = new List<AppointmentStatusItem>();
+        if (appts.Completed > 0) stats.Add(new() { Name = "Completed", Count = appts.Completed, Percentage = Math.Round((decimal)appts.Completed / total * 100, 1), BadgeClass = "bg-success" });
+        if (appts.Cancelled > 0) stats.Add(new() { Name = "Cancelled", Count = appts.Cancelled, Percentage = Math.Round((decimal)appts.Cancelled / total * 100, 1), BadgeClass = "bg-danger" });
+        if (appts.NoShow > 0) stats.Add(new() { Name = "No Show", Count = appts.NoShow, Percentage = Math.Round((decimal)appts.NoShow / total * 100, 1), BadgeClass = "bg-warning" });
+        if (appts.Scheduled > 0) stats.Add(new() { Name = "Scheduled", Count = appts.Scheduled, Percentage = Math.Round((decimal)appts.Scheduled / total * 100, 1), BadgeClass = "bg-info" });
+        return stats;
     }
 
     private async Task GenerateReport(string reportId)

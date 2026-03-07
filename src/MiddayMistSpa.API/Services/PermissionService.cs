@@ -122,6 +122,17 @@ public class PermissionService : IPermissionService
             "reports.view", "reports.export",
             "timeattendance.view",
             "notifications.view"
+        },
+        ["Sales Ledger"] = new HashSet<string>
+        {
+            "dashboard.view",
+            "pos.access",
+            "customers.view",
+            "services.view",
+            "accounting.view",
+            "reports.view", "reports.export",
+            "timeattendance.view",
+            "notifications.view"
         }
     };
 

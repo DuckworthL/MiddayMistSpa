@@ -2,6 +2,8 @@
 @inject IDashboardService DashboardService
 @inject IAppointmentApiService AppointmentService
 @inject IAuthStateService AuthService
+@inject IRolePermissionService RolePermissionService
+@inject IApiClient ApiClient
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -20,11 +22,14 @@ else
                 <h1 class="h3 mb-1" style="color: #2C2C2C;">Dashboard</h1>
                 <p class="mb-0" style="color: #6B7280;">Welcome back! Here's what's happening today.</p>
             </div>
-            <div>
-                <a href="/appointments/new" class="btn btn-primary">
-                    <i class="bi bi-plus-lg me-1"></i> New Appointment
-                </a>
-            </div>
+            @if (_canCreateAppointments)
+            {
+                <div>
+                    <a href="/appointments/new" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i> New Appointment
+                    </a>
+                </div>
+            }
         </div>
 
         @if (_isLoading)
@@ -33,58 +38,61 @@ else
         }
         else
         {
-            @* Stats Cards *@
-            <div class="row g-4 mb-4">
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <StatCard Title="Today's Revenue" Value="@($"₱{_todayRevenue:N0}")" Icon="bi-currency-dollar"
-                              Color="StatCard.CardColor.Success" />
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <StatCard Title="Appointments Today" Value="@_todayAppointments.ToString()"
-                              SubValue="@($"{_completedAppointments} completed")" Icon="bi-calendar-check"
-                              Color="StatCard.CardColor.Primary" />
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <StatCard Title="New Customers" Value="@_newCustomers.ToString()" Icon="bi-people"
-                              Color="StatCard.CardColor.Info" />
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <StatCard Title="Low Stock Items" Value="@_lowStockItems.ToString()" Icon="bi-box-seam"
-                              Color="@(_lowStockItems > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success)" />
-                </div>
-            </div>
-
-            <div class="row g-4">
-                @* Upcoming Appointments *@
-                <div class="col-12 col-lg-8">
-                    <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0" style="color: #2C2C2C;">Today's Appointments</h5>
-                            <a href="/appointments" class="btn btn-sm btn-outline-primary">View All</a>
+            @* Stats Cards — adaptive row that auto-sizes *@
+            @if (_statCards.Any())
+            {
+                var colClass = _statCards.Count switch
+                {
+                    1 => "col-12 col-sm-6 col-xl-4",
+                    2 => "col-12 col-sm-6",
+                    3 => "col-12 col-sm-6 col-xl-4",
+                    _ => "col-12 col-sm-6 col-xl-3"
+                };
+                <div class="row g-4 mb-4">
+                    @foreach (var card in _statCards)
+                    {
+                        <div class="@colClass">
+                            <StatCard Title="@card.Title" Value="@card.Value" SubValue="@card.SubValue"
+                                      Icon="@card.Icon" Color="@card.Color" />
                         </div>
-                        <div class="card-body p-0">
-                            @if (_upcomingAppointments.Any())
-                            {
-                                <div class="table-responsive">
-                                    <table class="table table-hover mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>Time</th>
-                                                <th>Customer</th>
-                                                <th>Service</th>
-                                                <th>Therapist</th>
-                                                <th>Status</th>
-                                                <th></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var appt in _upcomingAppointments.Take(8))
-                                            {
+                    }
+                </div>
+            }
+
+            @* Main Content Area — adaptive layout *@
+            @if (_canViewAppointments)
+            {
+                @* Appointments + sidebar layout *@
+                <div class="row g-4">
+                    <div class="col-12 col-lg-8">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0" style="color: #2C2C2C;">Today's Appointments</h5>
+                                <a href="/appointments" class="btn btn-sm btn-outline-primary">View All</a>
+                            </div>
+                            <div class="card-body p-0">
+                                @if (_upcomingAppointments.Any())
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead>
                                                 <tr>
-                                                    <td>
-                                                        <span class="fw-medium">@appt.StartTime.ToString("hh\\:mm")</span>
-                                                        <span class="small" style="color: #6B7280;">-
-                                                            @appt.EndTime.ToString("hh\\:mm")</span>
+                                                    <th>Time</th>
+                                                    <th>Customer</th>
+                                                    <th>Service</th>
+                                                    <th>Therapist</th>
+                                                    <th>Status</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var appt in _upcomingAppointments.Take(8))
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            <span class="fw-medium">@appt.StartTime.ToString("hh\\:mm")</span>
+                                                            <span class="small" style="color: #6B7280;">-
+                                                                @appt.EndTime.ToString("hh\\:mm")</span>
                                                         </td>
                                                         <td>@appt.CustomerName</td>
                                                         <td>@appt.ServiceName</td>
@@ -103,71 +111,187 @@ else
                                         </table>
                                     </div>
                                 }
-                            else
+                                else
                                 {
                                     <div class="text-center py-5">
                                         <i class="bi bi-calendar-x display-4 text-muted"></i>
                                         <p class="text-muted mt-2">No appointments scheduled for today</p>
-                                        <a href="/appointments/new" class="btn btn-primary btn-sm">
-                                            <i class="bi bi-plus me-1"></i> Schedule Appointment
-                                        </a>
+                                        @if (_canCreateAppointments)
+                                        {
+                                            <a href="/appointments/new" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-plus me-1"></i> Schedule Appointment
+                                            </a>
+                                        }
                                     </div>
                                 }
                             </div>
                         </div>
                     </div>
 
-                    @* Quick Actions & Stats *@
+                    @* Sidebar: Quick Actions + Top Services *@
                     <div class="col-12 col-lg-4">
-                        @* Quick Actions *@
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                        @if (_quickActions.Any())
+                        {
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        @foreach (var action in _quickActions)
+                                        {
+                                            <a href="@action.Href" class="btn btn-outline-primary text-start">
+                                                <i class="bi @action.Icon me-2"></i> @action.Label
+                                            </a>
+                                        }
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <div class="d-grid gap-2">
-                                    <a href="/customers" class="btn btn-outline-primary text-start">
-                                        <i class="bi bi-person-plus me-2"></i> Add Customer
-                                    </a>
-                                    <a href="/transactions" class="btn btn-outline-primary text-start">
-                                        <i class="bi bi-receipt me-2"></i> New Transaction
-                                    </a>
-                                    <a href="/inventory" class="btn btn-outline-primary text-start">
-                                        <i class="bi bi-box-seam me-2"></i> Check Inventory
-                                    </a>
+                        }
+
+                        @if (_canViewServices || _canViewReports)
+                        {
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (_topServices.Any())
+                                    {
+                                        @foreach (var service in _topServices.Take(5))
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <div>
+                                                    <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
+                                                    <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                                </div>
+                                                <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                @* No appointments view — full-width 3-column layout *@
+                <div class="row g-4">
+                    @* Quick Actions *@
+                    @if (_quickActions.Any())
+                    {
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        @foreach (var action in _quickActions)
+                                        {
+                                            <a href="@action.Href" class="btn btn-outline-primary text-start">
+                                                <i class="bi @action.Icon me-2"></i> @action.Label
+                                            </a>
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    }
 
-                        @* Top Services *@
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
-                            </div>
-                            <div class="card-body">
-                                @if (_topServices.Any())
-                                {
-                                    @foreach (var service in _topServices.Take(5))
+                    @* Role-Specific Widget *@
+                    @if (_roleWidget != null)
+                    {
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0" style="color: #2C2C2C;">@_roleWidget.Title</h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (_roleWidget.Items.Any())
                                     {
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <div>
-                                                <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
-                                                <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                        @foreach (var item in _roleWidget.Items)
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                         style="width: 36px; height: 36px; background: @item.BadgeBg;">
+                                                        <i class="bi @item.Icon" style="color: @item.IconColor; font-size: 0.9rem;"></i>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-medium" style="color: #2C2C2C;">@item.Label</div>
+                                                        @if (!string.IsNullOrEmpty(item.SubLabel))
+                                                        {
+                                                            <small style="color: #6B7280;">@item.SubLabel</small>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <span class="badge @item.ValueBadgeClass">@item.Value</span>
                                             </div>
-                                            <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center py-3">
+                                            <i class="bi @_roleWidget.EmptyIcon display-6 text-muted"></i>
+                                            <p class="text-muted mt-2 mb-0">@_roleWidget.EmptyMessage</p>
                                         </div>
                                     }
-                                }
-                                else
-                                {
-                                    <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
-                                }
+                                    @if (!string.IsNullOrEmpty(_roleWidget.LinkHref))
+                                    {
+                                        <div class="mt-3 text-center">
+                                            <a href="@_roleWidget.LinkHref" class="btn btn-sm btn-outline-primary">
+                                                @_roleWidget.LinkLabel
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    }
 
-                @* Revenue Chart Area *@
+                    @* Top Services *@
+                    @if (_canViewServices || _canViewReports)
+                    {
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (_topServices.Any())
+                                    {
+                                        @foreach (var service in _topServices.Take(5))
+                                        {
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <div>
+                                                    <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
+                                                    <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                                </div>
+                                                <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            @* Revenue Chart Area — visible if user can view accounting or reports *@
+            @if (_canViewAccounting || _canViewReports)
+            {
                 <div class="row mt-4">
                     <div class="col-12">
                         <div class="card border-0 shadow-sm">
@@ -199,25 +323,42 @@ else
                     </div>
                 </div>
             }
-        </div>
-    }
+        }
+    </div>
+}
 
 @code {
     private bool _isLoading = true;
-    private decimal _todayRevenue;
-    private int _todayAppointments;
-    private int _completedAppointments;
-    private int _newCustomers;
-    private int _lowStockItems;
+    private bool _isAuthChecked = false;
+    private DashboardSummary? _summary;
     private List<AppointmentSummary> _upcomingAppointments = new();
     private List<TopService> _topServices = new();
     private List<DailyRevenue> _revenueData = new();
-    private string _revenueView = "week"; // "week" or "month"
+    private string _revenueView = "week";
 
-    protected override void OnInitialized()
-    {
-        // Data will be loaded after auth check in OnAfterRenderAsync
-    }
+    // Permission flags
+    private bool _canViewAppointments;
+    private bool _canCreateAppointments;
+    private bool _canViewCustomers;
+    private bool _canViewInventory;
+    private bool _canViewAccounting;
+    private bool _canViewServices;
+    private bool _canViewReports;
+    private bool _canViewEmployees;
+    private bool _canViewPayroll;
+    private bool _canManageShifts;
+
+    // Role-adaptive data
+    private List<StatCardData> _statCards = new();
+    private List<QuickAction> _quickActions = new();
+    private RoleWidgetData? _roleWidget;
+    private string _userRole = "";
+
+    // HR-specific data
+    private int _clockedInCount;
+    private int _pendingLeavesCount;
+
+    protected override void OnInitialized() { }
 
     private async Task LoadDashboardData()
     {
@@ -225,24 +366,18 @@ else
 
         try
         {
-            // Load dashboard summary
-            var summary = await DashboardService.GetDashboardSummaryAsync();
-            if (summary != null)
+            // Load dashboard summary (main data source for all roles)
+            _summary = await DashboardService.GetDashboardSummaryAsync();
+            if (_summary != null)
             {
-                _todayRevenue = summary.Kpis.TotalRevenue;
-                _todayAppointments = summary.Kpis.TotalAppointments;
-                _completedAppointments = summary.Appointments.Completed;
-                _newCustomers = summary.Kpis.NewCustomers;
-                _lowStockItems = summary.Inventory.LowStockItems;
-                _topServices = summary.TopServices;
-
-                // Use DailyTrend from dashboard for initial chart data
-                _revenueData = summary.Revenue.DailyTrend ?? new();
+                _topServices = _summary.TopServices;
+                _revenueData = _summary.Revenue.DailyTrend ?? new();
             }
-            else
+
+            // Load appointments if user can view them
+            if (_canViewAppointments)
             {
-                // Fallback: load today's appointments directly
-                var todayAppts = await AppointmentService.GetAppointmentsAsync(date: DateTime.Today);
+                var todayAppts = await AppointmentService.GetAppointmentsAsync(date: PhilippineTime.Today);
                 _upcomingAppointments = todayAppts.Items.Select(a => new AppointmentSummary
                 {
                     AppointmentId = a.AppointmentId,
@@ -254,27 +389,16 @@ else
                     EndTime = a.EndTime,
                     Status = a.Status
                 }).ToList();
-                _todayAppointments = todayAppts.TotalCount;
             }
 
-            // Load upcoming appointments (from today's)
-            if (!_upcomingAppointments.Any())
-            {
-                var todayAppts2 = await AppointmentService.GetAppointmentsAsync(date: DateTime.Today);
-                _upcomingAppointments = todayAppts2.Items.Select(a => new AppointmentSummary
-                {
-                    AppointmentId = a.AppointmentId,
-                    CustomerName = a.CustomerName,
-                    ServiceName = a.ServiceName,
-                    TherapistName = a.TherapistName ?? "",
-                    AppointmentDate = a.AppointmentDate,
-                    StartTime = a.StartTime,
-                    EndTime = a.EndTime,
-                    Status = a.Status
-                }).ToList();
-            }
+            // Load role-specific additional data
+            await LoadRoleSpecificData();
 
-            // Load revenue data for the selected period
+            // Build stat cards and role widget based on role + data
+            BuildStatCards();
+            BuildRoleWidget();
+
+            // Load revenue data for chart
             await LoadRevenueData();
         }
         catch (Exception ex)
@@ -285,11 +409,167 @@ else
         _isLoading = false;
     }
 
+    private async Task LoadRoleSpecificData()
+    {
+        try
+        {
+            // HR: load live attendance and pending leaves
+            if (_canViewEmployees)
+            {
+                var liveStatus = await ApiClient.GetAsync<List<LiveAttendanceStatus>>("api/time-attendance/live-status");
+                _clockedInCount = liveStatus?.Count(s => s.IsClockedIn) ?? 0;
+
+                var pendingLeaves = await ApiClient.GetAsync<List<TimeOffResponse>>("api/time-attendance/time-off/pending");
+                _pendingLeavesCount = pendingLeaves?.Count ?? 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading role-specific data: {ex.Message}");
+        }
+    }
+
+    private void BuildStatCards()
+    {
+        _statCards = new List<StatCardData>();
+        var isAdmin = _userRole == "SuperAdmin" || _userRole == "Admin";
+
+        if (isAdmin || _userRole == "Receptionist")
+        {
+            // Admin/Receptionist: Revenue, Appointments, New Customers, Low Stock
+            if (_canViewAccounting)
+                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+            if (_canViewAppointments)
+                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
+            if (_canViewCustomers)
+                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
+            if (_canViewInventory)
+            {
+                var lowStock = _summary?.Inventory.LowStockItems ?? 0;
+                _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-box-seam", lowStock > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            }
+        }
+        else if (_userRole == "HR")
+        {
+            // HR: Clocked In, Pending Leaves, Appointments (occupancy indicator), Today's Revenue
+            _statCards.Add(new StatCardData("Clocked In Now", $"{_clockedInCount}", "employees on duty", "bi-person-check", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Pending Leave Requests", $"{_pendingLeavesCount}", null, "bi-calendar-event", _pendingLeavesCount > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
+            if (_canViewReports)
+                _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt", StatCard.CardColor.Info));
+        }
+        else if (_userRole == "Inventory")
+        {
+            // Inventory: Low Stock, Out of Stock, Expiring Items, Today's Appointments
+            var lowStock = _summary?.Inventory.LowStockItems ?? 0;
+            var outOfStock = _summary?.Inventory.OutOfStockItems ?? 0;
+            var expiring = _summary?.Inventory.ExpiringItems ?? 0;
+            _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-exclamation-triangle", lowStock > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Out of Stock", $"{outOfStock}", null, "bi-x-circle", outOfStock > 0 ? StatCard.CardColor.Danger : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Expiring Soon", $"{expiring}", null, "bi-clock-history", expiring > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            if (_canViewReports)
+                _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Info));
+        }
+        else if (_userRole == "Accountant")
+        {
+            // Accountant: Revenue, Avg Ticket, Appointments, New Customers
+            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff", StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Info));
+            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Secondary));
+        }
+        else if (_userRole == "Sales Ledger")
+        {
+            // Sales Ledger: Revenue, New Customers, Avg Ticket, Appointments
+            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
+            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff", StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Secondary));
+        }
+        else if (_userRole == "Therapist")
+        {
+            // Therapist: Today's Appointments, Completed
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Completed", $"{_summary?.Appointments.Completed ?? 0}", null, "bi-check-circle", StatCard.CardColor.Success));
+        }
+        else
+        {
+            // Fallback: show whatever the user can see
+            if (_canViewAccounting)
+                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+            if (_canViewAppointments)
+                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Primary));
+            if (_canViewCustomers)
+                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
+            if (_canViewInventory)
+                _statCards.Add(new StatCardData("Low Stock Items", $"{_summary?.Inventory.LowStockItems ?? 0}", null, "bi-box-seam", StatCard.CardColor.Warning));
+        }
+    }
+
+    private void BuildRoleWidget()
+    {
+        // Only build role widget for non-appointment roles (they get the appointments table instead)
+        if (_canViewAppointments) return;
+
+        if (_userRole == "HR")
+        {
+            var items = new List<RoleWidgetItem>();
+            items.Add(new RoleWidgetItem("Clocked In", $"{_clockedInCount}", "bi-person-check", "#d1fae5", "#059669", "bg-success"));
+            items.Add(new RoleWidgetItem("Pending Leaves", $"{_pendingLeavesCount}", "bi-calendar-event",
+                _pendingLeavesCount > 0 ? "#fef3c7" : "#d1fae5", _pendingLeavesCount > 0 ? "#d97706" : "#059669",
+                _pendingLeavesCount > 0 ? "bg-warning text-dark" : "bg-success"));
+            items.Add(new RoleWidgetItem("Completed Today", $"{_summary?.Appointments.Completed ?? 0}", "bi-check-circle", "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Occupancy Rate", $"{_summary?.Kpis.OccupancyRate ?? 0:N0}%", "bi-speedometer2", "#ede9fe", "#7c3aed", "bg-info"));
+
+            _roleWidget = new RoleWidgetData("Workforce Overview", items, "bi-people", "No workforce data available", "/time-attendance", "View Attendance");
+        }
+        else if (_userRole == "Inventory")
+        {
+            var items = new List<RoleWidgetItem>();
+            var lowStock = _summary?.Inventory.LowStockItems ?? 0;
+            var outOfStock = _summary?.Inventory.OutOfStockItems ?? 0;
+            var expiring = _summary?.Inventory.ExpiringItems ?? 0;
+            items.Add(new RoleWidgetItem("Low Stock", $"{lowStock}", "bi-exclamation-triangle", lowStock > 0 ? "#fef3c7" : "#d1fae5", lowStock > 0 ? "#d97706" : "#059669", lowStock > 0 ? "bg-warning text-dark" : "bg-success"));
+            items.Add(new RoleWidgetItem("Out of Stock", $"{outOfStock}", "bi-x-circle", outOfStock > 0 ? "#fecaca" : "#d1fae5", outOfStock > 0 ? "#dc2626" : "#059669", outOfStock > 0 ? "bg-danger" : "bg-success"));
+            items.Add(new RoleWidgetItem("Expiring Soon", $"{expiring}", "bi-clock-history", expiring > 0 ? "#fef3c7" : "#d1fae5", expiring > 0 ? "#d97706" : "#059669", expiring > 0 ? "bg-warning text-dark" : "bg-success"));
+
+            _roleWidget = new RoleWidgetData("Inventory Alerts", items, "bi-box-seam", "All inventory levels are healthy", "/inventory", "Manage Inventory");
+        }
+        else if (_userRole == "Accountant")
+        {
+            var items = new List<RoleWidgetItem>();
+            var rev = _summary?.Kpis.TotalRevenue ?? 0;
+            var serviceRev = _summary?.Revenue.ServiceRevenue ?? 0;
+            var productRev = _summary?.Revenue.ProductRevenue ?? 0;
+            var netRev = _summary?.Revenue.NetRevenue ?? 0;
+            items.Add(new RoleWidgetItem("Gross Revenue", $"₱{rev:N0}", "bi-cash-stack", "#d1fae5", "#059669", "bg-success"));
+            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Product Revenue", $"₱{productRev:N0}", "bi-bag", "#ede9fe", "#7c3aed", "bg-info"));
+            items.Add(new RoleWidgetItem("Net Revenue", $"₱{netRev:N0}", "bi-graph-up-arrow", "#d1fae5", "#059669", "bg-success"));
+
+            _roleWidget = new RoleWidgetData("Revenue Breakdown", items, "bi-pie-chart", "No revenue data available", "/accounting", "View Accounting");
+        }
+        else if (_userRole == "Sales Ledger")
+        {
+            var items = new List<RoleWidgetItem>();
+            var serviceRev = _summary?.Revenue.ServiceRevenue ?? 0;
+            var productRev = _summary?.Revenue.ProductRevenue ?? 0;
+            var netRev = _summary?.Revenue.NetRevenue ?? 0;
+            var retention = _summary?.Kpis.CustomerRetentionRate ?? 0;
+            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Product Revenue", $"₱{productRev:N0}", "bi-bag", "#ede9fe", "#7c3aed", "bg-info"));
+            items.Add(new RoleWidgetItem("Net Revenue", $"₱{netRev:N0}", "bi-graph-up-arrow", "#d1fae5", "#059669", "bg-success"));
+            items.Add(new RoleWidgetItem("Retention Rate", $"{retention:N0}%", "bi-arrow-repeat", "#fef3c7", "#d97706", "bg-warning text-dark"));
+
+            _roleWidget = new RoleWidgetData("Sales Overview", items, "bi-graph-up", "No sales data available", "/transactions", "View Transactions");
+        }
+    }
+
     private async Task LoadRevenueData()
     {
         try
         {
-            var endDate = DateTime.Today;
+            var endDate = PhilippineTime.Today;
             var startDate = _revenueView == "week" ? endDate.AddDays(-6) : endDate.AddDays(-29);
             _revenueData = await DashboardService.GetRevenueAsync(startDate, endDate);
         }
@@ -366,13 +646,10 @@ else
         }
     }
 
-    private bool _isAuthChecked = false;
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Try to restore session
             await AuthService.TryRestoreSessionAsync();
 
             if (!AuthService.IsAuthenticated)
@@ -382,14 +659,137 @@ else
             }
 
             _isAuthChecked = true;
+            _userRole = AuthService.CurrentUser?.Role ?? "";
+            var isAdmin = _userRole == "SuperAdmin" || _userRole == "Admin";
 
-            // Now load data after auth is ready
+            // Set permission flags
+            _canViewAppointments = isAdmin || RolePermissionService.HasPermission("appointments.view");
+            _canCreateAppointments = isAdmin || RolePermissionService.HasPermission("appointments.create");
+            _canViewCustomers = isAdmin || RolePermissionService.HasPermission("customers.view");
+            _canViewInventory = isAdmin || RolePermissionService.HasPermission("inventory.view");
+            _canViewAccounting = isAdmin || RolePermissionService.HasPermission("accounting.view") || RolePermissionService.HasPermission("pos.access");
+            _canViewServices = isAdmin || RolePermissionService.HasPermission("services.view");
+            _canViewReports = isAdmin || RolePermissionService.HasPermission("reports.view");
+            _canViewEmployees = isAdmin || RolePermissionService.HasPermission("employees.view");
+            _canViewPayroll = isAdmin || RolePermissionService.HasPermission("payroll.view");
+            _canManageShifts = isAdmin || RolePermissionService.HasPermission("shifts.manage");
+
+            // Build role-specific quick actions
+            BuildQuickActions(isAdmin);
+
+            // Load data
             await LoadDashboardData();
             StateHasChanged();
 
-            // Render chart after data loaded and DOM updated
-            await Task.Delay(100);
-            await RenderRevenueChart();
+            // Render chart after DOM update
+            if (_canViewAccounting || _canViewReports)
+            {
+                await Task.Delay(100);
+                await RenderRevenueChart();
+            }
+        }
+    }
+
+    private void BuildQuickActions(bool isAdmin)
+    {
+        _quickActions = new List<QuickAction>();
+
+        if (_userRole == "HR")
+        {
+            _quickActions.Add(new QuickAction { Href = "/time-attendance", Icon = "bi-clock", Label = "View Attendance" });
+            _quickActions.Add(new QuickAction { Href = "/employees", Icon = "bi-people", Label = "Manage Employees" });
+            if (_canManageShifts)
+                _quickActions.Add(new QuickAction { Href = "/shifts", Icon = "bi-calendar-range", Label = "Manage Shifts" });
+            if (_canViewPayroll)
+                _quickActions.Add(new QuickAction { Href = "/payroll", Icon = "bi-wallet2", Label = "View Payroll" });
+            _quickActions.Add(new QuickAction { Href = "/reports", Icon = "bi-bar-chart-line", Label = "View Reports" });
+        }
+        else if (_userRole == "Inventory")
+        {
+            _quickActions.Add(new QuickAction { Href = "/inventory", Icon = "bi-box-seam", Label = "Manage Inventory" });
+            _quickActions.Add(new QuickAction { Href = "/inventory/purchase-orders", Icon = "bi-cart-plus", Label = "Purchase Orders" });
+            _quickActions.Add(new QuickAction { Href = "/reports", Icon = "bi-bar-chart-line", Label = "View Reports" });
+        }
+        else if (_userRole == "Accountant")
+        {
+            _quickActions.Add(new QuickAction { Href = "/accounting", Icon = "bi-journal-text", Label = "Accounting" });
+            _quickActions.Add(new QuickAction { Href = "/accounting/journal", Icon = "bi-pencil-square", Label = "Journal Entry" });
+            if (_canViewPayroll)
+                _quickActions.Add(new QuickAction { Href = "/payroll", Icon = "bi-wallet2", Label = "View Payroll" });
+            _quickActions.Add(new QuickAction { Href = "/reports", Icon = "bi-bar-chart-line", Label = "View Reports" });
+        }
+        else if (_userRole == "Sales Ledger")
+        {
+            _quickActions.Add(new QuickAction { Href = "/transactions", Icon = "bi-receipt", Label = "New Transaction" });
+            _quickActions.Add(new QuickAction { Href = "/customers", Icon = "bi-people", Label = "View Customers" });
+            _quickActions.Add(new QuickAction { Href = "/services", Icon = "bi-scissors", Label = "View Services" });
+            _quickActions.Add(new QuickAction { Href = "/accounting", Icon = "bi-journal-text", Label = "View Accounting" });
+            _quickActions.Add(new QuickAction { Href = "/reports", Icon = "bi-bar-chart-line", Label = "View Reports" });
+        }
+        else
+        {
+            // Admin, Receptionist, Therapist, others
+            if (isAdmin || RolePermissionService.HasPermission("customers.create"))
+                _quickActions.Add(new QuickAction { Href = "/customers", Icon = "bi-person-plus", Label = "Add Customer" });
+            if (isAdmin || RolePermissionService.HasPermission("pos.access"))
+                _quickActions.Add(new QuickAction { Href = "/transactions", Icon = "bi-receipt", Label = "New Transaction" });
+            if (_canViewInventory)
+                _quickActions.Add(new QuickAction { Href = "/inventory", Icon = "bi-box-seam", Label = "Check Inventory" });
+            if (_canViewReports)
+                _quickActions.Add(new QuickAction { Href = "/reports", Icon = "bi-bar-chart-line", Label = "View Reports" });
+        }
+    }
+
+    // Inner classes for role-adaptive data
+    private class StatCardData
+    {
+        public string Title { get; set; }
+        public string Value { get; set; }
+        public string? SubValue { get; set; }
+        public string Icon { get; set; }
+        public StatCard.CardColor Color { get; set; }
+
+        public StatCardData(string title, string value, string? subValue, string icon, StatCard.CardColor color)
+        {
+            Title = title; Value = value; SubValue = subValue; Icon = icon; Color = color;
+        }
+    }
+
+    private class QuickAction
+    {
+        public string Href { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+
+    private class RoleWidgetData
+    {
+        public string Title { get; set; }
+        public List<RoleWidgetItem> Items { get; set; }
+        public string EmptyIcon { get; set; }
+        public string EmptyMessage { get; set; }
+        public string? LinkHref { get; set; }
+        public string? LinkLabel { get; set; }
+
+        public RoleWidgetData(string title, List<RoleWidgetItem> items, string emptyIcon, string emptyMessage, string? linkHref = null, string? linkLabel = null)
+        {
+            Title = title; Items = items; EmptyIcon = emptyIcon; EmptyMessage = emptyMessage; LinkHref = linkHref; LinkLabel = linkLabel;
+        }
+    }
+
+    private class RoleWidgetItem
+    {
+        public string Label { get; set; }
+        public string Value { get; set; }
+        public string Icon { get; set; }
+        public string BadgeBg { get; set; }
+        public string IconColor { get; set; }
+        public string ValueBadgeClass { get; set; }
+        public string? SubLabel { get; set; }
+
+        public RoleWidgetItem(string label, string value, string icon, string badgeBg, string iconColor, string valueBadgeClass, string? subLabel = null)
+        {
+            Label = label; Value = value; Icon = icon; BadgeBg = badgeBg; IconColor = iconColor; ValueBadgeClass = valueBadgeClass; SubLabel = subLabel;
         }
     }
 }

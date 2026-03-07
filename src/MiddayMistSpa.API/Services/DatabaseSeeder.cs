@@ -91,7 +91,7 @@ public class DatabaseSeeder : IDatabaseSeeder
             new() { RoleCode = "INVENTORY", RoleName = "Inventory", Description = "Manage products, stock, and purchase orders", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
             new() { RoleCode = "ACCOUNTANT", RoleName = "Accountant", Description = "Financial management, reports, and payroll", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
             new() { RoleCode = "HR", RoleName = "HR", Description = "Employee management, schedules, and time-off requests", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
-            new() { RoleCode = "SALES", RoleName = "Sales", Description = "View sales reports and customer analytics", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+            new() { RoleCode = "SALES_LEDGER", RoleName = "Sales Ledger", Description = "View sales reports and customer analytics", IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         };
 
         await _context.Roles.AddRangeAsync(roles);
@@ -112,7 +112,7 @@ public class DatabaseSeeder : IDatabaseSeeder
         var inventoryRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Inventory");
         var accountantRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Accountant");
         var hrRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "HR");
-        var salesRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Sales");
+        var salesLedgerRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Sales Ledger");
 
         if (superAdminRole == null || adminRole == null)
         {
@@ -248,15 +248,15 @@ public class DatabaseSeeder : IDatabaseSeeder
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             },
-            // Sales account
+            // Sales Ledger account
             new()
             {
-                Username = "sales",
-                Email = "sales@middaymistspa.com",
+                Username = "salesledger",
+                Email = "salesledger@middaymistspa.com",
                 EmailConfirmed = true,
-                PasswordHash = HashPassword("Sales@2026!"),
+                PasswordHash = HashPassword("SalesLedger@2026!"),
                 SecurityStamp = Guid.NewGuid().ToString(),
-                RoleId = salesRole?.RoleId ?? adminRole.RoleId,
+                RoleId = salesLedgerRole?.RoleId ?? adminRole.RoleId,
                 FirstName = "Roberto",
                 LastName = "Mendoza",
                 IsActive = true,
@@ -1157,7 +1157,7 @@ public class DatabaseSeeder : IDatabaseSeeder
     private async Task LinkUsersToEmployeesAsync()
     {
         // Roles whose users need an Employee record to clock in/out
-        var staffRoles = new[] { "Receptionist", "Therapist", "Inventory", "Accountant", "HR" };
+        var staffRoles = new[] { "Receptionist", "Therapist", "Inventory", "Accountant", "HR", "Sales Ledger" };
 
         var usersWithRoles = await _context.Users
             .Include(u => u.Role)
@@ -1194,6 +1194,7 @@ public class DatabaseSeeder : IDatabaseSeeder
                 "Inventory" => ("Inventory Staff", "Inventory", false),
                 "Accountant" => ("Accountant", "Finance", false),
                 "HR" => ("HR Staff", "Human Resources", false),
+                "Sales Ledger" => ("Sales Ledger", "Finance", false),
                 _ => ("Staff", "General", false)
             };
 

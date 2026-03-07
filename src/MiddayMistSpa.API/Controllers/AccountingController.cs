@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MiddayMistSpa.API.DTOs.Accounting;
 using MiddayMistSpa.API.DTOs.Employee;
 using MiddayMistSpa.API.Services;
+using MiddayMistSpa.Core;
 using System.Security.Claims;
 
 namespace MiddayMistSpa.API.Controllers;
@@ -13,11 +14,13 @@ namespace MiddayMistSpa.API.Controllers;
 public class AccountingController : ControllerBase
 {
     private readonly IAccountingService _accountingService;
+    private readonly IInvoiceService _invoiceService;
     private readonly ILogger<AccountingController> _logger;
 
-    public AccountingController(IAccountingService accountingService, ILogger<AccountingController> logger)
+    public AccountingController(IAccountingService accountingService, IInvoiceService invoiceService, ILogger<AccountingController> logger)
     {
         _accountingService = accountingService;
+        _invoiceService = invoiceService;
         _logger = logger;
     }
 
@@ -128,6 +131,14 @@ public class AccountingController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("journal-entries/summary")]
+    [Authorize(Policy = "Permission:accounting.view")]
+    public async Task<ActionResult<JournalSummaryResponse>> GetJournalSummary()
+    {
+        var result = await _accountingService.GetJournalSummaryAsync();
+        return Ok(result);
+    }
+
     [HttpGet("journal-entries/{id}")]
     [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<JournalEntryResponse>> GetJournalEntry(int id)
@@ -209,7 +220,7 @@ public class AccountingController : ControllerBase
     [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<TrialBalanceResponse>> GetTrialBalance([FromQuery] DateTime? asOfDate)
     {
-        var date = asOfDate ?? DateTime.Today;
+        var date = asOfDate ?? PhilippineTime.Today;
         var result = await _accountingService.GetTrialBalanceAsync(date);
         return Ok(result);
     }
@@ -226,7 +237,7 @@ public class AccountingController : ControllerBase
     [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<BalanceSheetResponse>> GetBalanceSheet([FromQuery] DateTime? asOfDate)
     {
-        var date = asOfDate ?? DateTime.Today;
+        var date = asOfDate ?? PhilippineTime.Today;
         var result = await _accountingService.GetBalanceSheetAsync(date);
         return Ok(result);
     }
@@ -259,6 +270,14 @@ public class AccountingController : ControllerBase
         [FromQuery] int pageSize = 20)
     {
         var result = await _accountingService.GetExpensesAsync(startDate, endDate, pageNumber, pageSize);
+        return Ok(result);
+    }
+
+    [HttpGet("expenses/summary")]
+    [Authorize(Policy = "Permission:accounting.view")]
+    public async Task<ActionResult<ExpenseSummaryResponse>> GetExpenseSummary()
+    {
+        var result = await _accountingService.GetExpenseSummaryAsync();
         return Ok(result);
     }
 
@@ -299,6 +318,14 @@ public class AccountingController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("income/summary")]
+    [Authorize(Policy = "Permission:accounting.view")]
+    public async Task<ActionResult<IncomeSummaryResponse>> GetIncomeSummary()
+    {
+        var result = await _accountingService.GetIncomeSummaryAsync();
+        return Ok(result);
+    }
+
     [HttpPost("income")]
     [Authorize(Policy = "Permission:accounting.manage")]
     public async Task<ActionResult<IncomeRecordResponse>> CreateIncomeRecord([FromBody] CreateIncomeRequest request)
@@ -328,9 +355,86 @@ public class AccountingController : ControllerBase
     [Authorize(Policy = "Permission:accounting.view")]
     public async Task<ActionResult<AccountingSummaryResponse>> GetAccountingSummary([FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
     {
-        var start = startDate ?? new DateTime(DateTime.Today.Year, 1, 1);
-        var end = endDate ?? DateTime.Today;
+        var start = startDate ?? new DateTime(PhilippineTime.Today.Year, 1, 1);
+        var end = endDate ?? PhilippineTime.Today;
         var result = await _accountingService.GetAccountingSummaryAsync(start, end);
         return Ok(result);
+    }
+
+    // ============================================================================
+    // Invoice Endpoints
+    // ============================================================================
+
+    [HttpGet("invoices")]
+    [Authorize(Policy = "Permission:accounting.view")]
+    public async Task<ActionResult<PagedResponse<InvoiceResponse>>> GetInvoices(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? status = null,
+        [FromQuery] string? search = null)
+    {
+        var result = await _invoiceService.GetInvoicesAsync(pageNumber, pageSize, status, search);
+        return Ok(result);
+    }
+
+    [HttpGet("invoices/{id}")]
+    [Authorize(Policy = "Permission:accounting.view")]
+    public async Task<ActionResult<InvoiceResponse>> GetInvoice(int id)
+    {
+        var result = await _invoiceService.GetInvoiceByIdAsync(id);
+        if (result == null)
+            return NotFound(new { error = "Invoice not found" });
+        return Ok(result);
+    }
+
+    [HttpPost("invoices")]
+    [Authorize(Policy = "Permission:accounting.manage")]
+    public async Task<ActionResult<InvoiceResponse>> CreateInvoice([FromBody] CreateInvoiceRequest request)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _invoiceService.CreateInvoiceAsync(request, userId);
+            return CreatedAtAction(nameof(GetInvoice), new { id = result.InvoiceId }, result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating invoice");
+            return StatusCode(500, new { error = "An error occurred while creating the invoice" });
+        }
+    }
+
+    [HttpPost("invoices/{id}/status")]
+    [Authorize(Policy = "Permission:accounting.manage")]
+    public async Task<ActionResult<InvoiceResponse>> UpdateInvoiceStatus(int id, [FromBody] UpdateInvoiceStatusRequest request)
+    {
+        try
+        {
+            var result = await _invoiceService.UpdateStatusAsync(id, request.Status);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("invoices/{id}/payment")]
+    [Authorize(Policy = "Permission:accounting.manage")]
+    public async Task<ActionResult<InvoiceResponse>> RecordInvoicePayment(int id, [FromBody] RecordPaymentRequest request)
+    {
+        try
+        {
+            var result = await _invoiceService.RecordPaymentAsync(id, request.Amount);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

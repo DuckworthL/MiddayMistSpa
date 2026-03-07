@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MiddayMistSpa.API.DTOs.Appointment;
 using MiddayMistSpa.API.DTOs.Employee;
 using MiddayMistSpa.API.Services;
+using MiddayMistSpa.Core;
 using System.Security.Claims;
 
 namespace MiddayMistSpa.API.Controllers;
@@ -394,7 +395,7 @@ public class AppointmentsController : ControllerBase
     [HttpGet("dashboard")]
     public async Task<ActionResult<AppointmentDashboardResponse>> GetDashboard([FromQuery] DateTime? date = null)
     {
-        var dashboard = await _appointmentService.GetDashboardAsync(date ?? DateTime.Today);
+        var dashboard = await _appointmentService.GetDashboardAsync(date ?? PhilippineTime.Today);
         return Ok(dashboard);
     }
 

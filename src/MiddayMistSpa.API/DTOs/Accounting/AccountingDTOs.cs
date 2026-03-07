@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace MiddayMistSpa.API.DTOs.Accounting;
 
 // ============================================================================
@@ -42,7 +44,9 @@ public class AccountSearchRequest
     public string? SearchTerm { get; set; }
     public string? AccountType { get; set; }
     public bool? IsActive { get; set; }
+    [Range(1, int.MaxValue)]
     public int PageNumber { get; set; } = 1;
+    [Range(1, 100)]
     public int PageSize { get; set; } = 50;
 }
 
@@ -110,7 +114,9 @@ public class JournalEntrySearchRequest
     public string? Status { get; set; }
     public int? AccountId { get; set; }
     public string? SearchTerm { get; set; }
+    [Range(1, int.MaxValue)]
     public int PageNumber { get; set; } = 1;
+    [Range(1, 100)]
     public int PageSize { get; set; } = 20;
 }
 
@@ -237,10 +243,15 @@ public class ExpenseResponse
 public class CreateExpenseRequest
 {
     public DateTime Date { get; set; }
+    [Required, MaxLength(500)]
     public string Description { get; set; } = string.Empty;
+    [MaxLength(200)]
     public string? Vendor { get; set; }
+    [Range(1, int.MaxValue)]
     public int ExpenseAccountId { get; set; }
+    [Range(1, int.MaxValue)]
     public int PaymentAccountId { get; set; }
+    [Range(0.01, double.MaxValue)]
     public decimal Amount { get; set; }
 }
 
@@ -254,6 +265,16 @@ public class IncomeRecordResponse
     public string Category { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Status { get; set; } = string.Empty;
+    public List<IncomeLineItemResponse> LineItems { get; set; } = new();
+}
+
+public class IncomeLineItemResponse
+{
+    public string ItemName { get; set; } = string.Empty;
+    public string ItemType { get; set; } = string.Empty; // "Service" or "Product"
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalPrice { get; set; }
 }
 
 public class CreateIncomeRequest
@@ -298,17 +319,36 @@ public class InvoiceLineResponse
 
 public class CreateInvoiceRequest
 {
+    [Required, Range(1, int.MaxValue)]
     public int CustomerId { get; set; }
     public DateTime InvoiceDate { get; set; }
     public DateTime DueDate { get; set; }
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+    [Required, MinLength(1)]
     public List<CreateInvoiceLineRequest> Lines { get; set; } = new();
 }
 
 public class CreateInvoiceLineRequest
 {
+    [Required, MaxLength(300)]
     public string Description { get; set; } = string.Empty;
+    [Range(1, int.MaxValue)]
     public int Quantity { get; set; }
+    [Range(0.01, double.MaxValue)]
     public decimal UnitPrice { get; set; }
+}
+
+public class UpdateInvoiceStatusRequest
+{
+    [Required]
+    public string Status { get; set; } = string.Empty;
+}
+
+public class RecordPaymentRequest
+{
+    [Range(0.01, double.MaxValue)]
+    public decimal Amount { get; set; }
 }
 
 // ============================================================================
@@ -348,4 +388,32 @@ public class RevenueStreamItem
     public string Stream { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal Percentage { get; set; }
+}
+
+// ============================================================================
+// Sub-page Summary DTOs
+// ============================================================================
+
+public class ExpenseSummaryResponse
+{
+    public decimal MonthTotal { get; set; }
+    public decimal LastMonthTotal { get; set; }
+    public decimal YtdTotal { get; set; }
+    public int PendingCount { get; set; }
+}
+
+public class IncomeSummaryResponse
+{
+    public decimal MonthTotal { get; set; }
+    public decimal ServicesRevenue { get; set; }
+    public decimal ProductSales { get; set; }
+    public decimal YtdTotal { get; set; }
+}
+
+public class JournalSummaryResponse
+{
+    public int TotalEntries { get; set; }
+    public int MonthEntries { get; set; }
+    public decimal TotalDebits { get; set; }
+    public decimal TotalCredits { get; set; }
 }

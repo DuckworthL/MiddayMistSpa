@@ -9,8 +9,7 @@ namespace MiddayMistSpa.API.DTOs.Transaction;
 
 public class CreateTransactionRequest
 {
-    [Required]
-    public int CustomerId { get; set; }
+    public int? CustomerId { get; set; }
 
     public int? AppointmentId { get; set; }
 
@@ -153,7 +152,7 @@ public class TransactionResponse
     public string TransactionNumber { get; set; } = string.Empty;
 
     // Customer Info
-    public int CustomerId { get; set; }
+    public int? CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string MembershipType { get; set; } = string.Empty;
 
@@ -280,7 +279,9 @@ public class TransactionSearchRequest
     public decimal? MaxAmount { get; set; }
     public string? SortBy { get; set; } = "date";
     public bool SortDescending { get; set; } = true;
+    [Range(1, int.MaxValue)]
     public int Page { get; set; } = 1;
+    [Range(1, 100)]
     public int PageSize { get; set; } = 20;
 }
 
@@ -417,4 +418,16 @@ public class ReceiptItemResponse
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public string? TherapistName { get; set; }
+}
+
+// ============================================================================
+// Transaction Page Stats
+// ============================================================================
+
+public class TransactionStatsResponse
+{
+    public decimal TodaySales { get; set; }
+    public int TodayCount { get; set; }
+    public decimal AverageTransaction { get; set; }
+    public decimal PendingPayments { get; set; }
 }

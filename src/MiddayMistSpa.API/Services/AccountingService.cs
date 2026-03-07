@@ -619,8 +619,9 @@ public class AccountingService : IAccountingService
 
     public async Task<PagedResponse<ExpenseResponse>> GetExpensesAsync(DateTime? startDate, DateTime? endDate, int pageNumber, int pageSize)
     {
+        var expenseTypes = new[] { "Expense", "Payroll", "COGS" };
         var query = _context.JournalEntries
-            .Where(j => j.ReferenceType == "Expense" && j.Status != "Voided");
+            .Where(j => expenseTypes.Contains(j.ReferenceType) && j.Status != "Voided");
 
         if (startDate.HasValue)
             query = query.Where(j => j.EntryDate >= startDate.Value);
@@ -640,14 +641,20 @@ public class AccountingService : IAccountingService
         var items = entries.Select(e =>
         {
             var expenseLine = e.Lines.FirstOrDefault(l => l.Account.AccountType == "Expense");
+            var vendor = e.ReferenceType switch
+            {
+                "Payroll" => "Payroll",
+                "COGS" => "Inventory (Product Sale)",
+                _ => e.ReferenceId
+            };
             return new ExpenseResponse
             {
                 JournalEntryId = e.JournalEntryId,
                 EntryNumber = e.EntryNumber,
                 Date = e.EntryDate,
                 Description = e.Description,
-                Vendor = e.ReferenceId,
-                Category = expenseLine?.Account.AccountName ?? "Uncategorized",
+                Vendor = vendor,
+                Category = expenseLine?.Account.AccountName ?? (e.ReferenceType == "Payroll" ? "Salary Expense" : e.ReferenceType == "COGS" ? "Cost of Goods Sold" : "Uncategorized"),
                 Amount = e.TotalDebit,
                 Status = e.Status,
                 CreatedByName = $"{e.CreatedByUser.FirstName} {e.CreatedByUser.LastName}"
@@ -699,8 +706,9 @@ public class AccountingService : IAccountingService
 
     public async Task<PagedResponse<IncomeRecordResponse>> GetIncomeRecordsAsync(DateTime? startDate, DateTime? endDate, int pageNumber, int pageSize)
     {
+        var incomeTypes = new[] { "Income", "Transaction" };
         var query = _context.JournalEntries
-            .Where(j => j.ReferenceType == "Income" && j.Status != "Voided");
+            .Where(j => incomeTypes.Contains(j.ReferenceType) && j.Status != "Voided");
 
         if (startDate.HasValue)
             query = query.Where(j => j.EntryDate >= startDate.Value);
@@ -716,19 +724,68 @@ public class AccountingService : IAccountingService
             .Take(pageSize)
             .ToListAsync();
 
+        // Batch-load transaction details for Transaction-type entries
+        var transactionRefIds = entries
+            .Where(e => e.ReferenceType == "Transaction" && int.TryParse(e.ReferenceId, out _))
+            .Select(e => int.Parse(e.ReferenceId!))
+            .ToList();
+
+        var transactions = transactionRefIds.Any()
+            ? await _context.Transactions
+                .Where(t => transactionRefIds.Contains(t.TransactionId))
+                .Include(t => t.ServiceItems).ThenInclude(si => si.Service)
+                .Include(t => t.ProductItems).ThenInclude(pi => pi.Product)
+                .Include(t => t.Customer)
+                .ToDictionaryAsync(t => t.TransactionId)
+            : new Dictionary<int, Core.Entities.Transaction.Transaction>();
+
         var items = entries.Select(e =>
         {
             var revenueLine = e.Lines.FirstOrDefault(l => l.Account.AccountType == "Revenue");
+            var customer = e.ReferenceType == "Transaction"
+                ? (e.Description?.Contains(" - ") == true ? e.Description.Split(" - ").Last() : "Walk-in")
+                : e.ReferenceId;
+
+            var lineItems = new List<IncomeLineItemResponse>();
+
+            // Populate line items from actual transaction data
+            if (e.ReferenceType == "Transaction" && int.TryParse(e.ReferenceId, out var txnId) && transactions.TryGetValue(txnId, out var txn))
+            {
+                foreach (var si in txn.ServiceItems)
+                {
+                    lineItems.Add(new IncomeLineItemResponse
+                    {
+                        ItemName = si.Service?.ServiceName ?? "Service",
+                        ItemType = "Service",
+                        Quantity = si.Quantity,
+                        UnitPrice = si.UnitPrice,
+                        TotalPrice = si.TotalPrice
+                    });
+                }
+                foreach (var pi in txn.ProductItems)
+                {
+                    lineItems.Add(new IncomeLineItemResponse
+                    {
+                        ItemName = pi.Product?.ProductName ?? "Product",
+                        ItemType = "Product",
+                        Quantity = pi.Quantity,
+                        UnitPrice = pi.UnitPrice,
+                        TotalPrice = pi.TotalPrice
+                    });
+                }
+            }
+
             return new IncomeRecordResponse
             {
                 JournalEntryId = e.JournalEntryId,
                 EntryNumber = e.EntryNumber,
                 Date = e.EntryDate,
                 Description = e.Description,
-                Customer = e.ReferenceId,
-                Category = revenueLine?.Account.AccountName ?? "Uncategorized",
+                Customer = customer,
+                Category = revenueLine?.Account.AccountName ?? "Revenue",
                 Amount = e.TotalCredit,
-                Status = e.Status
+                Status = e.Status,
+                LineItems = lineItems
             };
         }).ToList();
 
@@ -906,6 +963,42 @@ public class AccountingService : IAccountingService
 
         await CreateJournalEntryAsync(request, userId);
         _logger.LogInformation("Auto-JE created for transaction {TransactionId}, amount {Amount}", transactionId, totalAmount);
+
+        // COGS entry: when products are sold, record cost of goods sold
+        var productCost = transaction.ProductItems?
+            .Sum(pi => pi.Product.CostPrice * pi.Quantity) ?? 0;
+
+        if (productCost > 0)
+        {
+            var cogsAccount = await _context.ChartOfAccounts
+                .FirstOrDefaultAsync(a => a.AccountCategory == "COGS" && a.IsActive);
+            var inventoryAccount = await _context.ChartOfAccounts
+                .FirstOrDefaultAsync(a => a.AccountCategory == "Inventory" && a.AccountType == "Asset" && a.IsActive);
+
+            if (cogsAccount != null && inventoryAccount != null)
+            {
+                var cogsRequest = new CreateJournalEntryRequest
+                {
+                    EntryDate = DateTime.UtcNow.Date,
+                    Description = $"COGS - Transaction #{transaction.TransactionId} - {customerName}",
+                    ReferenceType = "COGS",
+                    ReferenceId = transaction.TransactionId.ToString(),
+                    Status = "Posted",
+                    Lines = new List<CreateJournalLineRequest>
+                    {
+                        new() { AccountId = cogsAccount.AccountId, DebitAmount = Math.Round(productCost, 2), CreditAmount = 0, Description = "Cost of goods sold" },
+                        new() { AccountId = inventoryAccount.AccountId, DebitAmount = 0, CreditAmount = Math.Round(productCost, 2), Description = "Inventory reduction" }
+                    }
+                };
+
+                await CreateJournalEntryAsync(cogsRequest, userId);
+                _logger.LogInformation("COGS JE created for transaction {TransactionId}, cost {Cost}", transactionId, productCost);
+            }
+            else
+            {
+                _logger.LogWarning("Skipping COGS JE for transaction {TransactionId}: COGS or Inventory account not set up", transactionId);
+            }
+        }
     }
 
     /// <summary>
@@ -1175,6 +1268,49 @@ public class AccountingService : IAccountingService
         _logger.LogInformation("Auto-JE created for PO {PONumber}, amount {Amount}", po.PONumber, totalAmount);
     }
 
+    /// <summary>
+    /// Create an income record when an invoice payment is received.
+    /// DR: Cash/Bank (payment received)
+    /// CR: Service Revenue (invoice income)
+    /// </summary>
+    public async Task CreateInvoicePaymentIncomeAsync(int invoiceId, decimal paymentAmount, int userId)
+    {
+        var invoice = await _context.Invoices
+            .Include(i => i.Customer)
+            .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId);
+
+        if (invoice == null)
+            throw new InvalidOperationException("Invoice not found");
+
+        var cashAcct = await _context.ChartOfAccounts
+            .FirstOrDefaultAsync(a => a.AccountCategory == "Cash" && a.AccountType == "Asset" && a.IsActive);
+        var revenueAcct = await _context.ChartOfAccounts
+            .FirstOrDefaultAsync(a => a.AccountCategory == "Service Revenue" && a.IsActive);
+
+        if (cashAcct == null || revenueAcct == null)
+        {
+            _logger.LogWarning("Skipping auto-income for invoice {InvoiceNumber}: required chart of accounts not set up", invoice.InvoiceNumber);
+            return;
+        }
+
+        var customerName = invoice.Customer != null
+            ? $"{invoice.Customer.FirstName} {invoice.Customer.LastName}"
+            : "Unknown";
+
+        var request = new CreateIncomeRequest
+        {
+            Date = PhilippineTime.Today,
+            Description = $"Invoice {invoice.InvoiceNumber} payment - {customerName}",
+            CustomerName = customerName,
+            RevenueAccountId = revenueAcct.AccountId,
+            DepositAccountId = cashAcct.AccountId,
+            Amount = paymentAmount
+        };
+
+        await CreateIncomeRecordAsync(request, userId);
+        _logger.LogInformation("Auto-income created for invoice {InvoiceNumber}, amount {Amount}", invoice.InvoiceNumber, paymentAmount);
+    }
+
     // ============================================================================
     // Dashboard/Summary
     // ============================================================================
@@ -1428,6 +1564,71 @@ public class AccountingService : IAccountingService
                 CreditAmount = l.CreditAmount,
                 Description = l.Description
             }).ToList()
+        };
+    }
+
+    // ============================================================================
+    // Sub-page Summaries (computed from full dataset)
+    // ============================================================================
+
+    public async Task<ExpenseSummaryResponse> GetExpenseSummaryAsync()
+    {
+        var today = PhilippineTime.Today;
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        var lastMonthStart = monthStart.AddMonths(-1);
+        var yearStart = new DateTime(today.Year, 1, 1);
+
+        var expenseTypes = new[] { "Expense", "Payroll", "COGS" };
+        var query = _context.JournalEntries
+            .Where(j => expenseTypes.Contains(j.ReferenceType) && j.Status != "Voided");
+
+        return new ExpenseSummaryResponse
+        {
+            MonthTotal = await query.Where(j => j.EntryDate >= monthStart).SumAsync(j => (decimal?)j.TotalDebit) ?? 0,
+            LastMonthTotal = await query.Where(j => j.EntryDate >= lastMonthStart && j.EntryDate < monthStart).SumAsync(j => (decimal?)j.TotalDebit) ?? 0,
+            YtdTotal = await query.Where(j => j.EntryDate >= yearStart).SumAsync(j => (decimal?)j.TotalDebit) ?? 0,
+            PendingCount = await query.CountAsync(j => j.Status == "Pending")
+        };
+    }
+
+    public async Task<IncomeSummaryResponse> GetIncomeSummaryAsync()
+    {
+        var today = PhilippineTime.Today;
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+        var yearStart = new DateTime(today.Year, 1, 1);
+
+        var incomeTypes = new[] { "Income", "Transaction" };
+        var query = _context.JournalEntries
+            .Where(j => incomeTypes.Contains(j.ReferenceType) && j.Status != "Voided");
+
+        var monthEntries = query.Where(j => j.EntryDate >= monthStart);
+
+        return new IncomeSummaryResponse
+        {
+            MonthTotal = await monthEntries.SumAsync(j => (decimal?)j.TotalCredit) ?? 0,
+            ServicesRevenue = await monthEntries
+                .Where(j => j.Lines.Any(l => l.Account.AccountType == "Revenue" && l.Account.AccountName.Contains("Service")))
+                .SumAsync(j => (decimal?)j.TotalCredit) ?? 0,
+            ProductSales = await monthEntries
+                .Where(j => j.Lines.Any(l => l.Account.AccountType == "Revenue" && l.Account.AccountName.Contains("Product")))
+                .SumAsync(j => (decimal?)j.TotalCredit) ?? 0,
+            YtdTotal = await query.Where(j => j.EntryDate >= yearStart).SumAsync(j => (decimal?)j.TotalCredit) ?? 0
+        };
+    }
+
+    public async Task<JournalSummaryResponse> GetJournalSummaryAsync()
+    {
+        var today = PhilippineTime.Today;
+        var monthStart = new DateTime(today.Year, today.Month, 1);
+
+        var allEntries = _context.JournalEntries.Where(j => j.Status != "Voided");
+
+        return new JournalSummaryResponse
+        {
+            TotalEntries = await allEntries.CountAsync(),
+            MonthEntries = await allEntries.CountAsync(j => j.EntryDate >= monthStart),
+            TotalDebits = await allEntries.SumAsync(j => (decimal?)j.TotalDebit) ?? 0,
+            TotalCredits = await allEntries.SumAsync(j => (decimal?)j.TotalCredit) ?? 0
         };
     }
 }

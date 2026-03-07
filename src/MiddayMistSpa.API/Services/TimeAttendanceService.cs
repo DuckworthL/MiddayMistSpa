@@ -1203,6 +1203,26 @@ public class TimeAttendanceService : ITimeAttendanceService
         return MapToAttendanceDto(record, employee);
     }
 
+    public async Task<AttendanceRecordDto> ApproveAttendanceRecordAsync(int attendanceId, int approvedByUserId)
+    {
+        var record = await _context.AttendanceRecords
+            .Include(a => a.Employee)
+            .FirstOrDefaultAsync(a => a.AttendanceId == attendanceId)
+            ?? throw new InvalidOperationException("Attendance record not found");
+
+        if (record.IsApproved)
+            throw new InvalidOperationException("Attendance record is already approved");
+
+        record.IsApproved = true;
+        record.UpdatedAt = PhilippineTime.Now;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Attendance record {AttendanceId} approved by user {UserId}", attendanceId, approvedByUserId);
+
+        return MapToAttendanceDto(record, record.Employee);
+    }
+
     public async Task<List<AttendanceRecordDto>> GetAttendanceRecordsAsync(int? employeeId = null, DateTime? date = null)
     {
         var query = _context.AttendanceRecords

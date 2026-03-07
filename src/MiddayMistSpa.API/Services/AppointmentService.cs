@@ -1023,7 +1023,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<List<AppointmentListResponse>> GetTodaysAppointmentsAsync()
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         return await _context.Appointments
             .AsNoTracking()
             .Include(a => a.Customer)
@@ -1039,7 +1039,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<List<AppointmentListResponse>> GetUpcomingAppointmentsAsync(int days = 7)
     {
-        var today = DateTime.Today;
+        var today = PhilippineTime.Today;
         var endDate = today.AddDays(days);
 
         return await _context.Appointments

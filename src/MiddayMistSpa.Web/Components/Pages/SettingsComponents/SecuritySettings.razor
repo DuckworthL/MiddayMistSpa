@@ -18,7 +18,8 @@
         else
         {
             @* Status Card *@
-            <div class="d-flex align-items-center p-3 rounded-3 mb-4" style="background: @(_isEnabled ? "#E8F5E9" : "#FFF3E0");">
+            <div class="d-flex align-items-center p-3 rounded-3 mb-4"
+                 style="background: @(_isEnabled ? "#E8F5E9" : "#FFF3E0");">
                 <div class="me-3">
                     <i class="bi @(_isEnabled ? "bi-shield-fill-check" : "bi-shield-fill-exclamation") fs-2"
                        style="color: @(_isEnabled ? "#2E7D32" : "#E65100");"></i>
@@ -106,7 +107,8 @@
             }
 
             @* Status Card *@
-            <div class="d-flex align-items-center p-3 rounded-3 mb-4" style="background: @(_captchaEnabled ? "#E8F5E9" : "#FFF3E0");">
+            <div class="d-flex align-items-center p-3 rounded-3 mb-4"
+                 style="background: @(_captchaEnabled ? "#E8F5E9" : "#FFF3E0");">
                 <div class="me-3">
                     <i class="bi @(_captchaEnabled ? "bi-shield-fill-check" : "bi-shield-fill-exclamation") fs-2"
                        style="color: @(_captchaEnabled ? "#2E7D32" : "#E65100");"></i>
@@ -117,8 +119,8 @@
                     </h6>
                     <p class="mb-0 small text-muted">
                         @(_captchaEnabled
-                            ? "Users must complete a CAPTCHA challenge when logging in"
-                            : "Enable CAPTCHA to protect the login page from automated attacks")
+                        ? "Users must complete a CAPTCHA challenge when logging in"
+                                : "Enable CAPTCHA to protect the login page from automated attacks")
                     </p>
                 </div>
             </div>
@@ -138,8 +140,10 @@
                 <div class="col-md-6">
                     <label class="form-label small text-muted">Secret Key</label>
                     <div class="input-group">
-                        <input type="@(_showSecretKey ? "text" : "password")" class="form-control" @bind="_captchaSecretKey" placeholder="reCAPTCHA v2 Secret Key" />
-                        <button class="btn btn-outline-secondary" type="button" @onclick="() => _showSecretKey = !_showSecretKey">
+                        <input type="@(_showSecretKey ? "text" : "password")" class="form-control" @bind="_captchaSecretKey"
+                               placeholder="reCAPTCHA v2 Secret Key" />
+                        <button class="btn btn-outline-secondary" type="button"
+                                @onclick="() => _showSecretKey = !_showSecretKey">
                             <i class="bi @(_showSecretKey ? "bi-eye-slash" : "bi-eye")"></i>
                         </button>
                     </div>
@@ -160,187 +164,195 @@
                 <p class="small text-muted mb-1"><i class="bi bi-info-circle me-1"></i> <strong>Note:</strong></p>
                 <ul class="small text-muted mb-0 ps-3">
                     <li>Uses Google reCAPTCHA v2 ("I'm not a robot" checkbox)</li>
-                    <li>Get your keys from <a href="https://www.google.com/recaptcha/admin" target="_blank">Google reCAPTCHA Admin</a></li>
-                    <li>To increase challenge difficulty, set Security Preference to "Most Secure" in the reCAPTCHA Admin console</li>
-                </ul>
+                    <li>Get your keys from <a href="https://www.google.com/recaptcha/admin" target="_blank">Google reCAPTCHA
+                        Admin</a></li>
+                        <li>To increase challenge difficulty, set Security Preference to "Most Secure" in the reCAPTCHA Admin
+                            console</li>
+                        </ul>
+                    </div>
+                }
             </div>
-        }
-    </div>
-</div>
+        </div>
 
-@* ===== SETUP MODAL ===== *@
-@if (_showSetupModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-shield-lock me-2"></i>
-                        @switch (_setupStep)
-                        {
-                            case 1:
-                                <span>Scan QR Code</span>
-                                break;
-                            case 2:
-                                <span>Verify Code</span>
-                                break;
-                            case 3:
-                                <span>Recovery Codes</span>
-                                break;
-                        }
-                    </h5>
-                    @if (_setupStep < 3)
-                    {
-                        <button type="button" class="btn-close" @onclick="CloseSetupModal"></button>
-                    }
-                </div>
-                <div class="modal-body">
-                    @if (!string.IsNullOrEmpty(_setupError))
-                    {
-                        <div class="alert alert-danger d-flex align-items-center py-2">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                            <span>@_setupError</span>
+        @* ===== SETUP MODAL ===== *@
+        @if (_showSetupModal)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-shield-lock me-2"></i>
+                                @switch (_setupStep)
+                                {
+                                    case 1:
+                                        <span>Scan QR Code</span>
+                                        break;
+                                    case 2:
+                                        <span>Verify Code</span>
+                                        break;
+                                    case 3:
+                                        <span>Recovery Codes</span>
+                                        break;
+                                }
+                            </h5>
+                            @if (_setupStep < 3)
+                            {
+                                <button type="button" class="btn-close" @onclick="CloseSetupModal"></button>
+                            }
+                        </div>
+                        <div class="modal-body">
+                            @if (!string.IsNullOrEmpty(_setupError))
+                            {
+                                <div class="alert alert-danger d-flex align-items-center py-2">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <span>@_setupError</span>
+                                </div>
+                            }
+
+                            @switch (_setupStep)
+                            {
+                                case 1:
+                                    @* Step 1: QR Code *@
+                                    <div class="text-center">
+                                        <p class="text-muted mb-3">Scan this QR code with your authenticator app (Google Authenticator,
+                                            Authy, etc.)</p>
+                                            @if (!string.IsNullOrEmpty(_qrCodeBase64))
+                                            {
+                                                <div class="mb-3">
+                                                    <img src="@_qrCodeBase64" alt="QR Code" class="img-fluid"
+                                                         style="max-width: 220px; image-rendering: pixelated;" />
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(_manualEntryKey))
+                                            {
+                                                <div class="mb-3">
+                                                    <p class="small text-muted mb-1">Or enter this key manually:</p>
+                                                    <code class="d-inline-block px-3 py-2 rounded"
+                                                          style="background: #F3F4F6; font-size: 0.95rem; letter-spacing: 2px;">@_manualEntryKey</code>
+                                                </div>
+                                            }
+                                        </div>
+                                        break;
+
+                case 2:
+                                            @* Step 2: Verify *@
+                                            <div class="text-center">
+                                                <p class="text-muted mb-3">Enter the 6-digit code from your authenticator app to confirm setup</p>
+                                                <div class="mx-auto" style="max-width: 200px;">
+                                                    <input type="text" class="form-control form-control-lg text-center" maxlength="6"
+                                                           placeholder="000000" @bind="_verifyCode" @bind:event="oninput"
+                                                           style="letter-spacing: 8px; font-size: 1.5rem; font-weight: 600;" />
+                                                </div>
+                                            </div>
+                                            break;
+
+                                        case 3:
+                                            @* Step 3: Recovery Codes *@
+                                            <div>
+                                                <div class="alert alert-warning d-flex align-items-start py-2 mb-3">
+                                                    <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                                                    <div>
+                                                        <strong>Save these recovery codes!</strong><br />
+                                                        <small>Each code can only be used once. Store them in a safe place. You will need these if
+                                                            you lose access to your authenticator app.</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="p-3 rounded-3" style="background: #F8F9FA;">
+                                                        <div class="row g-2">
+                                                            @foreach (var recoveryCode in _recoveryCodes)
+                                                            {
+                                                                <div class="col-6">
+                                                                    <span class="d-block text-center py-1 font-monospace"
+                                                                          style="font-size: 0.95rem;">@recoveryCode</span>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-check mt-3">
+                                                        <input class="form-check-input" type="checkbox" id="savedCodes" @bind="_savedCodesConfirmed" />
+                                                        <label class="form-check-label small" for="savedCodes">
+                                                            I have saved my recovery codes in a safe place
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                break;
+                                            }
+                                        </div>
+                                        <div class="modal-footer">
+                                            @switch (_setupStep)
+                                            {
+                                                case 1:
+                                                    <button class="btn btn-secondary" @onclick="CloseSetupModal">Cancel</button>
+                                                    <button class="btn btn-primary" @onclick="() => _setupStep = 2">
+                                                        Next <i class="bi bi-arrow-right ms-1"></i>
+                                                    </button>
+                                                    break;
+                                                case 2:
+                                                    <button class="btn btn-secondary" @onclick="() => _setupStep = 1">
+                                                        <i class="bi bi-arrow-left me-1"></i> Back
+                                                    </button>
+                                                    <button class="btn btn-primary" @onclick="VerifySetupCode"
+                                                            disabled="@(_verifyCode?.Length != 6 || _isVerifying)">
+                                                        @if (_isVerifying)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                                            <span>Verifying...</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-check-circle me-1"></i>
+                                                            <span>Verify & Enable</span>
+                                                        }
+                                                    </button>
+                                                    break;
+                                                case 3:
+                                                    <button class="btn btn-primary" disabled="@(!_savedCodesConfirmed)" @onclick="CloseSetupModal">
+                                                        <i class="bi bi-check-lg me-1"></i> Done
+                                                    </button>
+                                                    break;
+                                            }
+                                        </div>
+                                    </div>
+                            </div>
                         </div>
                     }
 
-                    @switch (_setupStep)
+                    @* ===== DISABLE MODAL ===== *@
+                    @if (_showDisableModal)
                     {
-                        case 1:
-                            @* Step 1: QR Code *@
-                            <div class="text-center">
-                                <p class="text-muted mb-3">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
-                                @if (!string.IsNullOrEmpty(_qrCodeBase64))
-                                {
-                                    <div class="mb-3">
-                                        <img src="@_qrCodeBase64" alt="QR Code" class="img-fluid" style="max-width: 220px; image-rendering: pixelated;" />
+                        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                            <div class="modal-dialog modal-dialog-centered modal-sm">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><i class="bi bi-shield-x me-2"></i>Disable 2FA</h5>
+                                        <button type="button" class="btn-close" @onclick="() => _showDisableModal = false"></button>
                                     </div>
-                                }
-                                @if (!string.IsNullOrEmpty(_manualEntryKey))
-                                {
-                                    <div class="mb-3">
-                                        <p class="small text-muted mb-1">Or enter this key manually:</p>
-                                        <code class="d-inline-block px-3 py-2 rounded" style="background: #F3F4F6; font-size: 0.95rem; letter-spacing: 2px;">@_manualEntryKey</code>
-                                    </div>
-                                }
-                            </div>
-                            break;
-
-                        case 2:
-                            @* Step 2: Verify *@
-                            <div class="text-center">
-                                <p class="text-muted mb-3">Enter the 6-digit code from your authenticator app to confirm setup</p>
-                                <div class="mx-auto" style="max-width: 200px;">
-                                    <input type="text" class="form-control form-control-lg text-center"
-                                           maxlength="6" placeholder="000000"
-                                           @bind="_verifyCode" @bind:event="oninput"
-                                           style="letter-spacing: 8px; font-size: 1.5rem; font-weight: 600;" />
-                                </div>
-                            </div>
-                            break;
-
-                        case 3:
-                            @* Step 3: Recovery Codes *@
-                            <div>
-                                <div class="alert alert-warning d-flex align-items-start py-2 mb-3">
-                                    <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
-                                    <div>
-                                        <strong>Save these recovery codes!</strong><br />
-                                        <small>Each code can only be used once. Store them in a safe place. You will need these if you lose access to your authenticator app.</small>
-                                    </div>
-                                </div>
-                                <div class="p-3 rounded-3" style="background: #F8F9FA;">
-                                    <div class="row g-2">
-                                        @foreach (var recoveryCode in _recoveryCodes)
+                                    <div class="modal-body">
+                                        @if (!string.IsNullOrEmpty(_disableError))
                                         {
-                                            <div class="col-6">
-                                                <span class="d-block text-center py-1 font-monospace" style="font-size: 0.95rem;">@recoveryCode</span>
-                                            </div>
+                                            <div class="alert alert-danger py-2 small">@_disableError</div>
                                         }
+                                        <p class="text-muted small">Enter a code from your authenticator app to confirm disabling 2FA.</p>
+                                        <input type="text" class="form-control text-center" maxlength="6" placeholder="000000"
+                                               @bind="_disableCode" @bind:event="oninput"
+                                               style="letter-spacing: 6px; font-size: 1.2rem; font-weight: 600;" />
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-secondary btn-sm" @onclick="() => _showDisableModal = false">Cancel</button>
+                                        <button class="btn btn-danger btn-sm" @onclick="DisableTwoFactor"
+                                                disabled="@(_disableCode?.Length != 6 || _isDisabling)">
+                                            @if (_isDisabling)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                            }
+                                            Disable 2FA
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="form-check mt-3">
-                                    <input class="form-check-input" type="checkbox" id="savedCodes" @bind="_savedCodesConfirmed" />
-                                    <label class="form-check-label small" for="savedCodes">
-                                        I have saved my recovery codes in a safe place
-                                    </label>
-                                </div>
                             </div>
-                            break;
+                        </div>
                     }
-                </div>
-                <div class="modal-footer">
-                    @switch (_setupStep)
-                    {
-                        case 1:
-                            <button class="btn btn-secondary" @onclick="CloseSetupModal">Cancel</button>
-                            <button class="btn btn-primary" @onclick="() => _setupStep = 2">
-                                Next <i class="bi bi-arrow-right ms-1"></i>
-                            </button>
-                            break;
-                        case 2:
-                            <button class="btn btn-secondary" @onclick="() => _setupStep = 1">
-                                <i class="bi bi-arrow-left me-1"></i> Back
-                            </button>
-                            <button class="btn btn-primary" @onclick="VerifySetupCode" disabled="@(_verifyCode?.Length != 6 || _isVerifying)">
-                                @if (_isVerifying)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-1"></span>
-                                    <span>Verifying...</span>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-check-circle me-1"></i>
-                                    <span>Verify & Enable</span>
-                                }
-                            </button>
-                            break;
-                        case 3:
-                            <button class="btn btn-primary" disabled="@(!_savedCodesConfirmed)" @onclick="CloseSetupModal">
-                                <i class="bi bi-check-lg me-1"></i> Done
-                            </button>
-                            break;
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-@* ===== DISABLE MODAL ===== *@
-@if (_showDisableModal)
-{
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-shield-x me-2"></i>Disable 2FA</h5>
-                    <button type="button" class="btn-close" @onclick="() => _showDisableModal = false"></button>
-                </div>
-                <div class="modal-body">
-                    @if (!string.IsNullOrEmpty(_disableError))
-                    {
-                        <div class="alert alert-danger py-2 small">@_disableError</div>
-                    }
-                    <p class="text-muted small">Enter a code from your authenticator app to confirm disabling 2FA.</p>
-                    <input type="text" class="form-control text-center" maxlength="6" placeholder="000000"
-                           @bind="_disableCode" @bind:event="oninput"
-                           style="letter-spacing: 6px; font-size: 1.2rem; font-weight: 600;" />
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-sm" @onclick="() => _showDisableModal = false">Cancel</button>
-                    <button class="btn btn-danger btn-sm" @onclick="DisableTwoFactor" disabled="@(_disableCode?.Length != 6 || _isDisabling)">
-                        @if (_isDisabling)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        Disable 2FA
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
 
 @code {
     // Status
@@ -447,7 +459,7 @@
                 _recoveryCodes = result.RecoveryCodes;
                 _setupStep = 3;
                 _isEnabled = true;
-                _enabledAt = DateTime.Now;
+                _enabledAt = PhilippineTime.Now;
             }
             else
             {

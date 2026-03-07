@@ -44,7 +44,7 @@
                             </button>
                             <button class="btn btn-outline-secondary" @onclick="CurrentPeriod">Current</button>
                             <button class="btn btn-outline-secondary" @onclick="NextPeriod"
-                                    disabled="@(_periodEnd >= DateTime.Today)">
+                                    disabled="@(_periodEnd >= PhilippineTime.Today)">
                                 <i class="bi bi-chevron-right"></i>
                             </button>
                         </div>
@@ -52,7 +52,7 @@
                     <div class="col">
                         <h5 class="mb-0">
                             @_periodStart.ToString("MMM dd") - @_periodEnd.ToString("MMM dd, yyyy")
-                            @if (_periodEnd >= DateTime.Today)
+                            @if (_periodEnd >= PhilippineTime.Today)
                             {
                                 <span class="badge bg-primary ms-2">Current Period</span>
                             }
@@ -528,7 +528,7 @@
                                                             @if (item.OvertimeHours > 0)
                                                             {
                                                                 <br />
-                                        
+
                                                                 <small class="text-warning">+@item.OvertimeHours.ToString("N2") OT</small>
                                                             }
                                                         </td>
@@ -760,7 +760,7 @@
                                                                                                     @if (item.OvertimeHours > 0)
                                                                                                     {
                                                                                                         <br />
-                                        
+
                                                                                                         <small class="text-warning">+@item.OvertimeHours.ToString("N1") OT</small>
                                                                                                     }
                                                                                                 </td>
@@ -898,102 +898,103 @@
                                                                                                                                                         class="text-info">@((item.SSSEmployerContribution +
                                                                                                                                                                                                                             item.PhilHealthEmployerContribution +
                                                                                                                                                                                                                             item.PagIBIGEmployerContribution +
-                                                                                                                                                                                                                            item.ECContribution).ToString("N2"))</span></div>
+                                                                                                                                                                                                                            item.ECContribution).ToString("N2"))</span>
                                                                                                                                                     </div>
                                                                                                                                                 </div>
                                                                                                                                             </div>
                                                                                                                                         </div>
                                                                                                                                     </div>
+                                                                                                                                </div>
+                                                                                                                            </td>
+                                                                                                                        </tr>
+                                                                                                                    }
+                                                                                                                }
+                                                                                                            </tbody>
+                                                                                                            <tfoot style="background: linear-gradient(135deg, #f8f9fa 0%, #e8eaf6 100%);"
+                                                                                                                   class="fw-bold">
+                                                                                                                <tr>
+                                                                                                                    <td colspan="4">Totals (@_previewItems.Count employees)</td>
+                                                                                                                    <td class="text-end">@_previewItems.Sum(p => p.BasicSalary).ToString("N2")</td>
+                                                                                                                    <td class="text-end text-success">@_previewItems.Sum(p => p.OvertimePay +
+                                                                                                                                                                p.NightDifferentialPay).ToString("N2")</td>
+                                                                                                                        <td class="text-end text-success">@_previewItems.Sum(p => p.Commissions +
+                                                                                                                                                                    p.Tips).ToString("N2")</td>
+                                                                                                                            <td class="text-end">@_previewItems.Sum(p => p.GrossPay).ToString("N2")</td>
+                                                                                                                            <td class="text-end text-danger">-@_previewItems.Sum(p =>
+                                                                                                                                                                        p.TotalDeductions).ToString("N2")</td>
+                                                                                                                                <td class="text-end text-primary">@_previewItems.Sum(p => p.NetPay).ToString("N2")
                                                                                                                                 </td>
                                                                                                                             </tr>
-                                                                                                                        }
-                                                                                                                    }
-                                                                                                                </tbody>
-                                                                                                                <tfoot style="background: linear-gradient(135deg, #f8f9fa 0%, #e8eaf6 100%);"
-                                                                                                                       class="fw-bold">
-                                                                                                                    <tr>
-                                                                                                                        <td colspan="4">Totals (@_previewItems.Count employees)</td>
-                                                                                                                        <td class="text-end">@_previewItems.Sum(p => p.BasicSalary).ToString("N2")</td>
-                                                                                                                        <td class="text-end text-success">@_previewItems.Sum(p => p.OvertimePay +
-                                                                                                                                                                    p.NightDifferentialPay).ToString("N2")</td>
-                                                                                                                            <td class="text-end text-success">@_previewItems.Sum(p => p.Commissions +
-                                                                                                                                                                        p.Tips).ToString("N2")</td>
-                                                                                                                                <td class="text-end">@_previewItems.Sum(p => p.GrossPay).ToString("N2")</td>
-                                                                                                                                <td class="text-end text-danger">-@_previewItems.Sum(p =>
-                                                                                                                                                                            p.TotalDeductions).ToString("N2")</td>
-                                                                                                                                    <td class="text-end text-primary">@_previewItems.Sum(p => p.NetPay).ToString("N2")
-                                                                                                                                    </td>
-                                                                                                                                </tr>
-                                                                                                                            </tfoot>
-                                                                                                                        </table>
-                                                                                                                    </div>
+                                                                                                                        </tfoot>
+                                                                                                                    </table>
+                                                                                                                </div>
 
-                                                                                                                    @* Employer Contributions Summary *@
-                                                                                                                    <div class="card border-info border-opacity-25 mb-0">
-                                                                                                                        <div class="card-header bg-info bg-opacity-10 py-2">
-                                                                                                                            <h6 class="mb-0"><i class="bi bi-building me-1"></i> Total Employer Contributions</h6>
-                                                                                                                        </div>
-                                                                                                                        <div class="card-body py-2">
-                                                                                                                            <div class="row text-center">
+                                                                                                                @* Employer Contributions Summary *@
+                                                                                                                <div class="card border-info border-opacity-25 mb-0">
+                                                                                                                    <div class="card-header bg-info bg-opacity-10 py-2">
+                                                                                                                        <h6 class="mb-0"><i class="bi bi-building me-1"></i> Total Employer Contributions</h6>
+                                                                                                                    </div>
+                                                                                                                    <div class="card-body py-2">
+                                                                                                                        <div class="row text-center">
+                                                                                                                            <div class="col">
+                                                                                                                                <div class="text-muted small">SSS (ER)</div>
+                                                                                                                                <div class="fw-bold">@_previewItems.Sum(p =>
+                                                                                                                                                                            p.SSSEmployerContribution).ToString("N2")</div>
+                                                                                                                                </div>
                                                                                                                                 <div class="col">
-                                                                                                                                    <div class="text-muted small">SSS (ER)</div>
+                                                                                                                                    <div class="text-muted small">PhilHealth (ER)</div>
                                                                                                                                     <div class="fw-bold">@_previewItems.Sum(p =>
-                                                                                                                                                                                p.SSSEmployerContribution).ToString("N2")</div>
+                                                                                                                                                                                p.PhilHealthEmployerContribution).ToString("N2")</div>
                                                                                                                                     </div>
                                                                                                                                     <div class="col">
-                                                                                                                                        <div class="text-muted small">PhilHealth (ER)</div>
+                                                                                                                                        <div class="text-muted small">Pag-IBIG (ER)</div>
                                                                                                                                         <div class="fw-bold">@_previewItems.Sum(p =>
-                                                                                                                                                                                    p.PhilHealthEmployerContribution).ToString("N2")</div>
+                                                                                                                                                                                    p.PagIBIGEmployerContribution).ToString("N2")</div>
                                                                                                                                         </div>
                                                                                                                                         <div class="col">
-                                                                                                                                            <div class="text-muted small">Pag-IBIG (ER)</div>
-                                                                                                                                            <div class="fw-bold">@_previewItems.Sum(p =>
-                                                                                                                                                                                        p.PagIBIGEmployerContribution).ToString("N2")</div>
-                                                                                                                                            </div>
-                                                                                                                                            <div class="col">
-                                                                                                                                                <div class="text-muted small">EC</div>
-                                                                                                                                                <div class="fw-bold">@_previewItems.Sum(p => p.ECContribution).ToString("N2")</div>
-                                                                                                                                            </div>
-                                                                                                                                            <div class="col">
-                                                                                                                                                <div class="text-muted small fw-bold">Total</div>
-                                                                                                                                                <div class="fw-bold text-info">@_previewItems.Sum(p => p.SSSEmployerContribution +
-                                                                                                                                                                                            p.PhilHealthEmployerContribution + p.PagIBIGEmployerContribution +
-                                                                                                                                                                                            p.ECContribution).ToString("N2")</div>
-                                                                                                                                                </div>
+                                                                                                                                            <div class="text-muted small">EC</div>
+                                                                                                                                            <div class="fw-bold">@_previewItems.Sum(p => p.ECContribution).ToString("N2")</div>
+                                                                                                                                        </div>
+                                                                                                                                        <div class="col">
+                                                                                                                                            <div class="text-muted small fw-bold">Total</div>
+                                                                                                                                            <div class="fw-bold text-info">@_previewItems.Sum(p => p.SSSEmployerContribution +
+                                                                                                                                                                                        p.PhilHealthEmployerContribution + p.PagIBIGEmployerContribution +
+                                                                                                                                                                                        p.ECContribution).ToString("N2")</div>
                                                                                                                                             </div>
                                                                                                                                         </div>
                                                                                                                                     </div>
-                                                                                                                                }
+                                                                                                                                </div>
+                                                                                                                            }
                     else
-                                                                                                                                {
-                                                                                                                                    <div class="text-center py-5">
-                                                                                                                                        <i class="bi bi-people display-4 text-muted"></i>
-                                                                                                                                        <p class="text-muted mt-2">No active employees found for this period.</p>
-                                                                                                                                    </div>
-                                                                                                                                }
-                                                                                                                            </div>
-                                                                                                                            <div class="modal-footer">
-                                                                                                                                <button type="button" class="btn btn-secondary" @onclick="ClosePreviewModal">Close</button>
-                                                                                                                                @if (_previewItems.Any() && _canManage)
-                                                                                                                                {
-                                                                                                                                    <button type="button" class="btn btn-primary" @onclick="PreviewToRunPayroll">
-                                                                                                                                        <i class="bi bi-play-fill me-1"></i> Proceed to Run Payroll
-                                                                                                                                    </button>
-                                                                                                                                }
-                                                                                                                            </div>
+                                                                                                                            {
+                                                                                                                                <div class="text-center py-5">
+                                                                                                                                    <i class="bi bi-people display-4 text-muted"></i>
+                                                                                                                                    <p class="text-muted mt-2">No active employees found for this period.</p>
+                                                                                                                                </div>
+                                                                                                                            }
+                                                                                                                        </div>
+                                                                                                                        <div class="modal-footer">
+                                                                                                                            <button type="button" class="btn btn-secondary" @onclick="ClosePreviewModal">Close</button>
+                                                                                                                            @if (_previewItems.Any() && _canManage)
+                                                                                                                            {
+                                                                                                                                <button type="button" class="btn btn-primary" @onclick="PreviewToRunPayroll">
+                                                                                                                                    <i class="bi bi-play-fill me-1"></i> Proceed to Run Payroll
+                                                                                                                                </button>
+                                                                                                                            }
                                                                                                                         </div>
                                                                                                                     </div>
                                                                                                                 </div>
-                                                                                                            }
+                                                                                                            </div>
+                                                                                                        }
 
-                                                                                                            @* Alert *@
-                                                                                                            @if (!string.IsNullOrEmpty(_alertMessage))
-                                                                                                            {
-                                                                                                                <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
-                                                                                                                    <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
-                                                                                                                </div>
-                                                                                                            }
-                                                                                                        </AuthorizedPage>
+                                                                                                        @* Alert *@
+                                                                                                        @if (!string.IsNullOrEmpty(_alertMessage))
+                                                                                                        {
+                                                                                                            <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+                                                                                                                <Alert Message="@_alertMessage" Type="@_alertType" OnDismiss="() => _alertMessage = string.Empty" />
+                                                                                                            </div>
+                                                                                                        }
+                                                                                                    </AuthorizedPage>
 
 @code {
     private bool _isLoading = true;
@@ -1218,62 +1219,109 @@
 
         try
         {
-            if (_currentPeriodId.HasValue)
+            var employeeIds = _payrollMode == "selected" && _selectedEmployeeIds.Any() ? _selectedEmployeeIds : null;
+
+            if (_currentPeriodId.HasValue && (_payrollStatus == "Processed" || _payrollStatus == "Paid"))
             {
-                if (_payrollStatus == "Processed" || _payrollStatus == "Paid")
+                // Period already processed — check if we can add selected employees
+                if (employeeIds == null || !employeeIds.Any())
                 {
-                    ShowAlert("This period has already been processed. Use the navigation arrows to select a different period.",
+                    ShowAlert("This period has already been processed. Select specific employees or use the navigation arrows to select a different period.",
                     Alert.AlertType.Warning);
                     _showRunPayrollModal = false;
                     _isProcessing = false;
                     return;
                 }
-            }
 
-            if (!_currentPeriodId.HasValue)
-            {
-                // Create a new payroll period first
-                var periodRequest = new CreatePayrollPeriodRequest
-                {
-                    PeriodName = $"Payroll {_periodStart:MMM dd} - {_periodEnd:MMM dd, yyyy}",
-                    StartDate = _periodStart,
-                    EndDate = _periodEnd,
-                    PayrollType = "Semi-Monthly",
-                    CutoffDate = _periodEnd,
-                    PaymentDate = _periodEnd.AddDays(5)
-                };
+                // Check which selected employees already have records
+                var existingIds = _payrollItems.Select(p => p.EmployeeId).ToHashSet();
+                var newEmployeeIds = employeeIds.Where(id => !existingIds.Contains(id)).ToList();
 
-                var period = await PayrollService.CreatePayrollPeriodAsync(periodRequest);
-                if (period != null)
+                if (!newEmployeeIds.Any())
                 {
-                    _currentPeriodId = period.PayrollPeriodId;
-                    // Generate payroll records for all employees
-                    var employeeIds = _payrollMode == "selected" && _selectedEmployeeIds.Any() ? _selectedEmployeeIds : null;
-                    var (generated, genError) = await PayrollService.GeneratePayrollRecordsWithErrorAsync(period.PayrollPeriodId,
-                    employeeIds);
-                    if (!generated)
-                    {
-                        ShowAlert(genError ?? "Failed to generate payroll records. Please try again.", Alert.AlertType.Error);
-                        _isProcessing = false;
-                        return;
-                    }
+                    ShowAlert("All selected employees already have payroll records for this period.",
+                    Alert.AlertType.Warning);
+                    _showRunPayrollModal = false;
+                    _isProcessing = false;
+                    return;
                 }
-            }
 
-            if (_currentPeriodId.HasValue)
-            {
-                // Finalize the payroll period
+                // Reopen the period, generate for new employees, then re-finalize
+                var reopened = await PayrollService.ReopenPayrollPeriodAsync(_currentPeriodId.Value);
+                if (reopened == null)
+                {
+                    ShowAlert("Failed to reopen payroll period. Please try again.", Alert.AlertType.Error);
+                    _isProcessing = false;
+                    return;
+                }
+
+                var (generated, genError) = await PayrollService.GeneratePayrollRecordsWithErrorAsync(
+                    _currentPeriodId.Value, newEmployeeIds);
+                if (!generated)
+                {
+                    ShowAlert(genError ?? "Failed to generate payroll records. Please try again.", Alert.AlertType.Error);
+                    _isProcessing = false;
+                    return;
+                }
+
                 var (result, finalizeError) = await PayrollService.FinalizePayrollPeriodWithErrorAsync(_currentPeriodId.Value);
                 if (result != null)
                 {
                     _payrollStatus = "Processed";
-                    ShowAlert("Payroll processed successfully!", Alert.AlertType.Success);
+                    ShowAlert("Payroll processed successfully for the selected employees!", Alert.AlertType.Success);
                     _showRunPayrollModal = false;
                     await LoadPayrollData();
                 }
                 else
                 {
                     ShowAlert(finalizeError ?? "Failed to finalize payroll. Please try again.", Alert.AlertType.Error);
+                }
+            }
+            else
+            {
+                if (!_currentPeriodId.HasValue)
+                {
+                    // Create a new payroll period first
+                    var periodRequest = new CreatePayrollPeriodRequest
+                    {
+                        PeriodName = $"Payroll {_periodStart:MMM dd} - {_periodEnd:MMM dd, yyyy}",
+                        StartDate = _periodStart,
+                        EndDate = _periodEnd,
+                        PayrollType = "Semi-Monthly",
+                        CutoffDate = _periodEnd,
+                        PaymentDate = _periodEnd.AddDays(5)
+                    };
+
+                    var period = await PayrollService.CreatePayrollPeriodAsync(periodRequest);
+                    if (period != null)
+                    {
+                        _currentPeriodId = period.PayrollPeriodId;
+                        var (generated, genError) = await PayrollService.GeneratePayrollRecordsWithErrorAsync(
+                            period.PayrollPeriodId, employeeIds);
+                        if (!generated)
+                        {
+                            ShowAlert(genError ?? "Failed to generate payroll records. Please try again.", Alert.AlertType.Error);
+                            _isProcessing = false;
+                            return;
+                        }
+                    }
+                }
+
+                if (_currentPeriodId.HasValue)
+                {
+                    // Finalize the payroll period
+                    var (result, finalizeError) = await PayrollService.FinalizePayrollPeriodWithErrorAsync(_currentPeriodId.Value);
+                    if (result != null)
+                    {
+                        _payrollStatus = "Processed";
+                        ShowAlert("Payroll processed successfully!", Alert.AlertType.Success);
+                        _showRunPayrollModal = false;
+                        await LoadPayrollData();
+                    }
+                    else
+                    {
+                        ShowAlert(finalizeError ?? "Failed to finalize payroll. Please try again.", Alert.AlertType.Error);
+                    }
                 }
             }
         }

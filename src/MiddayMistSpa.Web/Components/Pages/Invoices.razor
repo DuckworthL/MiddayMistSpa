@@ -1,6 +1,8 @@
 @page "/accounting/invoices"
 @inject IAuthStateService AuthService
 @inject IRolePermissionService RolePermissionService
+@inject IAccountingApiService AccountingService
+@inject ICustomerApiService CustomerService
 @inject NavigationManager Navigation
 
 <PageTitle>Invoices - MiddayMist Spa</PageTitle>
@@ -64,7 +66,7 @@
                 <div class="row g-3">
                     <div class="col-md-3">
                         <input type="text" class="form-control" placeholder="Search invoices..." @bind="_searchTerm"
-                            @bind:event="oninput" />
+                               @bind:event="oninput" />
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" @bind="_statusFilter">
@@ -108,44 +110,52 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var invoice in FilteredInvoices)
+                            @if (_isLoading)
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                    </td>
+                                </tr>
+                            }
+                            else if (!_invoices.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">No invoices found</td>
+                                </tr>
+                            }
+                            @foreach (var invoice in _invoices)
                             {
                                 <tr>
                                     <td>
-                                        <a href="/accounting/invoices/@invoice.Id" class="text-decoration-none fw-medium">
-                                            @invoice.InvoiceNumber
-                                        </a>
+                                        <span class="fw-medium">@invoice.InvoiceNumber</span>
                                     </td>
                                     <td>@invoice.CustomerName</td>
-                                    <td>@invoice.IssueDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@invoice.InvoiceDate.ToString("MMM dd, yyyy")</td>
                                     <td
-                                        class="@(invoice.DueDate < DateTime.Today && invoice.Status != "Paid" ? "text-danger" : "")">
+                                        class="@(invoice.DueDate < PhilippineTime.Today && invoice.Status != "Paid" ? "text-danger" : "")">
                                         @invoice.DueDate.ToString("MMM dd, yyyy")
                                     </td>
                                     <td>
                                         <span class="badge @GetStatusBadge(invoice.Status)">@invoice.Status</span>
                                     </td>
-                                    <td class="text-end fw-medium">₱@invoice.Amount.ToString("N2")</td>
+                                    <td class="text-end fw-medium">₱@invoice.Total.ToString("N2")</td>
                                     <td>
                                         <button class="btn btn-link btn-sm p-1" @onclick="() => ViewInvoice(invoice)"
-                                            title="View">
+                                                title="View">
                                             <i class="bi bi-eye text-info"></i>
                                         </button>
-                                        <button class="btn btn-link btn-sm p-1" @onclick="() => PrintInvoice(invoice)"
-                                            title="Print">
-                                            <i class="bi bi-printer text-secondary"></i>
-                                        </button>
-                                        @if (invoice.Status == "Pending" || invoice.Status == "Overdue")
+                                        @if (invoice.Status is "Sent" or "Partial" or "Overdue")
                                         {
                                             <button class="btn btn-link btn-sm p-1" @onclick="() => MarkAsPaid(invoice)"
-                                                title="Mark as Paid">
+                                                    title="Mark as Paid">
                                                 <i class="bi bi-check-circle text-success"></i>
                                             </button>
                                         }
                                         @if (invoice.Status == "Draft")
                                         {
                                             <button class="btn btn-link btn-sm p-1" @onclick="() => SendInvoice(invoice)"
-                                                title="Send">
+                                                    title="Send">
                                                 <i class="bi bi-send text-primary"></i>
                                             </button>
                                         }
@@ -174,10 +184,11 @@
                             <div class="col-md-6">
                                 <label class="form-label">Customer</label>
                                 <select class="form-select" @bind="_newInvoice.CustomerId">
-                                    <option value="">Select Customer</option>
-                                    <option value="1">Maria Santos</option>
-                                    <option value="2">Ana Reyes</option>
-                                    <option value="3">Sofia Garcia</option>
+                                    <option value="0">Select Customer</option>
+                                    @foreach (var c in _customers)
+                                    {
+                                        <option value="@c.CustomerId">@c.FirstName @c.LastName</option>
+                                    }
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -197,92 +208,169 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach (var item in _newInvoice.Items)
+                                        @foreach (var item in _newInvoiceLines)
                                         {
                                             <tr>
                                                 <td><input type="text" class="form-control form-control-sm"
-                                                        @bind="item.Description" /></td>
-                                                <td><input type="number" class="form-control form-control-sm"
-                                                        @bind="item.Quantity" /></td>
-                                                <td><input type="number" class="form-control form-control-sm"
-                                                        @bind="item.Price" /></td>
-                                                <td class="text-end align-middle">₱@((item.Quantity *
-                                                                                                item.Price).ToString("N2"))</td>
-                                                <td>
-                                                    <button class="btn btn-link btn-sm text-danger p-0"
-                                                        @onclick="() => RemoveItem(item)">
-                                                        <i class="bi bi-x"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                                               @bind="item.Description" /></td>
+                                                    <td><input type="number" class="form-control form-control-sm"
+                                                                   @bind="item.Quantity" /></td>
+                                                        <td><input type="number" class="form-control form-control-sm"
+                                                                       @bind="item.UnitPrice" /></td>
+                                                            <td class="text-end align-middle">₱@((item.Quantity *
+                                                                                                                                                                            item.UnitPrice).ToString("N2"))</td>
+                                                                <td>
+                                                                    <button class="btn btn-link btn-sm text-danger p-0"
+                                                                            @onclick="() => RemoveItem(item)">
+                                                                        <i class="bi bi-x"></i>
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="AddItem">
+                                                    <i class="bi bi-plus me-1"></i> Add Item
+                                                </button>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label">Notes</label>
+                                                <textarea class="form-control" rows="2" @bind="_newInvoiceNotes"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <div class="me-auto">
+                                            <strong>Total: ₱@_newInvoiceLines.Sum(i => i.Quantity * i.UnitPrice).ToString("N2")</strong>
+                                        </div>
+                                        <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
+                                        <button class="btn btn-outline-primary" @onclick="SaveAsDraft">Save as Draft</button>
+                                        <button class="btn btn-primary" @onclick="CreateAndSend">Create & Send</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_showDetailModal && _selectedInvoice != null)
+                    {
+                        <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Invoice @_selectedInvoice.InvoiceNumber</h5>
+                                        <button type="button" class="btn-close" @onclick="() => _showDetailModal = false"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <dl class="row mb-0">
+                                                    <dt class="col-sm-5">Customer</dt>
+                                                    <dd class="col-sm-7">@_selectedInvoice.CustomerName</dd>
+                                                    <dt class="col-sm-5">Invoice Date</dt>
+                                                    <dd class="col-sm-7">@_selectedInvoice.InvoiceDate.ToString("MMM dd, yyyy")</dd>
+                                                    <dt class="col-sm-5">Due Date</dt>
+                                                    <dd class="col-sm-7">@_selectedInvoice.DueDate.ToString("MMM dd, yyyy")</dd>
+                                                </dl>
+                                            </div>
+                                            <div class="col-md-6 text-end">
+                                                <span class="badge @GetStatusBadge(_selectedInvoice.Status) fs-6">@_selectedInvoice.Status</span>
+                                            </div>
+                                        </div>
+                                        @if (_selectedInvoice.Lines?.Any() == true)
+                                        {
+                                            <table class="table table-sm">
+                                                <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Price</th><th class="text-end">Amount</th></tr></thead>
+                                                <tbody>
+                                                    @foreach (var line in _selectedInvoice.Lines)
+                                                    {
+                                                        <tr>
+                                                            <td>@line.Description</td>
+                                                            <td class="text-end">@line.Quantity</td>
+                                                            <td class="text-end">₱@line.UnitPrice.ToString("N2")</td>
+                                                            <td class="text-end">₱@line.Amount.ToString("N2")</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
                                         }
-                                    </tbody>
-                                </table>
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="AddItem">
-                                    <i class="bi bi-plus me-1"></i> Add Item
-                                </button>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Notes</label>
-                                <textarea class="form-control" rows="2" @bind="_newInvoice.Notes"></textarea>
+                                        <div class="border-top pt-2">
+                                            <div class="row"><div class="col-8 text-end">Subtotal:</div><div class="col-4 text-end">₱@_selectedInvoice.Subtotal.ToString("N2")</div></div>
+                                            <div class="row"><div class="col-8 text-end">Tax:</div><div class="col-4 text-end">₱@_selectedInvoice.Tax.ToString("N2")</div></div>
+                                            <div class="row fw-bold"><div class="col-8 text-end">Total:</div><div class="col-4 text-end">₱@_selectedInvoice.Total.ToString("N2")</div></div>
+                                            <div class="row text-success"><div class="col-8 text-end">Paid:</div><div class="col-4 text-end">₱@_selectedInvoice.AmountPaid.ToString("N2")</div></div>
+                                            <div class="row fw-bold"><div class="col-8 text-end">Balance:</div><div class="col-4 text-end">₱@_selectedInvoice.Balance.ToString("N2")</div></div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-secondary" @onclick="() => _showDetailModal = false">Close</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <div class="me-auto">
-                            <strong>Total: ₱@_newInvoice.Items.Sum(i => i.Quantity * i.Price).ToString("N2")</strong>
-                        </div>
-                        <button class="btn btn-secondary" @onclick="() => _showModal = false">Cancel</button>
-                        <button class="btn btn-outline-primary" @onclick="SaveAsDraft">Save as Draft</button>
-                        <button class="btn btn-primary" @onclick="CreateAndSend">Create & Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-</AuthorizedPage>
+                    }
+                </AuthorizedPage>
 
 @code {
-    private List<InvoiceModel> _invoices = new()
-{
-new() { Id = 1, InvoiceNumber = "INV-2024-001", CustomerName = "Maria Santos", IssueDate = DateTime.Now.AddDays(-10),
-DueDate = DateTime.Now.AddDays(5), Status = "Pending", Amount = 5500 },
-new() { Id = 2, InvoiceNumber = "INV-2024-002", CustomerName = "Corporate Client A", IssueDate =
-DateTime.Now.AddDays(-15), DueDate = DateTime.Now.AddDays(-5), Status = "Overdue", Amount = 15200 },
-new() { Id = 3, InvoiceNumber = "INV-2024-003", CustomerName = "Ana Reyes", IssueDate = DateTime.Now.AddDays(-5),
-DueDate = DateTime.Now.AddDays(10), Status = "Paid", Amount = 3200 },
-new() { Id = 4, InvoiceNumber = "INV-2024-004", CustomerName = "Sofia Garcia", IssueDate = DateTime.Now.AddDays(-2),
-DueDate = DateTime.Now.AddDays(13), Status = "Pending", Amount = 2800 },
-new() { Id = 5, InvoiceNumber = "INV-2024-005", CustomerName = "Carmen Lopez", IssueDate = DateTime.Now, DueDate =
-DateTime.Now.AddDays(15), Status = "Draft", Amount = 4500 }
-};
+    private List<InvoiceResponse> _invoices = new();
+    private List<CustomerResponse> _customers = new();
 
     private string _searchTerm = "";
     private string _statusFilter = "";
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
+    private int _currentPage = 1;
+    private int _totalPages = 1;
+    private bool _isLoading;
 
-    private decimal _totalInvoiced = 31200m;
-    private decimal _totalPaid = 3200m;
-    private decimal _totalPending = 12800m;
-    private decimal _totalOverdue = 15200m;
+    private decimal _totalInvoiced;
+    private decimal _totalPaid;
+    private decimal _totalPending;
+    private decimal _totalOverdue;
 
     private bool _showModal = false;
-    private NewInvoiceModel _newInvoice = new();
+    private bool _showDetailModal = false;
+    private InvoiceResponse? _selectedInvoice;
+    private CreateInvoiceRequest _newInvoice = new();
+    private List<CreateInvoiceLineRequest> _newInvoiceLines = new() { new() { Quantity = 1 } };
+    private string _newInvoiceNotes = "";
 
-    private IEnumerable<InvoiceModel> FilteredInvoices => _invoices.Where(i =>
-    (string.IsNullOrEmpty(_searchTerm) ||
-    i.InvoiceNumber.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
-    i.CustomerName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)) &&
-    (string.IsNullOrEmpty(_statusFilter) || i.Status == _statusFilter) &&
-    (!_dateFrom.HasValue || i.IssueDate >= _dateFrom.Value) &&
-    (!_dateTo.HasValue || i.IssueDate <= _dateTo.Value)
-    );
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoices();
+        var customerResult = await CustomerService.GetCustomersAsync(page: 1, pageSize: 200);
+        _customers = customerResult.Items;
+    }
+
+    private async Task LoadInvoices()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await AccountingService.GetInvoicesAsync(
+                status: string.IsNullOrEmpty(_statusFilter) ? null : _statusFilter,
+                page: _currentPage,
+                pageSize: 20);
+            _invoices = result.Items;
+            _totalPages = result.TotalPages;
+
+            _totalInvoiced = _invoices.Sum(i => i.Total);
+            _totalPaid = _invoices.Where(i => i.Status == "Paid").Sum(i => i.Total);
+            _totalPending = _invoices.Where(i => i.Status is "Draft" or "Sent" or "Partial").Sum(i => i.Total);
+            _totalOverdue = _invoices.Where(i => i.Status == "Overdue").Sum(i => i.Total);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
 
     private string GetStatusBadge(string status) => status switch
     {
         "Paid" => "bg-success",
-        "Pending" => "bg-warning text-dark",
+        "Sent" => "bg-warning text-dark",
+        "Partial" => "bg-info",
         "Overdue" => "bg-danger",
         "Draft" => "bg-secondary",
         "Cancelled" => "bg-dark",
@@ -291,65 +379,89 @@ DateTime.Now.AddDays(15), Status = "Draft", Amount = 4500 }
 
     private void ShowCreateModal()
     {
-        _newInvoice = new NewInvoiceModel
+        _newInvoice = new CreateInvoiceRequest
         {
-            DueDate = DateTime.Now.AddDays(15),
-            Items = new List<InvoiceItemModel> { new() }
+            InvoiceDate = PhilippineTime.Today,
+            DueDate = PhilippineTime.Today.AddDays(15)
         };
+        _newInvoiceLines = new List<CreateInvoiceLineRequest> { new() { Quantity = 1 } };
+        _newInvoiceNotes = "";
         _showModal = true;
     }
 
     private void AddItem()
     {
-        _newInvoice.Items.Add(new InvoiceItemModel());
+        _newInvoiceLines.Add(new CreateInvoiceLineRequest { Quantity = 1 });
     }
 
-    private void RemoveItem(InvoiceItemModel item)
+    private void RemoveItem(CreateInvoiceLineRequest item)
     {
-        if (_newInvoice.Items.Count > 1)
-            _newInvoice.Items.Remove(item);
+        if (_newInvoiceLines.Count > 1)
+            _newInvoiceLines.Remove(item);
     }
 
-    private void SaveAsDraft()
+    private async Task SaveAsDraft()
     {
-        // TODO: Save as draft
+        await CreateInvoiceInternal();
+    }
+
+    private async Task CreateAndSend()
+    {
+        try
+        {
+            var invoice = await CreateInvoiceInternal();
+            if (invoice != null)
+                await AccountingService.UpdateInvoiceStatusAsync(invoice.InvoiceId, "Sent");
+            await LoadInvoices();
+        }
+        catch (Exception)
+        {
+            // LoadInvoices already handles errors
+        }
+    }
+
+    private async Task<InvoiceResponse?> CreateInvoiceInternal()
+    {
+        if (_newInvoice.CustomerId <= 0 || !_newInvoiceLines.Any(l => !string.IsNullOrWhiteSpace(l.Description)))
+            return null;
+
+        _newInvoice.Lines = _newInvoiceLines.Where(l => !string.IsNullOrWhiteSpace(l.Description)).ToList();
+        _newInvoice.Notes = _newInvoiceNotes;
+        var result = await AccountingService.CreateInvoiceAsync(_newInvoice);
         _showModal = false;
+        await LoadInvoices();
+        return result;
     }
 
-    private void CreateAndSend()
+    private void ViewInvoice(InvoiceResponse invoice)
     {
-        // TODO: Create and send invoice
-        _showModal = false;
+        _selectedInvoice = invoice;
+        _showDetailModal = true;
     }
 
-    private void ViewInvoice(InvoiceModel invoice) { }
-    private void PrintInvoice(InvoiceModel invoice) { }
-    private void MarkAsPaid(InvoiceModel invoice) { invoice.Status = "Paid"; }
-    private void SendInvoice(InvoiceModel invoice) { invoice.Status = "Pending"; }
-
-    private class InvoiceModel
+    private async Task MarkAsPaid(InvoiceResponse invoice)
     {
-        public int Id { get; set; }
-        public string InvoiceNumber { get; set; } = "";
-        public string CustomerName { get; set; } = "";
-        public DateTime IssueDate { get; set; }
-        public DateTime DueDate { get; set; }
-        public string Status { get; set; } = "";
-        public decimal Amount { get; set; }
+        try
+        {
+            await AccountingService.RecordInvoicePaymentAsync(invoice.InvoiceId, invoice.Balance);
+            await LoadInvoices();
+        }
+        catch (Exception)
+        {
+            await LoadInvoices();
+        }
     }
 
-    private class NewInvoiceModel
+    private async Task SendInvoice(InvoiceResponse invoice)
     {
-        public int CustomerId { get; set; }
-        public DateTime DueDate { get; set; }
-        public string Notes { get; set; } = "";
-        public List<InvoiceItemModel> Items { get; set; } = new();
-    }
-
-    private class InvoiceItemModel
-    {
-        public string Description { get; set; } = "";
-        public int Quantity { get; set; } = 1;
-        public decimal Price { get; set; }
+        try
+        {
+            await AccountingService.UpdateInvoiceStatusAsync(invoice.InvoiceId, "Sent");
+            await LoadInvoices();
+        }
+        catch (Exception)
+        {
+            await LoadInvoices();
+        }
     }
 }

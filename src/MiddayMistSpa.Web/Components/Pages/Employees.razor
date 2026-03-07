@@ -86,7 +86,7 @@
                                                          style="width: 40px; height: 40px;">
                                                         @(string.IsNullOrEmpty(employee.FirstName) ? "?" :
                                                         employee.FirstName[0..1])@(string.IsNullOrEmpty(employee.LastName) ? "" :
-                                                                                                                                                            employee.LastName[0..1])
+                                                                                                    employee.LastName[0..1])
                                                     </div>
                                                     <div>
                                                         <div class="fw-medium">@employee.FullName</div>
@@ -263,7 +263,7 @@
                              style="width: 72px; height: 72px; font-size: 1.5rem;">
                             @(string.IsNullOrEmpty(_viewEmployee.FirstName) ? "?" :
                             _viewEmployee.FirstName[0..1])@(string.IsNullOrEmpty(_viewEmployee.LastName) ? "" :
-                                                                                _viewEmployee.LastName[0..1])
+                                                    _viewEmployee.LastName[0..1])
                         </div>
                         <h5 class="mb-0">@_viewEmployee.FullName</h5>
                         <small class="text-muted">@_viewEmployee.EmployeeCode</small>
@@ -358,6 +358,7 @@
         _canDelete = role == "SuperAdmin" || role == "Admin" || RolePermissionService.HasPermission("employees.delete");
 
         _isLoading = true;
+        StateHasChanged();
         try
         {
             _employees = await EmployeeService.GetEmployeesAsync(_currentPage, _pageSize, _searchQuery, _activeOnlyFilter,
@@ -407,7 +408,7 @@
     {
         _isEditing = false;
         _editingEmployeeId = null;
-        _formModel = new CreateEmployeeRequest { HireDate = DateTime.Today };
+        _formModel = new CreateEmployeeRequest { HireDate = PhilippineTime.Today };
         _showModal = true;
     }
 

@@ -53,6 +53,21 @@ public interface IAuthService
     /// Terminate a specific session
     /// </summary>
     Task<bool> TerminateSessionAsync(int sessionId, int requestingUserId);
+
+    /// <summary>
+    /// Request password reset - generates a token for the user
+    /// </summary>
+    Task<DTOs.Auth.PasswordResetResponse> RequestPasswordResetAsync(string email);
+
+    /// <summary>
+    /// Reset password using a valid reset token
+    /// </summary>
+    Task<DTOs.Auth.PasswordResetResponse> ResetPasswordAsync(DTOs.Auth.ResetPasswordRequest request);
+
+    /// <summary>
+    /// Update the current user's profile
+    /// </summary>
+    Task<DTOs.Auth.UpdateProfileResponse> UpdateProfileAsync(int userId, DTOs.Auth.UpdateProfileRequest request);
 }
 
 public class UserSessionDto

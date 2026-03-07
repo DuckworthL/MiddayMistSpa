@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MiddayMistSpa.Core;
 
 namespace MiddayMistSpa.API.DTOs.Appointment;
 
@@ -131,8 +132,8 @@ public class AppointmentResponse
     public int TotalDurationMinutes => ServiceItems.Any() ? ServiceItems.Sum(s => s.DurationMinutes * s.Quantity) : DurationMinutes;
 
     // Computed
-    public bool IsToday => AppointmentDate.Date == DateTime.Today;
-    public bool IsUpcoming => AppointmentDate.Date >= DateTime.Today && Status != "Cancelled" && Status != "Completed";
+    public bool IsToday => AppointmentDate.Date == PhilippineTime.Today;
+    public bool IsUpcoming => AppointmentDate.Date >= PhilippineTime.Today && Status != "Cancelled" && Status != "Completed";
     public bool CanBeRescheduled => Status is "Scheduled" or "Confirmed";
     public bool CanBeCancelled => Status is "Scheduled" or "Confirmed";
 }

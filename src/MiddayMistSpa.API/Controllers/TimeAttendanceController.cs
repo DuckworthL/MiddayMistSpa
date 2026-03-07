@@ -622,6 +622,27 @@ public class TimeAttendanceController : ControllerBase
         }
     }
 
+    [HttpPost("attendance/{id}/approve")]
+    [Authorize(Policy = "Permission:timeattendance.manage")]
+    public async Task<ActionResult<AttendanceRecordDto>> ApproveAttendanceRecord(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var result = await _timeAttendanceService.ApproveAttendanceRecordAsync(id, userId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error approving attendance record {AttendanceId}", id);
+            return StatusCode(500, new { error = "An error occurred while approving the attendance record" });
+        }
+    }
+
     [HttpGet("attendance")]
     [Authorize(Policy = "Permission:timeattendance.view")]
     public async Task<ActionResult<List<AttendanceRecordDto>>> GetAttendanceRecords(
