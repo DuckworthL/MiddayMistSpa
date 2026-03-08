@@ -640,13 +640,18 @@ a:hover,
 .modal-header {
     border-bottom: 1px solid #E5E7EB;
     padding: 1.25rem 1.5rem;
-    background: #FAFAFA;
+    background: var(--spa-primary);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    color: white;
+}
+
+.modal-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
 }
 
 .modal-title {
     font-weight: 600;
-    color: var(--spa-text);
+    color: white;
 }
 
 .modal-body {
