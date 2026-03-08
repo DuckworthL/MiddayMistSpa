@@ -43,6 +43,7 @@ public class ProductResponse
     public int ProductId { get; set; }
     public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
+    public string? Brand { get; set; }
     public string? Description { get; set; }
     public int ProductCategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
@@ -60,7 +61,8 @@ public class ProductResponse
 
     // Tracking
     public DateTime? ExpiryDate { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
 
     // Status
     public bool IsActive { get; set; }
@@ -77,6 +79,7 @@ public class ProductListResponse
     public int ProductId { get; set; }
     public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
+    public string? Brand { get; set; }
     public int ProductCategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public string ProductType { get; set; } = string.Empty;
@@ -85,6 +88,8 @@ public class ProductListResponse
     public string UnitOfMeasure { get; set; } = string.Empty;
     public decimal CostPrice { get; set; }
     public decimal? SellingPrice { get; set; }
+    public int? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
     public bool IsLowStock { get; set; }
     public bool IsExpiringSoon { get; set; }
     public bool IsActive { get; set; }
@@ -97,6 +102,9 @@ public class CreateProductRequest
 
     [Required, StringLength(100)]
     public string ProductName { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string? Brand { get; set; }
 
     [StringLength(500)]
     public string? Description { get; set; }
@@ -120,7 +128,7 @@ public class CreateProductRequest
     public decimal RetailCommissionRate { get; set; } = 0.10m;
 
     public DateTime? ExpiryDate { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
 }
 
 public class UpdateProductRequest
@@ -130,6 +138,9 @@ public class UpdateProductRequest
 
     [Required, StringLength(100)]
     public string ProductName { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string? Brand { get; set; }
 
     [StringLength(500)]
     public string? Description { get; set; }
@@ -153,7 +164,7 @@ public class UpdateProductRequest
     public decimal RetailCommissionRate { get; set; }
 
     public DateTime? ExpiryDate { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
     public bool IsActive { get; set; } = true;
 }
 

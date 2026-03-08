@@ -49,6 +49,10 @@
                                     @onclick='() => _activeTab = "integrations"'>
                                 <i class="bi bi-hdd-network me-2"></i> API Services
                             </button>
+                            <button class="nav-link @(_activeTab == "holidays" ? "active" : "")"
+                                    @onclick='() => _activeTab = "holidays"'>
+                                <i class="bi bi-calendar-event me-2"></i> Holidays
+                            </button>
                         </nav>
                     </div>
                 </div>
@@ -78,6 +82,9 @@
                         break;
                     case "integrations":
                         <IntegrationSettings />
+                        break;
+                    case "holidays":
+                        <HolidaySettings />
                         break;
                 }
             </div>

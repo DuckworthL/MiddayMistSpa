@@ -534,4 +534,28 @@ public class PayrollController : ControllerBase
             return StatusCode(500, new { error = "An error occurred while calculating 13th month pay" });
         }
     }
+
+    // =========================================================================
+    // Bank File Export
+    // =========================================================================
+
+    [HttpPost("bank-file/{periodId}")]
+    [Authorize(Policy = "Permission:payroll.manage")]
+    public async Task<IActionResult> DownloadBankFile(int periodId)
+    {
+        try
+        {
+            var fileContent = await _payrollService.GenerateBankFileAsync(periodId);
+            return File(fileContent, "text/csv", $"payroll-bank-file-{periodId}.csv");
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating bank file for period {PeriodId}", periodId);
+            return StatusCode(500, new { error = "An error occurred while generating the bank file" });
+        }
+    }
 }

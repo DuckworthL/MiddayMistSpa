@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using MiddayMistSpa.API.DTOs.Settings;
 using MiddayMistSpa.Core.Entities.Configuration;
 using MiddayMistSpa.Core.Entities.Identity;
+using MiddayMistSpa.Core.Entities.Payroll;
 using MiddayMistSpa.Infrastructure.Data;
 
 namespace MiddayMistSpa.API.Services;
@@ -730,4 +731,83 @@ public class SettingsService : ISettingsService
         },
         _ => new HashSet<string> { "dashboard.view" }
     };
+
+    // =========================================================================
+    // Holiday Management
+    // =========================================================================
+
+    public async Task<List<HolidayResponse>> GetHolidaysAsync(int? year = null)
+    {
+        var query = _context.PhilippineHolidays.AsQueryable();
+        if (year.HasValue)
+            query = query.Where(h => h.Year == year.Value);
+
+        return await query.OrderBy(h => h.HolidayDate)
+            .Select(h => new HolidayResponse
+            {
+                HolidayId = h.HolidayId,
+                HolidayName = h.HolidayName,
+                HolidayDate = h.HolidayDate,
+                HolidayType = h.HolidayType,
+                Year = h.Year,
+                IsRecurring = h.IsRecurring
+            }).ToListAsync();
+    }
+
+    public async Task<HolidayResponse> CreateHolidayAsync(CreateHolidayRequest request)
+    {
+        var holiday = new PhilippineHoliday
+        {
+            HolidayName = request.HolidayName,
+            HolidayDate = request.HolidayDate,
+            HolidayType = request.HolidayType,
+            Year = request.HolidayDate.Year,
+            IsRecurring = request.IsRecurring
+        };
+        _context.PhilippineHolidays.Add(holiday);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Holiday created: {Name} on {Date}", holiday.HolidayName, holiday.HolidayDate);
+
+        return new HolidayResponse
+        {
+            HolidayId = holiday.HolidayId,
+            HolidayName = holiday.HolidayName,
+            HolidayDate = holiday.HolidayDate,
+            HolidayType = holiday.HolidayType,
+            Year = holiday.Year,
+            IsRecurring = holiday.IsRecurring
+        };
+    }
+
+    public async Task<HolidayResponse> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request)
+    {
+        var holiday = await _context.PhilippineHolidays.FindAsync(holidayId)
+            ?? throw new ArgumentException("Holiday not found");
+
+        holiday.HolidayName = request.HolidayName;
+        holiday.HolidayDate = request.HolidayDate;
+        holiday.HolidayType = request.HolidayType;
+        holiday.Year = request.HolidayDate.Year;
+        holiday.IsRecurring = request.IsRecurring;
+        await _context.SaveChangesAsync();
+
+        return new HolidayResponse
+        {
+            HolidayId = holiday.HolidayId,
+            HolidayName = holiday.HolidayName,
+            HolidayDate = holiday.HolidayDate,
+            HolidayType = holiday.HolidayType,
+            Year = holiday.Year,
+            IsRecurring = holiday.IsRecurring
+        };
+    }
+
+    public async Task<bool> DeleteHolidayAsync(int holidayId)
+    {
+        var holiday = await _context.PhilippineHolidays.FindAsync(holidayId)
+            ?? throw new ArgumentException("Holiday not found");
+        _context.PhilippineHolidays.Remove(holiday);
+        await _context.SaveChangesAsync();
+        return true;
+    }
 }

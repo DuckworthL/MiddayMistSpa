@@ -159,3 +159,33 @@ public record ServiceCategorySettingsResponse
     public bool IsActive { get; init; }
     public string Color { get; init; } = "#8B5A9C";
 }
+
+// =============================================================================
+// Philippine Holidays
+// =============================================================================
+
+public record HolidayResponse
+{
+    public int HolidayId { get; init; }
+    public string HolidayName { get; init; } = "";
+    public DateTime HolidayDate { get; init; }
+    public string HolidayType { get; init; } = "";
+    public int Year { get; init; }
+    public bool IsRecurring { get; init; }
+}
+
+public record CreateHolidayRequest
+{
+    public string HolidayName { get; init; } = "";
+    public DateTime HolidayDate { get; init; }
+    public string HolidayType { get; init; } = "Regular";
+    public bool IsRecurring { get; init; } = true;
+}
+
+public record UpdateHolidayRequest
+{
+    public string HolidayName { get; init; } = "";
+    public DateTime HolidayDate { get; init; }
+    public string HolidayType { get; init; } = "Regular";
+    public bool IsRecurring { get; init; } = true;
+}

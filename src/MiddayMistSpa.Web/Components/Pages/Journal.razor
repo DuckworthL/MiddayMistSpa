@@ -21,9 +21,14 @@
                 <h1 class="h3 mb-0" style="color: #2C2C2C;">Journal Entries</h1>
                 <p class="text-muted mb-0">Record and view general ledger journal entries</p>
             </div>
-            <button class="btn btn-primary" @onclick="ShowAddModal">
-                <i class="bi bi-plus-lg me-1"></i> New Entry
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-warning" @onclick="ShowFiscalYearCloseModal">
+                    <i class="bi bi-calendar-check me-1"></i> Year-End Close
+                </button>
+                <button class="btn btn-primary" @onclick="ShowAddModal">
+                    <i class="bi bi-plus-lg me-1"></i> New Entry
+                </button>
+            </div>
         </div>
 
         @* Summary Cards *@
@@ -157,7 +162,7 @@
                                     <td>@entry.Description</td>
                                     <td>
                                         <span class="badge @GetReferenceTypeBadge(entry.ReferenceType)">@(entry.ReferenceType ??
-                                                                                                                            "—")</span>
+                                                                                "—")</span>
                                         </td>
                                         <td>
                                             <span class="badge @GetStatusBadge(entry.Status)">@entry.Status</span>
@@ -292,7 +297,7 @@
                     <div class="alert alert-warning d-flex align-items-center mt-3" role="alert">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         <span>Debits and credits must be equal. Difference: ₱@Math.Abs(_entryLines.Sum(l => l.Debit) -
-                                                                            _entryLines.Sum(l => l.Credit)).ToString("N2")</span>
+                                                _entryLines.Sum(l => l.Credit)).ToString("N2")</span>
                         </div>
                     }
                 </ChildContent>
@@ -388,7 +393,77 @@
                     <button type="button" class="btn btn-secondary" @onclick="() => _showViewModal = false">Close</button>
                 </FooterContent>
             </Modal>
-        </AuthorizedPage>
+
+            @* Fiscal Year Close Modal *@
+            <Modal Title="Fiscal Year Close" IsVisible="_showFiscalYearCloseModal"
+                   OnClose="() => _showFiscalYearCloseModal = false" Size="Modal.ModalSize.Default">
+                <ChildContent>
+                    @if (_fiscalYearCloseResult != null)
+                    {
+                        <div class="alert alert-success">
+                            <h6 class="alert-heading"><i class="bi bi-check-circle me-1"></i> Fiscal Year
+                                @_fiscalYearCloseResult.FiscalYear Closed</h6>
+                                <hr />
+                                <div class="row g-2">
+                                    <div class="col-6"><strong>Entry Number:</strong></div>
+                                    <div class="col-6">@_fiscalYearCloseResult.EntryNumber</div>
+                                    <div class="col-6"><strong>Total Revenue:</strong></div>
+                                    <div class="col-6">₱@_fiscalYearCloseResult.TotalRevenue.ToString("N2")</div>
+                                    <div class="col-6"><strong>Total Expenses:</strong></div>
+                                    <div class="col-6">₱@_fiscalYearCloseResult.TotalExpenses.ToString("N2")</div>
+                                    <div class="col-6"><strong>Net Income:</strong></div>
+                                    <div
+                                        class="col-6 fw-bold @(_fiscalYearCloseResult.NetIncome >= 0 ? "text-success" : "text-danger")">
+                                        ₱@_fiscalYearCloseResult.NetIncome.ToString("N2")</div>
+                                        <div class="col-6"><strong>Accounts Closed:</strong></div>
+                                        <div class="col-6">@_fiscalYearCloseResult.AccountsClosed</div>
+                                    </div>
+                                </div>
+                            }
+            else
+                            {
+                                <div class="alert alert-warning mb-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <strong>Caution:</strong> This will create a closing journal entry that
+                                    zeros out all Revenue and Expense accounts and transfers the net income to Retained Earnings.
+                                    This action cannot be undone easily.
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Fiscal Year to Close</label>
+                                    <select class="form-select" @bind="_fiscalYearToClose">
+                                        @for (int y = PhilippineTime.Today.Year; y >= 2020; y--)
+                                        {
+                                            <option value="@y">@y</option>
+                                        }
+                                    </select>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_fiscalYearCloseError))
+                                {
+                                    <div class="alert alert-danger">@_fiscalYearCloseError</div>
+                                }
+                            }
+                        </ChildContent>
+                        <FooterContent>
+                            @if (_fiscalYearCloseResult != null)
+                            {
+                                <button type="button" class="btn btn-secondary" @onclick="CloseFiscalYearModal">Close</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-secondary"
+                                        @onclick="() => _showFiscalYearCloseModal = false">Cancel</button>
+                                <button type="button" class="btn btn-warning" @onclick="PerformFiscalYearClose"
+                                        disabled="@_isFiscalYearClosing">
+                                    @if (_isFiscalYearClosing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    <i class="bi bi-lock me-1"></i> Close Fiscal Year
+                                </button>
+                            }
+                        </FooterContent>
+                    </Modal>
+                </AuthorizedPage>
 
 @code {
     private bool _isLoading = true;
@@ -655,6 +730,7 @@ new()
         "Payroll" => "bg-primary",
         "PurchaseOrder" => "bg-secondary",
         "Manual" => "bg-dark",
+        "FiscalYearClose" => "bg-warning",
         _ => "bg-light text-dark"
     };
 
@@ -671,5 +747,51 @@ new()
         public string Account { get; set; } = "";
         public decimal Debit { get; set; }
         public decimal Credit { get; set; }
+    }
+
+    // Fiscal Year Close
+    private bool _showFiscalYearCloseModal;
+    private bool _isFiscalYearClosing;
+    private int _fiscalYearToClose = PhilippineTime.Today.Year - 1;
+    private string? _fiscalYearCloseError;
+    private FiscalYearCloseResponse? _fiscalYearCloseResult;
+
+    private void ShowFiscalYearCloseModal()
+    {
+        _fiscalYearCloseResult = null;
+        _fiscalYearCloseError = null;
+        _isFiscalYearClosing = false;
+        _fiscalYearToClose = PhilippineTime.Today.Year - 1;
+        _showFiscalYearCloseModal = true;
+    }
+
+    private async Task PerformFiscalYearClose()
+    {
+        _isFiscalYearClosing = true;
+        _fiscalYearCloseError = null;
+        try
+        {
+            var (result, error) = await AccountingService.PerformFiscalYearCloseAsync(_fiscalYearToClose);
+            if (error != null)
+            {
+                _fiscalYearCloseError = error;
+            }
+            else
+            {
+                _fiscalYearCloseResult = result;
+                await LoadData();
+            }
+        }
+        catch (Exception ex)
+        {
+            _fiscalYearCloseError = $"Failed to close fiscal year: {ex.Message}";
+        }
+        _isFiscalYearClosing = false;
+    }
+
+    private void CloseFiscalYearModal()
+    {
+        _showFiscalYearCloseModal = false;
+        _fiscalYearCloseResult = null;
     }
 }

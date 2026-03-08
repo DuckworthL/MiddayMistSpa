@@ -250,6 +250,7 @@ public class EmployeePerformanceRequest
 
     public int? DepartmentId { get; set; }
     public string? JobTitle { get; set; }
+    public int? EmployeeId { get; set; }
     public string? SortBy { get; set; } = "Revenue"; // Revenue, Appointments, Rating
 }
 
@@ -276,6 +277,11 @@ public class EmployeePerformanceItem
     public decimal CommissionsEarned { get; set; }
     public decimal AverageServiceValue { get; set; }
     public int DaysWorked { get; set; }
+    public int ScheduledDays { get; set; }
+    public int Absences { get; set; }
+    public decimal AttendanceRate { get; set; }
+    public decimal ServiceCommissions { get; set; }
+    public decimal ProductCommissions { get; set; }
     public decimal UtilizationRate { get; set; } // Booked hours vs available hours
     public decimal AverageRating { get; set; }
     public int ReviewCount { get; set; }
@@ -823,4 +829,38 @@ public class MonthStats
     public int Appointments { get; set; }
     public int NewCustomers { get; set; }
     public decimal AverageTicket { get; set; }
+}
+
+// =========================================================================
+// Commission Summary Report
+// =========================================================================
+
+public class CommissionSummaryRequest
+{
+    [Required]
+    public DateTime StartDate { get; set; }
+
+    [Required]
+    public DateTime EndDate { get; set; }
+}
+
+public class CommissionSummaryResponse
+{
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public decimal TotalServiceCommissions { get; set; }
+    public decimal TotalProductCommissions { get; set; }
+    public decimal GrandTotal { get; set; }
+    public List<EmployeeCommissionSummary> Employees { get; set; } = new();
+}
+
+public class EmployeeCommissionSummary
+{
+    public int EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public string JobTitle { get; set; } = string.Empty;
+    public decimal ServiceCommissions { get; set; }
+    public decimal ProductCommissions { get; set; }
+    public decimal TotalCommissions { get; set; }
+    public int TransactionCount { get; set; }
 }

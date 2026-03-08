@@ -20,6 +20,9 @@
             <div class="d-flex gap-2">
                 @if (_canManage)
                 {
+                    <button class="btn btn-outline-secondary" @onclick="ShowPerformanceReportModal">
+                        <i class="bi bi-bar-chart me-1"></i> Performance Report
+                    </button>
                     <button class="btn btn-outline-primary" @onclick="ShowBonusModal">
                         <i class="bi bi-gift me-1"></i> Add Bonus
                     </button>
@@ -69,21 +72,25 @@
 
         @* Summary Cards *@
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col">
                 <StatCard Title="Total Payroll" Value="@_totalPayroll.ToString("C")" Icon="bi-wallet2"
                           Color="StatCard.CardColor.Primary" />
             </div>
-            <div class="col-md-3">
+            <div class="col">
                 <StatCard Title="Employees" Value="@_employeeCount.ToString()" Icon="bi-people"
                           Color="StatCard.CardColor.Info" />
             </div>
-            <div class="col-md-3">
+            <div class="col">
                 <StatCard Title="Total Hours" Value="@_totalHours.ToString("N0")" Icon="bi-clock-history"
                           Color="StatCard.CardColor.Success" />
             </div>
-            <div class="col-md-3">
-                <StatCard Title="Bonuses/Deductions" Value="@_totalAdjustments.ToString("C")" Icon="bi-plus-slash-minus"
-                          Color="StatCard.CardColor.Warning" />
+            <div class="col">
+                <StatCard Title="Total Bonuses" Value="@_totalBonuses.ToString("C")" Icon="bi-graph-up-arrow"
+                          Color="StatCard.CardColor.Success" />
+            </div>
+            <div class="col">
+                <StatCard Title="Total Deductions" Value="@_totalDeductions.ToString("C")" Icon="bi-graph-down-arrow"
+                          Color="StatCard.CardColor.Danger" />
             </div>
         </div>
 
@@ -100,7 +107,6 @@
                         <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
                             <option value="PDF">PDF</option>
                             <option value="Excel">Excel</option>
-                            <option value="CSV">CSV</option>
                         </select>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="ExportPayroll" disabled="@_isExporting">
                             @if (_isExporting)
@@ -112,6 +118,9 @@
                                 <i class="bi bi-download me-1"></i>
                             }
                             Export
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" @onclick="ExportBankFile" disabled="@_isExporting">
+                            <i class="bi bi-bank me-1"></i> Bank File
                         </button>
                     </div>
                 </div>
@@ -434,11 +443,11 @@
             <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055; background-color: rgba(0,0,0,0.5);">
                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
                     <div class="modal-content">
-                        <div class="modal-header bg-primary text-white">
+                        <div class="modal-header">
                             <h5 class="modal-title">
                                 <i class="bi bi-file-earmark-text me-2"></i>Payroll Summary
                             </h5>
-                            <button type="button" class="btn-close btn-close-white" @onclick="ClosePayrollDetailModal"></button>
+                            <button type="button" class="btn-close" @onclick="ClosePayrollDetailModal"></button>
                         </div>
                         <div class="modal-body" id="payroll-detail-content">
                             @* Header Info *@
@@ -650,12 +659,11 @@
                                             <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055; background-color: rgba(0,0,0,0.5);">
                                                 <div class="modal-dialog modal-xl modal-dialog-scrollable">
                                                     <div class="modal-content">
-                                                        <div class="modal-header"
-                                                             style="background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%); color: white;">
+                                                        <div class="modal-header">
                                                             <h5 class="modal-title">
                                                                 <i class="bi bi-binoculars me-2"></i>Payroll Preview
                                                             </h5>
-                                                            <button type="button" class="btn-close btn-close-white" @onclick="ClosePreviewModal"></button>
+                                                            <button type="button" class="btn-close" @onclick="ClosePreviewModal"></button>
                                                         </div>
                                                         <div class="modal-body">
                                                             @if (_isLoadingPreview)
@@ -720,7 +728,12 @@
                                                                             </div>
 
                                                                             @* Employee Breakdown *@
-                                                                            <h6 class="mb-3"><i class="bi bi-table me-1"></i> Employee Breakdown</h6>
+                                                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                                                <h6 class="mb-0"><i class="bi bi-table me-1"></i> Employee Breakdown</h6>
+                                                                                <div style="width: 280px;">
+                                                                                    <input type="text" class="form-control form-control-sm" placeholder="Search employee..." @bind="_previewSearchTerm" @bind:event="oninput" />
+                                                                                </div>
+                                                                            </div>
                                                                             <div class="table-responsive">
                                                                                 <table class="table table-sm table-hover table-bordered mb-4">
                                                                                     <thead style="background: linear-gradient(135deg, #f8f9fa 0%, #e8eaf6 100%);">
@@ -738,7 +751,7 @@
                                                                                         </tr>
                                                                                     </thead>
                                                                                     <tbody>
-                                                                                        @foreach (var item in _previewItems)
+                                                                                        @foreach (var item in FilteredPreviewItems)
                                                                                         {
                                                                                             <tr @onclick="() => TogglePreviewDetail(item.EmployeeId)" style="cursor: pointer;">
                                                                                                 <td>
@@ -800,7 +813,7 @@
                                                                                                                 <div class="p-3" style="background: #f8f9fa;">
                                                                                                                     <div class="row g-3">
                                                                                                                         @* Earnings Breakdown *@
-                                                                                                                        <div class="col-md-4">
+                                                                                                                        <div class="col-md-3">
                                                                                                                             <div class="card border-success border-opacity-25 h-100">
                                                                                                                                 <div class="card-header bg-success bg-opacity-10 py-2">
                                                                                                                                     <small class="fw-bold text-success"><i
@@ -843,7 +856,7 @@
                                                                                                                                 </div>
                                                                                                                             </div>
                                                                                                                             @* Deductions Breakdown *@
-                                                                                                                            <div class="col-md-4">
+                                                                                                                            <div class="col-md-3">
                                                                                                                                 <div class="card border-danger border-opacity-25 h-100">
                                                                                                                                     <div class="card-header bg-danger bg-opacity-10 py-2">
                                                                                                                                         <small class="fw-bold text-danger"><i
@@ -871,8 +884,42 @@
                                                                                                                                             </div>
                                                                                                                                         </div>
                                                                                                                                     </div>
-                                                                                                                                    @* Employer Contributions *@
-                                                                                                                                    <div class="col-md-4">
+                                                                                                                                    @* Performance Summary *@
+                                                                                                                                    <div class="col-md-3">
+                                                                                                                                        <div class="card border-warning border-opacity-25 h-100">
+                                                                                                                                            <div class="card-header bg-warning bg-opacity-10 py-2">
+                                                                                                                                                <small class="fw-bold text-warning"><i
+                                                                                                                                                    class="bi bi-graph-up me-1"></i>Performance</small>
+                                                                                                                                                </div>
+                                                                                                                                                <div class="card-body py-2 small">
+                                                                                                                                                    <div class="d-flex justify-content-between"><span>Days Worked</span><span>@item.DaysWorked.ToString("N1")</span></div>
+                                                                                                                                                    <div class="d-flex justify-content-between"><span>Hours Worked</span><span>@item.HoursWorked.ToString("N1")</span></div>
+                                                                                                                                                    @if (item.OvertimeHours > 0)
+                                                                                                                                                    {
+                                                                                                                                                        <div class="d-flex justify-content-between"><span>Overtime</span><span class="text-warning">@item.OvertimeHours.ToString("N1") hrs</span></div>
+                                                                                                                                                    }
+                                                                                                                                                    @if (item.NightDifferentialHours > 0)
+                                                                                                                                                    {
+                                                                                                                                                        <div class="d-flex justify-content-between"><span>Night Diff</span><span>@item.NightDifferentialHours.ToString("N1") hrs</span></div>
+                                                                                                                                                    }
+                                                                                                                                                    <hr class="my-1" />
+                                                                                                                                                    @if (item.Commissions > 0)
+                                                                                                                                                    {
+                                                                                                                                                        <div class="d-flex justify-content-between"><span>Commissions</span><span class="text-success">@item.Commissions.ToString("N2")</span></div>
+                                                                                                                                                    }
+                                                                                                                                                    @if (item.Tips > 0)
+                                                                                                                                                    {
+                                                                                                                                                        <div class="d-flex justify-content-between"><span>Tips</span><span class="text-success">@item.Tips.ToString("N2")</span></div>
+                                                                                                                                                    }
+                                                                                                                                                    @if (item.Commissions + item.Tips == 0)
+                                                                                                                                                    {
+                                                                                                                                                        <div class="text-muted text-center"><small>No commissions/tips</small></div>
+                                                                                                                                                    }
+                                                                                                                                                </div>
+                                                                                                                                            </div>
+                                                                                                                                        </div>
+                                                                                                                    @* Employer Contributions *@
+                                                                                                                                    <div class="col-md-3">
                                                                                                                                         <div class="card border-info border-opacity-25 h-100">
                                                                                                                                             <div class="card-header bg-info bg-opacity-10 py-2">
                                                                                                                                                 <small class="fw-bold text-info"><i
@@ -913,16 +960,16 @@
                                                                                                             <tfoot style="background: linear-gradient(135deg, #f8f9fa 0%, #e8eaf6 100%);"
                                                                                                                    class="fw-bold">
                                                                                                                 <tr>
-                                                                                                                    <td colspan="4">Totals (@_previewItems.Count employees)</td>
-                                                                                                                    <td class="text-end">@_previewItems.Sum(p => p.BasicSalary).ToString("N2")</td>
-                                                                                                                    <td class="text-end text-success">@_previewItems.Sum(p => p.OvertimePay +
+                                                                                                                    <td colspan="4">Totals (@FilteredPreviewItems.Count() employees@(string.IsNullOrWhiteSpace(_previewSearchTerm) ? "" : $" of {_previewItems.Count}"))</td>
+                                                                                                                    <td class="text-end">@FilteredPreviewItems.Sum(p => p.BasicSalary).ToString("N2")</td>
+                                                                                                                    <td class="text-end text-success">@FilteredPreviewItems.Sum(p => p.OvertimePay +
                                                                                                                                                                 p.NightDifferentialPay).ToString("N2")</td>
-                                                                                                                        <td class="text-end text-success">@_previewItems.Sum(p => p.Commissions +
+                                                                                                                        <td class="text-end text-success">@FilteredPreviewItems.Sum(p => p.Commissions +
                                                                                                                                                                     p.Tips).ToString("N2")</td>
-                                                                                                                            <td class="text-end">@_previewItems.Sum(p => p.GrossPay).ToString("N2")</td>
-                                                                                                                            <td class="text-end text-danger">-@_previewItems.Sum(p =>
+                                                                                                                            <td class="text-end">@FilteredPreviewItems.Sum(p => p.GrossPay).ToString("N2")</td>
+                                                                                                                            <td class="text-end text-danger">-@FilteredPreviewItems.Sum(p =>
                                                                                                                                                                         p.TotalDeductions).ToString("N2")</td>
-                                                                                                                                <td class="text-end text-primary">@_previewItems.Sum(p => p.NetPay).ToString("N2")
+                                                                                                                                <td class="text-end text-primary">@FilteredPreviewItems.Sum(p => p.NetPay).ToString("N2")
                                                                                                                                 </td>
                                                                                                                             </tr>
                                                                                                                         </tfoot>
@@ -987,6 +1034,229 @@
                                                                                                             </div>
                                                                                                         }
 
+        @* Employee Performance Report Modal *@
+        @if (_showPerformanceModal)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055; background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-bar-chart-fill me-2"></i>Employee Performance Report
+                            </h5>
+                            <button type="button" class="btn-close" @onclick="ClosePerformanceModal"></button>
+                        </div>
+                        <div class="modal-body">
+                            @* Filters *@
+                            <div class="row g-3 mb-4 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">Employee</label>
+                                    <select class="form-select" @onchange="OnPerformanceEmployeeChanged">
+                                        <option value="0">All Employees</option>
+                                        @foreach (var emp in _employeeLookup)
+                                        {
+                                            <option value="@emp.Id" selected="@(_perfEmployeeId == emp.Id)">@emp.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted">Period</label>
+                                    <div class="form-control-plaintext fw-medium">
+                                        @_periodStart.ToString("MMM dd") - @_periodEnd.ToString("MMM dd, yyyy")
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-primary w-100" @onclick="LoadPerformanceData" disabled="@_isLoadingPerformance">
+                                        @if (_isLoadingPerformance)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-arrow-clockwise me-1"></i>
+                                        }
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (_isLoadingPerformance)
+                            {
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+                                    <p class="text-muted">Loading performance data...</p>
+                                </div>
+                            }
+                            else if (_performanceData != null && _performanceData.Employees.Any())
+                            {
+                                @* Summary Cards *@
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-3">
+                                        <div class="border rounded-3 p-3 text-center" style="background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);">
+                                            <i class="bi bi-people-fill text-primary fs-5"></i>
+                                            <div class="h4 mb-0 mt-1">@_performanceData.Employees.Count</div>
+                                            <small class="text-muted">Employees</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="border rounded-3 p-3 text-center" style="background: linear-gradient(135deg, #f8f9fa 0%, #e8f5e9 100%);">
+                                            <i class="bi bi-calendar-check text-success fs-5"></i>
+                                            <div class="h4 mb-0 mt-1">@(_performanceData.Employees.Sum(e => e.Absences))</div>
+                                            <small class="text-muted">Total Absences</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="border rounded-3 p-3 text-center" style="background: linear-gradient(135deg, #f8f9fa 0%, #fff3e0 100%);">
+                                            <i class="bi bi-clipboard-check text-warning fs-5"></i>
+                                            <div class="h4 mb-0 mt-1">@_performanceData.Employees.Sum(e => e.AppointmentsCompleted)</div>
+                                            <small class="text-muted">Services Completed</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="border rounded-3 p-3 text-center" style="background: linear-gradient(135deg, #f8f9fa 0%, #fce4ec 100%);">
+                                            <i class="bi bi-cash-stack text-danger fs-5"></i>
+                                            <div class="h4 mb-0 mt-1">@_performanceData.Employees.Sum(e => e.CommissionsEarned).ToString("C")</div>
+                                            <small class="text-muted">Total Commissions</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @* Performance Table *@
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover table-bordered mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Employee</th>
+                                                <th>Position</th>
+                                                <th class="text-center">Scheduled</th>
+                                                <th class="text-center">Worked</th>
+                                                <th class="text-center">Absences</th>
+                                                <th class="text-center">Attendance</th>
+                                                <th class="text-center">Services</th>
+                                                <th class="text-end">Revenue</th>
+                                                <th class="text-end">Svc Comm</th>
+                                                <th class="text-end">Prod Comm</th>
+                                                <th class="text-end fw-bold">Total Comm</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var emp in _performanceData.Employees)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                                 style="width: 30px; height: 30px; font-size: 0.7rem;">
+                                                                @GetInitials(emp.EmployeeName)
+                                                            </div>
+                                                            <span class="fw-medium">@emp.EmployeeName</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>@emp.Position</td>
+                                                    <td class="text-center">@emp.ScheduledDays days</td>
+                                                    <td class="text-center">@emp.DaysWorked days</td>
+                                                    <td class="text-center">
+                                                        @if (emp.Absences > 0)
+                                                        {
+                                                            <span class="badge bg-danger">@emp.Absences</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-success">0</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span class="badge bg-@(emp.AttendanceRate >= 90 ? "success" : emp.AttendanceRate >= 70 ? "warning" : "danger")">
+                                                            @emp.AttendanceRate.ToString("N0")%
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        @emp.AppointmentsCompleted
+                                                        @if (emp.AppointmentsScheduled > 0)
+                                                        {
+                                                            <small class="text-muted">/ @emp.AppointmentsScheduled</small>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">@emp.RevenueGenerated.ToString("C")</td>
+                                                    <td class="text-end">
+                                                        @if (emp.ServiceCommissions > 0)
+                                                        {
+                                                            <span class="text-success">@emp.ServiceCommissions.ToString("C")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted">-</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">
+                                                        @if (emp.ProductCommissions > 0)
+                                                        {
+                                                            <span class="text-info">@emp.ProductCommissions.ToString("C")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-muted">-</span>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end fw-bold">@emp.CommissionsEarned.ToString("C")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot class="table-light fw-bold">
+                                            <tr>
+                                                <td colspan="2">Totals</td>
+                                                <td class="text-center">@_performanceData.Employees.Sum(e => e.ScheduledDays)</td>
+                                                <td class="text-center">@_performanceData.Employees.Sum(e => e.DaysWorked)</td>
+                                                <td class="text-center text-danger">@_performanceData.Employees.Sum(e => e.Absences)</td>
+                                                <td class="text-center">
+                                                    @{ var avgAtt = _performanceData.Employees.Average(e => e.AttendanceRate); }
+                                                    @avgAtt.ToString("N0")%
+                                                </td>
+                                                <td class="text-center">@_performanceData.Employees.Sum(e => e.AppointmentsCompleted)</td>
+                                                <td class="text-end">@_performanceData.Employees.Sum(e => e.RevenueGenerated).ToString("C")</td>
+                                                <td class="text-end text-success">@_performanceData.Employees.Sum(e => e.ServiceCommissions).ToString("C")</td>
+                                                <td class="text-end text-info">@_performanceData.Employees.Sum(e => e.ProductCommissions).ToString("C")</td>
+                                                <td class="text-end">@_performanceData.Employees.Sum(e => e.CommissionsEarned).ToString("C")</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-5">
+                                    <i class="bi bi-bar-chart display-4 text-muted"></i>
+                                    <p class="text-muted mt-2">No performance data available for this period</p>
+                                </div>
+                            }
+                        </div>
+                        <div class="modal-footer">
+                            <div class="d-flex gap-2">
+                                <select class="form-select form-select-sm" style="width: auto;" @bind="_perfExportFormat">
+                                    <option value="PDF">PDF</option>
+                                    <option value="Excel">Excel</option>
+                                    <option value="CSV">CSV</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="ExportPerformanceReport"
+                                        disabled="@(_isExportingPerformance || _performanceData == null || !_performanceData.Employees.Any())">
+                                    @if (_isExportingPerformance)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-download me-1"></i>
+                                    }
+                                    Export
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-secondary" @onclick="ClosePerformanceModal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
                                                                                                         @* Alert *@
                                                                                                         @if (!string.IsNullOrEmpty(_alertMessage))
                                                                                                         {
@@ -1007,7 +1277,8 @@
     private decimal _totalPayroll;
     private int _employeeCount;
     private decimal _totalHours;
-    private decimal _totalAdjustments;
+    private decimal _totalBonuses;
+    private decimal _totalDeductions;
 
     // Payroll data
     private List<PayrollItemViewModel> _payrollItems = new();
@@ -1047,6 +1318,20 @@
     private bool _isLoadingPreview;
     private List<PayrollRecordResponse> _previewItems = new();
     private int? _expandedPreviewEmployeeId;
+    private string _previewSearchTerm = string.Empty;
+    private IEnumerable<PayrollRecordResponse> FilteredPreviewItems => string.IsNullOrWhiteSpace(_previewSearchTerm)
+        ? _previewItems
+        : _previewItems.Where(p => p.EmployeeName.Contains(_previewSearchTerm, StringComparison.OrdinalIgnoreCase)
+            || p.EmployeeCode.Contains(_previewSearchTerm, StringComparison.OrdinalIgnoreCase)
+            || p.Position.Contains(_previewSearchTerm, StringComparison.OrdinalIgnoreCase));
+
+    // Performance Report Modal
+    private bool _showPerformanceModal;
+    private bool _isLoadingPerformance;
+    private EmployeePerformanceResponse? _performanceData;
+    private int? _perfEmployeeId;
+    private string _perfExportFormat = "PDF";
+    private bool _isExportingPerformance;
 
     protected override void OnInitialized()
     {
@@ -1134,7 +1419,7 @@
                     RegularHours = r.HoursWorked,
                     OvertimeHours = r.OvertimeHours,
                     HourlyRate = r.HoursWorked > 0 ? r.BasicSalary / r.HoursWorked : 0,
-                    Bonus = r.Tips,
+                    Bonus = r.Tips + r.TotalAllowances,
                     Commission = r.Commissions,
                     Deductions = r.TotalDeductions,
                     GrossPay = r.GrossPay,
@@ -1176,7 +1461,8 @@
             _employeeCount = _payrollItems.Count;
             _totalHours = _payrollItems.Sum(p => p.RegularHours + p.OvertimeHours);
             _totalPayroll = _payrollItems.Sum(p => p.NetPay);
-            _totalAdjustments = _payrollItems.Sum(p => p.Bonus + p.Commission - p.Deductions);
+            _totalBonuses = _payrollItems.Sum(p => p.Bonus + p.Commission);
+            _totalDeductions = _payrollItems.Sum(p => p.Deductions);
         }
         catch (Exception ex)
         {
@@ -1403,7 +1689,7 @@
                 RegularHours = r.HoursWorked,
                 OvertimeHours = r.OvertimeHours,
                 HourlyRate = r.HoursWorked > 0 ? r.BasicSalary / r.HoursWorked : 0,
-                Bonus = r.Tips,
+                Bonus = r.Tips + r.TotalAllowances,
                 Commission = r.Commissions,
                 Deductions = r.TotalDeductions,
                 GrossPay = r.GrossPay,
@@ -1501,6 +1787,40 @@
         }
     }
 
+    private async Task ExportBankFile()
+    {
+        if (_currentPeriodId == null)
+        {
+            ShowAlert("No payroll period found. Please process payroll first before exporting a bank file.", Alert.AlertType.Warning);
+            return;
+        }
+        _isExporting = true;
+        StateHasChanged();
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await PayrollService.DownloadBankFileAsync(_currentPeriodId.Value);
+            if (fileContent != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName ?? $"payroll-bank-file-{_currentPeriodId}.csv", contentType ?? "text/csv", base64);
+                ShowAlert("Bank file exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Bank file export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Bank file export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task ShowPreviewModal()
     {
         _showPreviewModal = true;
@@ -1546,6 +1866,82 @@
     {
         _alertMessage = message;
         _alertType = type;
+    }
+
+    // Performance Report Methods
+    private async Task ShowPerformanceReportModal()
+    {
+        _showPerformanceModal = true;
+        _perfEmployeeId = null;
+        _performanceData = null;
+        StateHasChanged();
+        await LoadPerformanceData();
+    }
+
+    private void ClosePerformanceModal()
+    {
+        _showPerformanceModal = false;
+        _performanceData = null;
+    }
+
+    private async Task OnPerformanceEmployeeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var id) && id > 0)
+            _perfEmployeeId = id;
+        else
+            _perfEmployeeId = null;
+
+        await LoadPerformanceData();
+    }
+
+    private async Task LoadPerformanceData()
+    {
+        _isLoadingPerformance = true;
+        StateHasChanged();
+
+        try
+        {
+            _performanceData = await ReportsService.GetEmployeePerformanceAsync(_periodStart, _periodEnd, _perfEmployeeId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading performance data: {ex.Message}");
+            ShowAlert("Failed to load performance data.", Alert.AlertType.Error);
+        }
+
+        _isLoadingPerformance = false;
+        StateHasChanged();
+    }
+
+    private async Task ExportPerformanceReport()
+    {
+        _isExportingPerformance = true;
+        StateHasChanged();
+
+        try
+        {
+            var (fileContent, fileName, contentType, errorMessage) = await ReportsService.ExportReportAsync(
+                "employee", _perfExportFormat, _periodStart, _periodEnd);
+            if (fileContent != null && fileName != null)
+            {
+                var base64 = Convert.ToBase64String(fileContent);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, contentType ?? "application/octet-stream", base64);
+                ShowAlert("Performance report exported successfully!", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert(errorMessage ?? "Export failed.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Export failed: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isExportingPerformance = false;
+            StateHasChanged();
+        }
     }
 
     // View Models

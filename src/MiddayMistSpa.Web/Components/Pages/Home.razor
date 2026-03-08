@@ -25,7 +25,7 @@ else
             @if (_canCreateAppointments)
             {
                 <div>
-                    <a href="/appointments/new" class="btn btn-primary">
+                    <a href="/appointments?action=new" class="btn btn-primary">
                         <i class="bi bi-plus-lg me-1"></i> New Appointment
                     </a>
                 </div>
@@ -52,8 +52,8 @@ else
                     @foreach (var card in _statCards)
                     {
                         <div class="@colClass">
-                            <StatCard Title="@card.Title" Value="@card.Value" SubValue="@card.SubValue"
-                                      Icon="@card.Icon" Color="@card.Color" />
+                            <StatCard Title="@card.Title" Value="@card.Value" SubValue="@card.SubValue" Icon="@card.Icon"
+                                      Color="@card.Color" />
                         </div>
                     }
                 </div>
@@ -93,239 +93,239 @@ else
                                                             <span class="fw-medium">@appt.StartTime.ToString("hh\\:mm")</span>
                                                             <span class="small" style="color: #6B7280;">-
                                                                 @appt.EndTime.ToString("hh\\:mm")</span>
-                                                        </td>
-                                                        <td>@appt.CustomerName</td>
-                                                        <td>@appt.ServiceName</td>
-                                                        <td>@(appt.TherapistName ?? "TBA")</td>
-                                                        <td>
-                                                            <StatusBadge Status="@appt.Status" />
-                                                        </td>
-                                                        <td>
-                                                            <a href="/appointments/@appt.AppointmentId" class="btn btn-sm btn-link">
-                                                                <i class="bi bi-eye"></i>
-                                                            </a>
-                                                        </td>
-                                                    </tr>
-                                                }
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="text-center py-5">
-                                        <i class="bi bi-calendar-x display-4 text-muted"></i>
-                                        <p class="text-muted mt-2">No appointments scheduled for today</p>
-                                        @if (_canCreateAppointments)
-                                        {
-                                            <a href="/appointments/new" class="btn btn-primary btn-sm">
-                                                <i class="bi bi-plus me-1"></i> Schedule Appointment
-                                            </a>
-                                        }
-                                    </div>
-                                }
+                                                            </td>
+                                                            <td>@appt.CustomerName</td>
+                                                            <td>@appt.ServiceName</td>
+                                                            <td>@(appt.TherapistName ?? "TBA")</td>
+                                                            <td>
+                                                                <StatusBadge Status="@appt.Status" />
+                                                            </td>
+                                                            <td>
+                                                                <a href="/appointments/@appt.AppointmentId" class="btn btn-sm btn-link">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                    else
+                                    {
+                                        <div class="text-center py-5">
+                                            <i class="bi bi-calendar-x display-4 text-muted"></i>
+                                            <p class="text-muted mt-2">No appointments scheduled for today</p>
+                                            @if (_canCreateAppointments)
+                                            {
+                                                <a href="/appointments?action=new" class="btn btn-primary btn-sm">
+                                                    <i class="bi bi-plus me-1"></i> Schedule Appointment
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    @* Sidebar: Quick Actions + Top Services *@
-                    <div class="col-12 col-lg-4">
+                        @* Sidebar: Quick Actions + Top Services *@
+                        <div class="col-12 col-lg-4">
+                            @if (_quickActions.Any())
+                            {
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-grid gap-2">
+                                            @foreach (var action in _quickActions)
+                                            {
+                                                <a href="@action.Href" class="btn btn-outline-primary text-start">
+                                                    <i class="bi @action.Icon me-2"></i> @action.Label
+                                                </a>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (_canViewServices || _canViewReports)
+                            {
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (_topServices.Any())
+                                        {
+                                            @foreach (var service in _topServices.Take(5))
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <div>
+                                                        <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
+                                                        <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                                    </div>
+                                                    <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+    else
+                {
+                    @* No appointments view — full-width 3-column layout *@
+                    <div class="row g-4">
+                        @* Quick Actions *@
                         @if (_quickActions.Any())
                         {
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-grid gap-2">
+                                            @foreach (var action in _quickActions)
+                                            {
+                                                <a href="@action.Href" class="btn btn-outline-primary text-start">
+                                                    <i class="bi @action.Icon me-2"></i> @action.Label
+                                                </a>
+                                            }
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="card-body">
-                                    <div class="d-grid gap-2">
-                                        @foreach (var action in _quickActions)
+                            </div>
+                        }
+
+                        @* Role-Specific Widget *@
+                        @if (_roleWidget != null)
+                        {
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h5 class="mb-0" style="color: #2C2C2C;">@_roleWidget.Title</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (_roleWidget.Items.Any())
                                         {
-                                            <a href="@action.Href" class="btn btn-outline-primary text-start">
-                                                <i class="bi @action.Icon me-2"></i> @action.Label
-                                            </a>
+                                            @foreach (var item in _roleWidget.Items)
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
+                                                             style="width: 36px; height: 36px; background: @item.BadgeBg;">
+                                                            <i class="bi @item.Icon" style="color: @item.IconColor; font-size: 0.9rem;"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-medium" style="color: #2C2C2C;">@item.Label</div>
+                                                            @if (!string.IsNullOrEmpty(item.SubLabel))
+                                                            {
+                                                                <small style="color: #6B7280;">@item.SubLabel</small>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    <span class="badge @item.ValueBadgeClass">@item.Value</span>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center py-3">
+                                                <i class="bi @_roleWidget.EmptyIcon display-6 text-muted"></i>
+                                                <p class="text-muted mt-2 mb-0">@_roleWidget.EmptyMessage</p>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(_roleWidget.LinkHref))
+                                        {
+                                            <div class="mt-3 text-center">
+                                                <a href="@_roleWidget.LinkHref" class="btn btn-sm btn-outline-primary">
+                                                    @_roleWidget.LinkLabel
+                                                </a>
+                                            </div>
                                         }
                                     </div>
                                 </div>
                             </div>
                         }
 
+                        @* Top Services *@
                         @if (_canViewServices || _canViewReports)
                         {
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
-                                </div>
-                                <div class="card-body">
-                                    @if (_topServices.Any())
-                                    {
-                                        @foreach (var service in _topServices.Take(5))
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (_topServices.Any())
                                         {
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <div>
-                                                    <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
-                                                    <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                            @foreach (var service in _topServices.Take(5))
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                                    <div>
+                                                        <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
+                                                        <small style="color: #6B7280;">@service.BookingCount bookings</small>
+                                                    </div>
+                                                    <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
                                                 </div>
-                                                <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
-                                            </div>
+                                            }
                                         }
-                                    }
-                                    else
-                                    {
-                                        <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
-                                    }
+                                        else
+                                        {
+                                            <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         }
                     </div>
-                </div>
-            }
-            else
-            {
-                @* No appointments view — full-width 3-column layout *@
-                <div class="row g-4">
-                    @* Quick Actions *@
-                    @if (_quickActions.Any())
-                    {
-                        <div class="col-12 col-md-6 col-lg-4">
-                            <div class="card h-100">
-                                <div class="card-header">
-                                    <h5 class="mb-0" style="color: #2C2C2C;">Quick Actions</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="d-grid gap-2">
-                                        @foreach (var action in _quickActions)
-                                        {
-                                            <a href="@action.Href" class="btn btn-outline-primary text-start">
-                                                <i class="bi @action.Icon me-2"></i> @action.Label
-                                            </a>
-                                        }
+                }
+
+                @* Revenue Chart Area — visible if user can view accounting or reports *@
+                @if (_canViewAccounting || _canViewReports)
+                {
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">Revenue Overview</h5>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn @(_revenueView == "week" ? "btn-primary" : "btn-outline-secondary")"
+                                                @onclick="@(() => SetRevenueView("week"))">Week</button>
+                                        <button class="btn @(_revenueView == "month" ? "btn-primary" : "btn-outline-secondary")"
+                                                @onclick="@(() => SetRevenueView("month"))">Month</button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    }
-
-                    @* Role-Specific Widget *@
-                    @if (_roleWidget != null)
-                    {
-                        <div class="col-12 col-md-6 col-lg-4">
-                            <div class="card h-100">
-                                <div class="card-header">
-                                    <h5 class="mb-0" style="color: #2C2C2C;">@_roleWidget.Title</h5>
-                                </div>
                                 <div class="card-body">
-                                    @if (_roleWidget.Items.Any())
+                                    @if (_revenueData.Any())
                                     {
-                                        @foreach (var item in _roleWidget.Items)
-                                        {
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <div class="d-flex align-items-center">
-                                                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3"
-                                                         style="width: 36px; height: 36px; background: @item.BadgeBg;">
-                                                        <i class="bi @item.Icon" style="color: @item.IconColor; font-size: 0.9rem;"></i>
-                                                    </div>
-                                                    <div>
-                                                        <div class="fw-medium" style="color: #2C2C2C;">@item.Label</div>
-                                                        @if (!string.IsNullOrEmpty(item.SubLabel))
-                                                        {
-                                                            <small style="color: #6B7280;">@item.SubLabel</small>
-                                                        }
-                                                    </div>
-                                                </div>
-                                                <span class="badge @item.ValueBadgeClass">@item.Value</span>
-                                            </div>
-                                        }
+                                        <div style="height: 280px; position: relative;">
+                                            <canvas id="revenueChart"></canvas>
+                                        </div>
                                     }
                                     else
                                     {
-                                        <div class="text-center py-3">
-                                            <i class="bi @_roleWidget.EmptyIcon display-6 text-muted"></i>
-                                            <p class="text-muted mt-2 mb-0">@_roleWidget.EmptyMessage</p>
-                                        </div>
-                                    }
-                                    @if (!string.IsNullOrEmpty(_roleWidget.LinkHref))
-                                    {
-                                        <div class="mt-3 text-center">
-                                            <a href="@_roleWidget.LinkHref" class="btn btn-sm btn-outline-primary">
-                                                @_roleWidget.LinkLabel
-                                            </a>
+                                        <div class="text-center py-5 text-muted">
+                                            <i class="bi bi-bar-chart display-4"></i>
+                                            <p class="mt-2">No revenue data for this period</p>
                                         </div>
                                     }
                                 </div>
-                            </div>
-                        </div>
-                    }
-
-                    @* Top Services *@
-                    @if (_canViewServices || _canViewReports)
-                    {
-                        <div class="col-12 col-md-6 col-lg-4">
-                            <div class="card h-100">
-                                <div class="card-header">
-                                    <h5 class="mb-0" style="color: #2C2C2C;">Top Services (This Month)</h5>
-                                </div>
-                                <div class="card-body">
-                                    @if (_topServices.Any())
-                                    {
-                                        @foreach (var service in _topServices.Take(5))
-                                        {
-                                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                                <div>
-                                                    <div class="fw-medium" style="color: #2C2C2C;">@service.ServiceName</div>
-                                                    <small style="color: #6B7280;">@service.BookingCount bookings</small>
-                                                </div>
-                                                <span class="badge bg-success">₱@service.TotalRevenue.ToString("N0")</span>
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <p class="text-center mb-0" style="color: #6B7280;">No data available</p>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-
-            @* Revenue Chart Area — visible if user can view accounting or reports *@
-            @if (_canViewAccounting || _canViewReports)
-            {
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">Revenue Overview</h5>
-                                <div class="btn-group btn-group-sm">
-                                    <button class="btn @(_revenueView == "week" ? "btn-primary" : "btn-outline-secondary")"
-                                            @onclick="@(() => SetRevenueView("week"))">Week</button>
-                                    <button class="btn @(_revenueView == "month" ? "btn-primary" : "btn-outline-secondary")"
-                                            @onclick="@(() => SetRevenueView("month"))">Month</button>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                @if (_revenueData.Any())
-                                {
-                                    <div style="height: 280px; position: relative;">
-                                        <canvas id="revenueChart"></canvas>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="text-center py-5 text-muted">
-                                        <i class="bi bi-bar-chart display-4"></i>
-                                        <p class="mt-2">No revenue data for this period</p>
-                                    </div>
-                                }
                             </div>
                         </div>
                     </div>
-                </div>
+                }
             }
-        }
-    </div>
-}
+        </div>
+    }
 
 @code {
     private bool _isLoading = true;
@@ -438,25 +438,33 @@ else
         {
             // Admin/Receptionist: Revenue, Appointments, New Customers, Low Stock
             if (_canViewAccounting)
-                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null,
+                "bi-currency-dollar", StatCard.CardColor.Success));
             if (_canViewAppointments)
-                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
+                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}",
+                $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
             if (_canViewCustomers)
-                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
+                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people",
+                StatCard.CardColor.Info));
             if (_canViewInventory)
             {
                 var lowStock = _summary?.Inventory.LowStockItems ?? 0;
-                _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-box-seam", lowStock > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+                _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-box-seam", lowStock > 0 ?
+                StatCard.CardColor.Warning : StatCard.CardColor.Success));
             }
         }
         else if (_userRole == "HR")
         {
             // HR: Clocked In, Pending Leaves, Appointments (occupancy indicator), Today's Revenue
-            _statCards.Add(new StatCardData("Clocked In Now", $"{_clockedInCount}", "employees on duty", "bi-person-check", StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("Pending Leave Requests", $"{_pendingLeavesCount}", null, "bi-calendar-event", _pendingLeavesCount > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Clocked In Now", $"{_clockedInCount}", "employees on duty", "bi-person-check",
+            StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Pending Leave Requests", $"{_pendingLeavesCount}", null, "bi-calendar-event",
+            _pendingLeavesCount > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}",
+            $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Primary));
             if (_canViewReports)
-                _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt", StatCard.CardColor.Info));
+                _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt",
+                StatCard.CardColor.Info));
         }
         else if (_userRole == "Inventory")
         {
@@ -464,45 +472,63 @@ else
             var lowStock = _summary?.Inventory.LowStockItems ?? 0;
             var outOfStock = _summary?.Inventory.OutOfStockItems ?? 0;
             var expiring = _summary?.Inventory.ExpiringItems ?? 0;
-            _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-exclamation-triangle", lowStock > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("Out of Stock", $"{outOfStock}", null, "bi-x-circle", outOfStock > 0 ? StatCard.CardColor.Danger : StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("Expiring Soon", $"{expiring}", null, "bi-clock-history", expiring > 0 ? StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Low Stock Items", $"{lowStock}", null, "bi-exclamation-triangle", lowStock > 0 ?
+            StatCard.CardColor.Warning : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Out of Stock", $"{outOfStock}", null, "bi-x-circle", outOfStock > 0 ?
+            StatCard.CardColor.Danger : StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Expiring Soon", $"{expiring}", null, "bi-clock-history", expiring > 0 ?
+            StatCard.CardColor.Warning : StatCard.CardColor.Success));
             if (_canViewReports)
-                _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Info));
+                _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null,
+                "bi-calendar-check", StatCard.CardColor.Info));
         }
         else if (_userRole == "Accountant")
         {
             // Accountant: Revenue, Avg Ticket, Appointments, New Customers
-            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff", StatCard.CardColor.Primary));
-            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Info));
-            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Secondary));
+            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null,
+            "bi-currency-dollar", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff",
+            StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}",
+            $"{_summary?.Appointments.Completed ?? 0} completed", "bi-calendar-check", StatCard.CardColor.Info));
+            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people",
+            StatCard.CardColor.Secondary));
         }
         else if (_userRole == "Sales Ledger")
         {
             // Sales Ledger: Revenue, New Customers, Avg Ticket, Appointments
-            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
-            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
-            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff", StatCard.CardColor.Primary));
-            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Secondary));
+            _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null,
+            "bi-currency-dollar", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people",
+            StatCard.CardColor.Info));
+            _statCards.Add(new StatCardData("Avg Ticket", $"₱{_summary?.Kpis.AverageTicket ?? 0:N0}", null, "bi-receipt-cutoff",
+            StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null,
+            "bi-calendar-check", StatCard.CardColor.Secondary));
         }
         else if (_userRole == "Therapist")
         {
             // Therapist: Today's Appointments, Completed
-            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Primary));
-            _statCards.Add(new StatCardData("Completed", $"{_summary?.Appointments.Completed ?? 0}", null, "bi-check-circle", StatCard.CardColor.Success));
+            _statCards.Add(new StatCardData("Today's Appointments", $"{_summary?.Kpis.TotalAppointments ?? 0}", null,
+            "bi-calendar-check", StatCard.CardColor.Primary));
+            _statCards.Add(new StatCardData("Completed", $"{_summary?.Appointments.Completed ?? 0}", null, "bi-check-circle",
+            StatCard.CardColor.Success));
         }
         else
         {
             // Fallback: show whatever the user can see
             if (_canViewAccounting)
-                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null, "bi-currency-dollar", StatCard.CardColor.Success));
+                _statCards.Add(new StatCardData("Today's Revenue", $"₱{_summary?.Kpis.TotalRevenue ?? 0:N0}", null,
+                "bi-currency-dollar", StatCard.CardColor.Success));
             if (_canViewAppointments)
-                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}", null, "bi-calendar-check", StatCard.CardColor.Primary));
+                _statCards.Add(new StatCardData("Appointments Today", $"{_summary?.Kpis.TotalAppointments ?? 0}", null,
+                "bi-calendar-check", StatCard.CardColor.Primary));
             if (_canViewCustomers)
-                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people", StatCard.CardColor.Info));
+                _statCards.Add(new StatCardData("New Customers", $"{_summary?.Kpis.NewCustomers ?? 0}", null, "bi-people",
+                StatCard.CardColor.Info));
             if (_canViewInventory)
-                _statCards.Add(new StatCardData("Low Stock Items", $"{_summary?.Inventory.LowStockItems ?? 0}", null, "bi-box-seam", StatCard.CardColor.Warning));
+                _statCards.Add(new StatCardData("Low Stock Items", $"{_summary?.Inventory.LowStockItems ?? 0}", null, "bi-box-seam",
+                StatCard.CardColor.Warning));
         }
     }
 
@@ -514,14 +540,18 @@ else
         if (_userRole == "HR")
         {
             var items = new List<RoleWidgetItem>();
-            items.Add(new RoleWidgetItem("Clocked In", $"{_clockedInCount}", "bi-person-check", "#d1fae5", "#059669", "bg-success"));
+            items.Add(new RoleWidgetItem("Clocked In", $"{_clockedInCount}", "bi-person-check", "#d1fae5", "#059669",
+            "bg-success"));
             items.Add(new RoleWidgetItem("Pending Leaves", $"{_pendingLeavesCount}", "bi-calendar-event",
-                _pendingLeavesCount > 0 ? "#fef3c7" : "#d1fae5", _pendingLeavesCount > 0 ? "#d97706" : "#059669",
-                _pendingLeavesCount > 0 ? "bg-warning text-dark" : "bg-success"));
-            items.Add(new RoleWidgetItem("Completed Today", $"{_summary?.Appointments.Completed ?? 0}", "bi-check-circle", "#dbeafe", "#2563eb", "bg-primary"));
-            items.Add(new RoleWidgetItem("Occupancy Rate", $"{_summary?.Kpis.OccupancyRate ?? 0:N0}%", "bi-speedometer2", "#ede9fe", "#7c3aed", "bg-info"));
+            _pendingLeavesCount > 0 ? "#fef3c7" : "#d1fae5", _pendingLeavesCount > 0 ? "#d97706" : "#059669",
+            _pendingLeavesCount > 0 ? "bg-warning text-dark" : "bg-success"));
+            items.Add(new RoleWidgetItem("Completed Today", $"{_summary?.Appointments.Completed ?? 0}", "bi-check-circle",
+            "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Occupancy Rate", $"{_summary?.Kpis.OccupancyRate ?? 0:N0}%", "bi-speedometer2", "#ede9fe",
+            "#7c3aed", "bg-info"));
 
-            _roleWidget = new RoleWidgetData("Workforce Overview", items, "bi-people", "No workforce data available", "/time-attendance", "View Attendance");
+            _roleWidget = new RoleWidgetData("Workforce Overview", items, "bi-people", "No workforce data available",
+            "/time-attendance", "View Attendance");
         }
         else if (_userRole == "Inventory")
         {
@@ -529,11 +559,15 @@ else
             var lowStock = _summary?.Inventory.LowStockItems ?? 0;
             var outOfStock = _summary?.Inventory.OutOfStockItems ?? 0;
             var expiring = _summary?.Inventory.ExpiringItems ?? 0;
-            items.Add(new RoleWidgetItem("Low Stock", $"{lowStock}", "bi-exclamation-triangle", lowStock > 0 ? "#fef3c7" : "#d1fae5", lowStock > 0 ? "#d97706" : "#059669", lowStock > 0 ? "bg-warning text-dark" : "bg-success"));
-            items.Add(new RoleWidgetItem("Out of Stock", $"{outOfStock}", "bi-x-circle", outOfStock > 0 ? "#fecaca" : "#d1fae5", outOfStock > 0 ? "#dc2626" : "#059669", outOfStock > 0 ? "bg-danger" : "bg-success"));
-            items.Add(new RoleWidgetItem("Expiring Soon", $"{expiring}", "bi-clock-history", expiring > 0 ? "#fef3c7" : "#d1fae5", expiring > 0 ? "#d97706" : "#059669", expiring > 0 ? "bg-warning text-dark" : "bg-success"));
+            items.Add(new RoleWidgetItem("Low Stock", $"{lowStock}", "bi-exclamation-triangle", lowStock > 0 ? "#fef3c7" :
+            "#d1fae5", lowStock > 0 ? "#d97706" : "#059669", lowStock > 0 ? "bg-warning text-dark" : "bg-success"));
+            items.Add(new RoleWidgetItem("Out of Stock", $"{outOfStock}", "bi-x-circle", outOfStock > 0 ? "#fecaca" : "#d1fae5",
+            outOfStock > 0 ? "#dc2626" : "#059669", outOfStock > 0 ? "bg-danger" : "bg-success"));
+            items.Add(new RoleWidgetItem("Expiring Soon", $"{expiring}", "bi-clock-history", expiring > 0 ? "#fef3c7" : "#d1fae5",
+            expiring > 0 ? "#d97706" : "#059669", expiring > 0 ? "bg-warning text-dark" : "bg-success"));
 
-            _roleWidget = new RoleWidgetData("Inventory Alerts", items, "bi-box-seam", "All inventory levels are healthy", "/inventory", "Manage Inventory");
+            _roleWidget = new RoleWidgetData("Inventory Alerts", items, "bi-box-seam", "All inventory levels are healthy",
+            "/inventory", "Manage Inventory");
         }
         else if (_userRole == "Accountant")
         {
@@ -543,11 +577,13 @@ else
             var productRev = _summary?.Revenue.ProductRevenue ?? 0;
             var netRev = _summary?.Revenue.NetRevenue ?? 0;
             items.Add(new RoleWidgetItem("Gross Revenue", $"₱{rev:N0}", "bi-cash-stack", "#d1fae5", "#059669", "bg-success"));
-            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb",
+            "bg-primary"));
             items.Add(new RoleWidgetItem("Product Revenue", $"₱{productRev:N0}", "bi-bag", "#ede9fe", "#7c3aed", "bg-info"));
             items.Add(new RoleWidgetItem("Net Revenue", $"₱{netRev:N0}", "bi-graph-up-arrow", "#d1fae5", "#059669", "bg-success"));
 
-            _roleWidget = new RoleWidgetData("Revenue Breakdown", items, "bi-pie-chart", "No revenue data available", "/accounting", "View Accounting");
+            _roleWidget = new RoleWidgetData("Revenue Breakdown", items, "bi-pie-chart", "No revenue data available", "/accounting",
+            "View Accounting");
         }
         else if (_userRole == "Sales Ledger")
         {
@@ -556,12 +592,14 @@ else
             var productRev = _summary?.Revenue.ProductRevenue ?? 0;
             var netRev = _summary?.Revenue.NetRevenue ?? 0;
             var retention = _summary?.Kpis.CustomerRetentionRate ?? 0;
-            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb", "bg-primary"));
+            items.Add(new RoleWidgetItem("Service Revenue", $"₱{serviceRev:N0}", "bi-scissors", "#dbeafe", "#2563eb",
+            "bg-primary"));
             items.Add(new RoleWidgetItem("Product Revenue", $"₱{productRev:N0}", "bi-bag", "#ede9fe", "#7c3aed", "bg-info"));
             items.Add(new RoleWidgetItem("Net Revenue", $"₱{netRev:N0}", "bi-graph-up-arrow", "#d1fae5", "#059669", "bg-success"));
             items.Add(new RoleWidgetItem("Retention Rate", $"{retention:N0}%", "bi-arrow-repeat", "#fef3c7", "#d97706", "bg-warning text-dark"));
 
-            _roleWidget = new RoleWidgetData("Sales Overview", items, "bi-graph-up", "No sales data available", "/transactions", "View Transactions");
+            _roleWidget = new RoleWidgetData("Sales Overview", items, "bi-graph-up", "No sales data available", "/transactions",
+            "View Transactions");
         }
     }
 
@@ -596,26 +634,26 @@ else
         try
         {
             var labels = _revenueData.Select(d =>
-                _revenueView == "week" ? d.Date.ToString("ddd") : d.Date.ToString("MMM dd")).ToArray();
+            _revenueView == "week" ? d.Date.ToString("ddd") : d.Date.ToString("MMM dd")).ToArray();
             var data = _revenueData.Select(d => (double)d.Revenue).ToArray();
 
             var datasets = new[]
             {
-                new
-                {
-                    label = "Revenue (₱)",
-                    data = data,
-                    borderColor = "rgba(99, 102, 241, 1)",
-                    backgroundColor = "rgba(99, 102, 241, 0.15)",
-                    fill = true,
-                    tension = 0.4,
-                    pointRadius = 4,
-                    pointBackgroundColor = "rgba(99, 102, 241, 1)",
-                    pointBorderColor = "#fff",
-                    pointBorderWidth = 2,
-                    borderWidth = 2
-                }
-            };
+new
+{
+label = "Revenue (₱)",
+data = data,
+borderColor = "rgba(99, 102, 241, 1)",
+backgroundColor = "rgba(99, 102, 241, 0.15)",
+fill = true,
+tension = 0.4,
+pointRadius = 4,
+pointBackgroundColor = "rgba(99, 102, 241, 1)",
+pointBorderColor = "#fff",
+pointBorderWidth = 2,
+borderWidth = 2
+}
+};
 
             var options = new
             {
@@ -667,7 +705,8 @@ else
             _canCreateAppointments = isAdmin || RolePermissionService.HasPermission("appointments.create");
             _canViewCustomers = isAdmin || RolePermissionService.HasPermission("customers.view");
             _canViewInventory = isAdmin || RolePermissionService.HasPermission("inventory.view");
-            _canViewAccounting = isAdmin || RolePermissionService.HasPermission("accounting.view") || RolePermissionService.HasPermission("pos.access");
+            _canViewAccounting = isAdmin || RolePermissionService.HasPermission("accounting.view") ||
+            RolePermissionService.HasPermission("pos.access");
             _canViewServices = isAdmin || RolePermissionService.HasPermission("services.view");
             _canViewReports = isAdmin || RolePermissionService.HasPermission("reports.view");
             _canViewEmployees = isAdmin || RolePermissionService.HasPermission("employees.view");
@@ -771,9 +810,11 @@ else
         public string? LinkHref { get; set; }
         public string? LinkLabel { get; set; }
 
-        public RoleWidgetData(string title, List<RoleWidgetItem> items, string emptyIcon, string emptyMessage, string? linkHref = null, string? linkLabel = null)
+        public RoleWidgetData(string title, List<RoleWidgetItem> items, string emptyIcon, string emptyMessage, string? linkHref
+        = null, string? linkLabel = null)
         {
-            Title = title; Items = items; EmptyIcon = emptyIcon; EmptyMessage = emptyMessage; LinkHref = linkHref; LinkLabel = linkLabel;
+            Title = title; Items = items; EmptyIcon = emptyIcon; EmptyMessage = emptyMessage; LinkHref = linkHref; LinkLabel =
+            linkLabel;
         }
     }
 
@@ -787,9 +828,11 @@ else
         public string ValueBadgeClass { get; set; }
         public string? SubLabel { get; set; }
 
-        public RoleWidgetItem(string label, string value, string icon, string badgeBg, string iconColor, string valueBadgeClass, string? subLabel = null)
+        public RoleWidgetItem(string label, string value, string icon, string badgeBg, string iconColor, string valueBadgeClass,
+        string? subLabel = null)
         {
-            Label = label; Value = value; Icon = icon; BadgeBg = badgeBg; IconColor = iconColor; ValueBadgeClass = valueBadgeClass; SubLabel = subLabel;
+            Label = label; Value = value; Icon = icon; BadgeBg = badgeBg; IconColor = iconColor; ValueBadgeClass = valueBadgeClass;
+            SubLabel = subLabel;
         }
     }
 }

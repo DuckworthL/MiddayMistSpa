@@ -28,6 +28,7 @@ public interface ITimeAttendanceService
     Task<TimeOffResponse> RejectTimeOffRequestAsync(int timeOffRequestId, int rejectedByUserId, RejectTimeOffRequest request);
     Task<bool> CancelTimeOffRequestAsync(int timeOffRequestId, int cancelledByUserId);
     Task<List<TimeOffResponse>> GetPendingTimeOffRequestsAsync();
+    Task<int?> GetEmployeeIdByUserIdAsync(int userId);
 
     // ============================================================================
     // Leave Balance Management

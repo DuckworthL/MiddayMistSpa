@@ -79,6 +79,7 @@ public class SpaDbContext : DbContext
     public DbSet<TransactionServiceItem> TransactionServiceItems => Set<TransactionServiceItem>();
     public DbSet<TransactionProductItem> TransactionProductItems => Set<TransactionProductItem>();
     public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<CashDrawerSession> CashDrawerSessions => Set<CashDrawerSession>();
 
     // Accounting
     public DbSet<ChartOfAccount> ChartOfAccounts => Set<ChartOfAccount>();
@@ -134,6 +135,14 @@ public class SpaDbContext : DbContext
         modelBuilder.Entity<MiddayMistSpa.Core.Entities.Transaction.Transaction>()
             .HasIndex(e => e.TransactionNumber)
             .IsUnique();
+
+        // CashDrawerSession - configure non-conventional FK relationships
+        modelBuilder.Entity<CashDrawerSession>(entity =>
+        {
+            entity.HasKey(e => e.SessionId);
+            entity.HasOne(e => e.OpenedByUser).WithMany().HasForeignKey(e => e.OpenedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.ClosedByUser).WithMany().HasForeignKey(e => e.ClosedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
 
         // Configure decimal precision for Philippine Peso (default 18,2)
         // Skip properties that already have explicit precision set by configurations (e.g., ExchangeRate at 18,6)

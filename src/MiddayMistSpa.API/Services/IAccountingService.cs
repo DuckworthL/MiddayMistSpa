@@ -46,4 +46,7 @@ public interface IAccountingService
     Task<ExpenseSummaryResponse> GetExpenseSummaryAsync();
     Task<IncomeSummaryResponse> GetIncomeSummaryAsync();
     Task<JournalSummaryResponse> GetJournalSummaryAsync();
+
+    // Fiscal Year Close
+    Task<FiscalYearCloseResponse> PerformFiscalYearCloseAsync(int fiscalYear, int userId);
 }

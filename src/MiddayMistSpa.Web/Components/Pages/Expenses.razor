@@ -229,14 +229,14 @@
     @if (_showDetailModal && _selectedExpense != null)
     {
         <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Expense Details</h5>
                         <button type="button" class="btn-close" @onclick="() => _showDetailModal = false"></button>
                     </div>
                     <div class="modal-body">
-                        <dl class="row mb-0">
+                        <dl class="row mb-3">
                             <dt class="col-sm-4">Entry #</dt>
                             <dd class="col-sm-8">@_selectedExpense.EntryNumber</dd>
                             <dt class="col-sm-4">Date</dt>
@@ -246,14 +246,17 @@
                             <dt class="col-sm-4">Vendor</dt>
                             <dd class="col-sm-8">@(_selectedExpense.Vendor ?? "—")</dd>
                             <dt class="col-sm-4">Category</dt>
-                            <dd class="col-sm-8">@_selectedExpense.Category</dd>
-                            <dt class="col-sm-4">Amount</dt>
-                            <dd class="col-sm-8 fw-bold text-danger">₱@_selectedExpense.Amount.ToString("N2")</dd>
+                            <dd class="col-sm-8"><span class="badge @GetCategoryBadge(_selectedExpense.Category)">@_selectedExpense.Category</span></dd>
                             <dt class="col-sm-4">Status</dt>
                             <dd class="col-sm-8"><span class="badge @GetStatusBadge(_selectedExpense.Status)">@_selectedExpense.Status</span></dd>
                             <dt class="col-sm-4">Created By</dt>
                             <dd class="col-sm-8">@_selectedExpense.CreatedByName</dd>
                         </dl>
+
+                        <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                            <span class="fw-semibold fs-5">Total Amount</span>
+                            <span class="fw-bold fs-5 text-danger">₱@_selectedExpense.Amount.ToString("N2")</span>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" @onclick="() => _showDetailModal = false">Close</button>
@@ -347,6 +350,16 @@
         "Approved" or "Posted" => "bg-success",
         "Pending" or "Draft" => "bg-warning text-dark",
         "Rejected" or "Voided" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetCategoryBadge(string category) => category switch
+    {
+        "Salary Expense" => "bg-primary",
+        "Cost of Goods Sold" => "bg-info",
+        "Rent Expense" => "bg-warning text-dark",
+        "Utilities Expense" => "bg-secondary",
+        "Supplies Expense" => "bg-success",
         _ => "bg-secondary"
     };
 

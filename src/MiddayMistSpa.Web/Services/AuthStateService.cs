@@ -27,6 +27,8 @@ public class LoginResult
     public bool RequiresTwoFactor { get; set; }
     public string? TwoFactorToken { get; set; }
     public string? ErrorMessage { get; set; }
+    public int? RemainingAttempts { get; set; }
+    public DateTime? LockoutEnd { get; set; }
 }
 
 public class AuthStateService : IAuthStateService
@@ -95,7 +97,9 @@ public class AuthStateService : IAuthStateService
         return new LoginResult
         {
             Success = false,
-            ErrorMessage = response?.Message ?? errorMessage ?? "Invalid username or password"
+            ErrorMessage = response?.Message ?? errorMessage ?? "Invalid username or password",
+            RemainingAttempts = response?.RemainingAttempts,
+            LockoutEnd = response?.LockoutEnd
         };
     }
 

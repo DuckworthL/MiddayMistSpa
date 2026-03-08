@@ -109,12 +109,21 @@ public class AuthService : IAuthService
             _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
 
-            var remainingAttempts = _lockoutPolicy.MaxTotalFailedAttempts - user.AccessFailedCount;
+            // Count remaining attempts until the next lockout threshold
+            int remainingAttempts;
+            if (user.AccessFailedCount < _lockoutPolicy.MaxFailedAttempts)
+                remainingAttempts = _lockoutPolicy.MaxFailedAttempts - user.AccessFailedCount;
+            else if (user.AccessFailedCount < _lockoutPolicy.MaxTotalFailedAttempts)
+                remainingAttempts = _lockoutPolicy.MaxTotalFailedAttempts - user.AccessFailedCount;
+            else
+                remainingAttempts = 0;
+
             return new LoginResponse
             {
                 Success = false,
                 Message = "Invalid username or password",
-                RemainingAttempts = remainingAttempts > 0 ? remainingAttempts : 0
+                RemainingAttempts = remainingAttempts,
+                LockoutEnd = user.LockoutEnd
             };
         }
 

@@ -56,11 +56,11 @@
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
                 <div class="row g-3 align-items-center">
-                    <div class="col-md-4">
+                    <div class="col">
                         <SearchInput @bind-Value="_searchTerm" OnSearch="LoadProducts"
                                      Placeholder="Search products..." />
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-auto">
                         <select class="form-select" @onchange="OnCategoryFilterChange">
                             <option value="">All Categories</option>
                             @foreach (var category in _categories)
@@ -69,7 +69,7 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-auto">
                         <select class="form-select" @bind="_stockFilter" @bind:after="OnStockFilterChanged">
                             <option value="">All Stock Levels</option>
                             <option value="low">Low Stock</option>
@@ -77,14 +77,14 @@
                             <option value="ok">In Stock</option>
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-auto">
                         <select class="form-select" @onchange="OnStatusFilterChange">
                             <option value="">All Status</option>
                             <option value="true">Active</option>
                             <option value="false">Archived</option>
                         </select>
                     </div>
-                    <div class="col-auto ms-auto d-flex gap-2">
+                    <div class="col-auto d-flex gap-2">
                         <select class="form-select form-select-sm" style="width: auto;" @bind="_exportFormat">
                             <option value="PDF">PDF</option>
                             <option value="Excel">Excel</option>
@@ -262,6 +262,46 @@
                             <option value="@category.CategoryId">@category.Name</option>
                         }
                     </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Supplier</label>
+                    @if (_isAddingNewSupplier)
+                    {
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="_newSupplierName"
+                                   placeholder="Enter new supplier name..." />
+                            <button type="button" class="btn btn-success btn-sm" @onclick="SaveNewSupplier"
+                                    disabled="@_isSavingSupplier">
+                                @if (_isSavingSupplier)
+                                {
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-lg"></i>
+                                }
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelNewSupplier">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="input-group">
+                            <select class="form-select" @bind="_productForm.SupplierId">
+                                <option value="">Select Supplier...</option>
+                                @foreach (var supplier in _suppliers)
+                                {
+                                    <option value="@supplier.SupplierId">@supplier.SupplierName</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="StartAddingSupplier"
+                                    title="Add new supplier">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    }
                 </div>
                 <div class="col-12">
                     <label class="form-label">Description</label>
@@ -442,6 +482,12 @@
 @code {
     private PagedResponse<ProductResponse> _products = new();
     private List<ProductCategoryResponse> _categories = new();
+    private List<SupplierResponse> _suppliers = new();
+
+    // Inline supplier add
+    private bool _isAddingNewSupplier;
+    private bool _isSavingSupplier;
+    private string _newSupplierName = string.Empty;
     private bool _isLoading = true;
 
     // Permission flags
@@ -498,7 +544,7 @@
 
         try
         {
-            await LoadCategories();
+            await Task.WhenAll(LoadCategories(), LoadSuppliers());
             await Task.WhenAll(LoadProducts(), LoadStats());
         }
         catch (Exception ex)
@@ -538,6 +584,62 @@
     private async Task LoadCategories()
     {
         _categories = await InventoryService.GetCategoriesAsync();
+    }
+
+    private async Task LoadSuppliers()
+    {
+        _suppliers = await InventoryService.GetSuppliersAsync();
+    }
+
+    private void StartAddingSupplier()
+    {
+        _newSupplierName = string.Empty;
+        _isAddingNewSupplier = true;
+    }
+
+    private void CancelNewSupplier()
+    {
+        _isAddingNewSupplier = false;
+        _newSupplierName = string.Empty;
+    }
+
+    private async Task SaveNewSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(_newSupplierName))
+        {
+            ShowAlert("Supplier name is required.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSavingSupplier = true;
+        try
+        {
+            var result = await InventoryService.CreateSupplierAsync(new CreateSupplierRequest
+            {
+                SupplierName =
+_newSupplierName.Trim()
+            });
+            if (result != null)
+            {
+                await LoadSuppliers();
+                _productForm.SupplierId = result.SupplierId;
+                _isAddingNewSupplier = false;
+                _newSupplierName = string.Empty;
+                ShowAlert($"Supplier '{result.SupplierName}' added.", Alert.AlertType.Success);
+            }
+            else
+            {
+                ShowAlert("Failed to create supplier.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isSavingSupplier = false;
+        }
     }
 
     private async Task LoadProducts()
@@ -636,6 +738,7 @@
             Brand = product.Brand,
             Description = product.Description,
             CategoryId = product.ProductCategoryId,
+            SupplierId = product.SupplierId,
             UnitCost = product.UnitCost,
             RetailPrice = product.RetailPrice,
             ReorderLevel = product.ReorderLevel,
@@ -671,6 +774,7 @@
                     Brand = _productForm.Brand,
                     Description = _productForm.Description,
                     CategoryId = _productForm.CategoryId,
+                    SupplierId = _productForm.SupplierId,
                     UnitCost = _productForm.UnitCost,
                     RetailPrice = _productForm.RetailPrice,
                     ReorderLevel = _productForm.ReorderLevel,

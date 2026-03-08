@@ -7,12 +7,50 @@
 @inject ICurrencyApiService CurrencyService
 @inject IRolePermissionService RolePermissionService
 @inject IAuthStateService AuthService
+@inject ICashDrawerApiService CashDrawerService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
 <PageTitle>POS - MiddayMist Spa</PageTitle>
 
 <AuthorizedPage OnAuthReady="LoadData">
+    @* Cash Drawer Status Bar *@
+    <div class="d-flex align-items-center justify-content-between px-3 py-2 mb-2 rounded border bg-light">
+        @if (_drawerSession != null && _drawerSession.Status == "Open")
+        {
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <span class="badge bg-success"><i class="bi bi-unlock me-1"></i>Drawer Open</span>
+                <small class="text-muted">Opened by @_drawerSession.OpenedByName at @_drawerSession.OpenedAt.ToString("hh:mm tt")</small>
+                <small><strong>Float:</strong> ₱@_drawerSession.StartingFloat.ToString("N2")</small>
+                <small><strong>Cash In:</strong> ₱@_drawerSession.TotalCashIn.ToString("N2")</small>
+                <small><strong>Expected:</strong> ₱@_drawerSession.ExpectedCash.ToString("N2")</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-info btn-sm" @onclick="ShowDrawerHistory">
+                    <i class="bi bi-clock-history me-1"></i>History
+                </button>
+                <button class="btn btn-outline-danger btn-sm" @onclick="ShowCloseDrawerModal">
+                    <i class="bi bi-lock me-1"></i>Close Drawer
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary"><i class="bi bi-lock me-1"></i>Drawer Closed</span>
+                <small class="text-muted">Open the cash drawer to start accepting cash payments</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-info btn-sm" @onclick="ShowDrawerHistory">
+                    <i class="bi bi-clock-history me-1"></i>History
+                </button>
+                <button class="btn btn-success btn-sm" @onclick="ShowOpenDrawerModal">
+                    <i class="bi bi-unlock me-1"></i>Open Drawer
+                </button>
+            </div>
+        }
+    </div>
+
     <div class="pos-container">
         @* Left Panel - Appointments & Products *@
         <div class="pos-products">
@@ -113,408 +151,617 @@
             else
                             {
                                 @* Products Panel *@
-                                <div class="pos-search mb-3">
+                                <div class="pos-search mb-3" style="position: relative;">
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                        <input type="text" class="form-control" placeholder="Search products..." @bind="_searchTerm"
-                                               @bind:event="oninput" />
+                                        <input type="text" class="form-control" placeholder="Search products by name..." @bind="_searchTerm"
+                                               @bind:event="oninput" @onfocus="() => _showProductDropdown = true" />
+                                        @if (!string.IsNullOrWhiteSpace(_searchTerm))
+                                        {
+                                            <button class="btn btn-outline-secondary" type="button"
+                                                    @onclick="() => { _searchTerm = string.Empty; _showProductDropdown = false; }">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        }
                                     </div>
-                                </div>
-
-                                <div class="pos-categories mb-3">
-                                    <button class="btn btn-sm @(_selectedCategory == null ? "btn-secondary" : "btn-outline-secondary")"
-                                            @onclick="() => _selectedCategory = null">
-                                        All
-                                    </button>
-                                    @foreach (var cat in GetProductCategories())
+                                    @if (_showProductDropdown && !string.IsNullOrWhiteSpace(_searchTerm))
                                     {
-                                        <button class="btn btn-sm @(_selectedCategory == cat ? "btn-secondary" : "btn-outline-secondary")"
-                                                @onclick="() => _selectedCategory = cat">
-                                            @cat
-                                        </button>
-                                    }
-                                </div>
-
-                                <div class="pos-items-grid">
-                                    @foreach (var product in GetFilteredProducts())
-                                    {
-                                        <div class="pos-item @(product.QuantityInStock <= 0 ? "out-of-stock" : "")"
-                                             @onclick="() => AddProductToCart(product)">
-                                            <div class="pos-item-name">@product.Name</div>
-                                            <div class="pos-item-price">₱@((product.SellingPrice ?? product.CostPrice).ToString("N0"))</div>
-                                            @if (_selectedCurrency != "PHP")
-                                            {
-                                                <div class="pos-item-converted">@ConvertDisplay(product.SellingPrice ?? product.CostPrice)</div>
-                                            }
-                                            <div class="pos-item-stock">
-                                                @if (product.QuantityInStock <= 0)
+                                        var matches = GetFilteredProducts().Take(8).ToList();
+                                        @if (matches.Any())
+                                        {
+                                            <div class="list-group shadow-sm"
+                                                 style="position: absolute; z-index: 100; width: 100%; max-height: 280px; overflow-y: auto; top: 100%;">
+                                                @foreach (var product in matches)
                                                 {
-                                                    <span class="text-danger">Out of stock</span>
-                                                }
-                                                else
-                                                {
-                                                    <span>@product.QuantityInStock in stock</span>
-                                                }
-                                            </div>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-
-                        @* Right Panel - Cart & Checkout *@
-                        <div class="pos-cart">
-                            <div class="cart-header">
-                                <h4 class="mb-0">Current Sale</h4>
-                                @if (_cartItems.Any() || _selectedAppointment != null)
-                                {
-                                    <button class="btn btn-outline-danger btn-sm" @onclick="ClearCart">
-                                        <i class="bi bi-trash me-1"></i>Clear
-                                    </button>
-                                }
-                            </div>
-
-                            @* Customer Selection *@
-                            <div class="customer-section mb-3">
-                                @if (_selectedCustomer == null)
-                                {
-                                    <div class="input-group">
-                                        <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                        <input type="text" class="form-control" placeholder="Search customer..." value="@_customerSearch"
-                                               @oninput="OnCustomerSearchInput" @onfocus="OnCustomerFocus" />
-                                    </div>
-                                    @if (_showCustomerDropdown && _filteredCustomers.Any())
-                                    {
-                                        <div class="customer-dropdown">
-                                            @foreach (var customer in _filteredCustomers.Take(5))
-                                            {
-                                                <div class="customer-option" @onclick="() => SelectCustomer(customer)">
-                                                    <strong>@customer.FullName</strong>
-                                                    <span class="text-muted">@customer.PhoneNumber</span>
-                                                </div>
-                                            }
-                                        </div>
-                                    }
-                                }
-                                else
-                                {
-                                    <div class="selected-customer">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="customer-avatar">
-                                                <i class="bi bi-person-fill"></i>
-                                            </div>
-                                            <div>
-                                                <strong>@_selectedCustomer.FullName</strong>
-                                                <div class="small text-muted">@_selectedCustomer.PhoneNumber</div>
-                                                <div class="small">
-                                                    <span class="badge bg-warning text-dark me-1">@_selectedCustomer.MembershipType</span>
-                                                    <i class="bi bi-gem text-warning me-1" style="font-size:0.75rem"></i>
-                                                    <span class="fw-semibold">@_selectedCustomer.LoyaltyPoints pts</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button class="btn btn-link text-danger btn-sm" @onclick="ClearCustomer">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
-                                    </div>
-
-                                    @* Use Loyalty Points *@
-                                    @if (_selectedCustomer.LoyaltyPoints > 0 && _cartItems.Any())
-                                    {
-                                        <div class="mt-2">
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text"><i class="bi bi-gem me-1"></i>Redeem pts</span>
-                                                <input type="number" class="form-control" placeholder="0" value="@_pointsToRedeem"
-                                                       @oninput="e => { if (int.TryParse(e.Value?.ToString(), out int v)) _pointsToRedeem = Math.Min(Math.Max(0, v), _selectedCustomer.LoyaltyPoints); }"
-                                                       min="0" max="@_selectedCustomer.LoyaltyPoints" step="1" />
-                                                <span class="input-group-text text-success">-₱@_pointsToRedeem</span>
-                                            </div>
-                                            <div class="form-text">1 pt = ₱1 &nbsp;|&nbsp; Max: @_selectedCustomer.LoyaltyPoints pts</div>
-                                        </div>
-                                    }
-                                }
-                            </div>
-
-                            @* Cart Items *@
-                            <div class="cart-items">
-                                @if (!_cartItems.Any())
-                                {
-                                    <div class="empty-cart">
-                                        <p class="mb-1">No items yet</p>
-                                        <small class="text-muted">Select an appointment or add products</small>
-                                    </div>
-                                }
-                                else
-                                {
-                                    @* Service items from appointment *@
-                                    @foreach (var item in _cartItems.Where(c => c.Type == "Service"))
-                                    {
-                                        <div class="cart-item cart-item-service">
-                                            <div class="cart-item-row-top">
-                                                <span class="cart-item-name" title="@item.Name">
-                                                    <i class="bi bi-gem text-primary" style="font-size:0.7rem"></i> @item.Name
-                                                </span>
-                                                <div class="cart-item-qty">
-                                                    <button class="btn btn-sm btn-outline-secondary"
-                                                            @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
-                                                    <span>@item.Quantity</span>
-                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
-                                                        class="bi bi-plus"></i></button>
+                                                    <button type="button"
+                                                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2 @(product.QuantityInStock <= 0 ? "disabled text-muted" : "")"
+                                                            @onclick="() => { AddProductToCart(product); _showProductDropdown = false; }"
+                                                            disabled="@(product.QuantityInStock <= 0)">
+                                                        <div>
+                                                            <div class="fw-medium">@product.ProductName</div>
+                                                            <small class="text-muted">@(product.CategoryName ?? "Uncategorized") &middot;
+                                                                @product.QuantityInStock in stock</small>
+                                                            </div>
+                                                            <span class="fw-semibold text-primary">₱@((product.SellingPrice ??
+                                                                                            product.CostPrice).ToString("N0"))</span>
+                                                            </button>
+                                                        }
                                                     </div>
-                                                </div>
-                                                <div class="cart-item-row-bottom">
-                                                    <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
+                                                }
+                                            }
+                                        </div>
+
+                                        <div class="pos-categories mb-3">
+                                            <button class="btn btn-sm @(_selectedCategory == null ? "btn-secondary" : "btn-outline-secondary")"
+                                                    @onclick="() => _selectedCategory = null">
+                                                All
+                                            </button>
+                                            @foreach (var cat in GetProductCategories())
+                                            {
+                                                <button class="btn btn-sm @(_selectedCategory == cat ? "btn-secondary" : "btn-outline-secondary")"
+                                                        @onclick="() => _selectedCategory = cat">
+                                                    @cat
+                                                </button>
+                                            }
+                                        </div>
+
+                                        <div class="pos-items-grid">
+                                            @foreach (var product in GetFilteredProducts())
+                                            {
+                                                <div class="pos-item @(product.QuantityInStock <= 0 ? "out-of-stock" : "")"
+                                                     @onclick="() => AddProductToCart(product)">
+                                                    <div class="pos-item-name">@product.Name</div>
+                                                    <div class="pos-item-price">₱@((product.SellingPrice ?? product.CostPrice).ToString("N0"))</div>
                                                     @if (_selectedCurrency != "PHP")
                                                     {
-                                                        <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
+                                                        <div class="pos-item-converted">@ConvertDisplay(product.SellingPrice ?? product.CostPrice)</div>
                                                     }
-                                                </div>
-                                            </div>
-                                        }
-
-                                        @* Product items *@
-                                        @foreach (var item in _cartItems.Where(c => c.Type == "Product"))
-                                        {
-                                            <div class="cart-item">
-                                                <div class="cart-item-row-top">
-                                                    <span class="cart-item-name" title="@item.Name">
-                                                        <i class="bi bi-box text-secondary" style="font-size:0.7rem"></i> @item.Name
-                                                    </span>
-                                                    <div class="cart-item-qty">
-                                                        <button class="btn btn-sm btn-outline-secondary"
-                                                                @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
-                                                        <span>@item.Quantity</span>
-                                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
-                                                            class="bi bi-plus"></i></button>
-                                                        </div>
-                                                    </div>
-                                                    <div class="cart-item-row-bottom">
-                                                        <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
-                                                        @if (_selectedCurrency != "PHP")
+                                                    <div class="pos-item-stock">
+                                                        @if (product.QuantityInStock <= 0)
                                                         {
-                                                            <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
+                                                            <span class="text-danger">Out of stock</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@product.QuantityInStock in stock</span>
                                                         }
                                                     </div>
                                                 </div>
                                             }
-                                        }
-                                    </div>
-
-                                    @* Discount Section *@
-                                    @if (_cartItems.Any())
-                                    {
-                                        <div class="discount-section">
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text"><i class="bi bi-percent"></i></span>
-                                                <input type="number" class="form-control" placeholder="Discount %" @bind="_discountPercent" min="0"
-                                                       max="100" />
-                                                <button class="btn btn-outline-secondary" type="button" @onclick="ApplyDiscount">Apply</button>
-                                            </div>
                                         </div>
                                     }
+                                </div>
 
-                                    @* Cart Summary *@
-                                    <div class="cart-summary">
-                                        <div class="summary-row">
-                                            <span>Subtotal</span>
-                                            <span>₱ @Subtotal.ToString("N2")</span>
-                                        </div>
-                                        <div class="summary-row">
-                                            <span>Discount (@_discountPercent%)</span>
-                                            <span class="text-danger">-₱ @DiscountAmount.ToString("N2")</span>
-                                        </div>
-                                        @if (PointsDiscount > 0)
+                                @* Right Panel - Cart & Checkout *@
+                                <div class="pos-cart">
+                                    <div class="cart-header">
+                                        <h4 class="mb-0">Current Sale</h4>
+                                        @if (_cartItems.Any() || _selectedAppointment != null)
                                         {
-                                            <div class="summary-row">
-                                                <span><i class="bi bi-gem me-1"></i>Points (@_pointsToRedeem pts)</span>
-                                                <span class="text-danger">-₱ @PointsDiscount.ToString("N2")</span>
-                                            </div>
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="ClearCart">
+                                                <i class="bi bi-trash me-1"></i>Clear
+                                            </button>
                                         }
-                                        <div class="summary-row">
-                                            <span>VAT (12%)</span>
-                                            <span>₱ @TaxAmount.ToString("N2")</span>
-                                        </div>
-                                        <div class="summary-row total">
-                                            <span>Total</span>
-                                            <span>
-                                                ₱ @GrandTotal.ToString("N2")
-                                                @if (_selectedCurrency != "PHP" && _exchangeRate > 0)
-                                                {
-                                                    <small class="d-block text-muted fw-normal"
-                                                           style="font-size: 0.7em;">@ConvertDisplay(GrandTotal)</small>
-                                                }
-                                            </span>
-                                        </div>
                                     </div>
 
-                                    @* Currency Selector *@
-                                    <div class="currency-section">
-                                        <div class="currency-selector-inline">
-                                            <i class="bi bi-currency-exchange me-2 text-muted"></i>
-                                            <label class="form-label mb-0 me-2 small text-muted">Display Currency</label>
-                                            <select class="form-select form-select-sm currency-select-inline" value="@_selectedCurrency"
-                                                    @onchange="OnCurrencyChanged">
-                                                <option value="PHP">PHP ₱</option>
-                                                @foreach (var c in _supportedCurrencies.Where(c => c.Code != "PHP"))
-                                                {
-                                                    <option value="@c.Code">@c.Code @c.Symbol</option>
-                                                }
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    @* Payment Methods *@
-                                    <div class="payment-section">
-                                        <label class="form-label">Payment Method</label>
-                                        <div class="payment-methods">
-                                            <button class="payment-method @(_paymentMethod == "Cash" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "Cash"'>
-                                                <i class="bi bi-cash-coin"></i>
-                                                <span>Cash</span>
-                                            </button>
-                                            <button class="payment-method @(_paymentMethod == "Card" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "Card"'>
-                                                <i class="bi bi-credit-card"></i>
-                                                <span>Card</span>
-                                            </button>
-                                            <button class="payment-method @(_paymentMethod == "GCash" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "GCash"'>
-                                                <i class="bi bi-phone"></i>
-                                                <span>GCash</span>
-                                            </button>
-                                            <button class="payment-method @(_paymentMethod == "Bank Transfer" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "Bank Transfer"'>
-                                                <i class="bi bi-bank"></i>
-                                                <span>Bank Transfer</span>
-                                            </button>
-                                            <button class="payment-method @(_paymentMethod == "Maya" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "Maya"'>
-                                                <i class="bi bi-phone"></i>
-                                                <span>Maya</span>
-                                            </button>
-                                            <button class="payment-method @(_paymentMethod == "Split" ? "active" : "")"
-                                                    @onclick='() => _paymentMethod = "Split"'>
-                                                <i class="bi bi-pie-chart"></i>
-                                                <span>Split</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    @* Cash Tendered (for cash payments) *@
-                                    @if (_paymentMethod == "Cash")
-                                    {
-                                        <div class="cash-section">
-                                            <label class="form-label">Cash Tendered</label>
+                                    @* Customer Selection *@
+                                    <div class="customer-section mb-3">
+                                        @if (_selectedCustomer == null)
+                                        {
                                             <div class="input-group">
-                                                <span class="input-group-text">₱</span>
-                                                <input type="number" class="form-control form-control-lg" @bind="_cashTendered" />
+                                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                                <input type="text" class="form-control" placeholder="Search customer..." value="@_customerSearch"
+                                                       @oninput="OnCustomerSearchInput" @onfocus="OnCustomerFocus" />
                                             </div>
-                                            @if (_cashTendered > 0 && _cashTendered >= GrandTotal)
+                                            @if (_showCustomerDropdown && _filteredCustomers.Any())
                                             {
-                                                <div class="change-display">
-                                                    <span>Change:</span>
-                                                    <strong>₱@((_cashTendered - GrandTotal).ToString("N0"))</strong>
+                                                <div class="customer-dropdown">
+                                                    @foreach (var customer in _filteredCustomers.Take(5))
+                                                    {
+                                                        <div class="customer-option" @onclick="() => SelectCustomer(customer)">
+                                                            <strong>@customer.FullName</strong>
+                                                            <span class="text-muted">@customer.PhoneNumber</span>
+                                                        </div>
+                                                    }
                                                 </div>
                                             }
-                                            <div class="quick-cash">
-                                                @foreach (var amount in new[] { 100, 500, 1000, 2000, 5000 })
-                                                {
-                                                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => _cashTendered = amount">
-                                                        ₱@amount
-                                                    </button>
-                                                }
-                                                <button class="btn btn-outline-primary btn-sm" @onclick="() => _cashTendered = GrandTotal">
-                                                    Exact
-                                                </button>
-                                            </div>
-                                        </div>
-                                    }
-
-                                    @* Error Message *@
-                                    @if (!string.IsNullOrEmpty(_errorMessage))
-                                    {
-                                        <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
-                                            <i class="bi bi-exclamation-triangle me-1"></i> @_errorMessage
-                                            <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
-                                        </div>
-                                    }
-
-                                    @* Checkout Button *@
-                                    <button class="btn btn-success btn-lg w-100 checkout-btn" disabled="@(!CanCheckout)"
-                                            @onclick="ProcessCheckout">
-                                        @if (_isProcessing)
-                                        {
-                                            <span class="spinner-border spinner-border-sm me-2"></span>
-                                            <span>Processing...</span>
                                         }
                                         else
                                         {
-                                            <i class="bi bi-check-circle me-2"></i>
-                                            <span>Complete Sale - ₱@GrandTotal.ToString("N0")
-                                                @if (_selectedCurrency != "PHP")
-                                                {
-                                                    <small class="ms-1">(@ConvertDisplay(GrandTotal))</small>
-                                                }
-                                            </span>
-                                        }
-                                    </button>
-                                </div>
-                            </div>
-
-                            @* Success Modal *@
-                            @if (_showSuccessModal)
-                            {
-                                <div class="modal-backdrop fade show"></div>
-                                <div class="modal fade show d-block" tabindex="-1">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content">
-                                            <div class="modal-body text-center py-5">
-                                                <div class="success-icon mb-4">
-                                                    <i class="bi bi-check-circle-fill"></i>
+                                            <div class="selected-customer">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="customer-avatar">
+                                                        <i class="bi bi-person-fill"></i>
+                                                    </div>
+                                                    <div>
+                                                        <strong>@_selectedCustomer.FullName</strong>
+                                                        <div class="small text-muted">@_selectedCustomer.PhoneNumber</div>
+                                                        <div class="small">
+                                                            <span class="badge bg-warning text-dark me-1">@_selectedCustomer.MembershipType</span>
+                                                            <i class="bi bi-gem text-warning me-1" style="font-size:0.75rem"></i>
+                                                            <span class="fw-semibold">@_selectedCustomer.LoyaltyPoints pts</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <h3 class="text-success mb-2">Payment Successful!</h3>
-                                                <p class="text-muted mb-4">Transaction completed successfully</p>
-                                                <div class="receipt-summary">
-                                                    <div class="d-flex justify-content-between mb-2">
-                                                        <span>Total Paid:</span>
-                                                        <strong>₱@(_lastPaymentMethod == "Cash" ? _lastCashTendered.ToString("N0") :
-                                                                                            _lastGrandTotal.ToString("N0"))</strong>
-                                                        </div>
-                                                        @if (_lastTransaction?.ClientCurrency != null && _lastTransaction.ClientCurrency != "PHP" &&
-                                                                                _lastTransaction.TotalInClientCurrency.HasValue)
-                                                        {
-                                                            <div class="d-flex justify-content-between mb-2">
-                                                                <span>In @_lastTransaction.ClientCurrency:</span>
-                                                                <strong>@CurrencyDisplay.GetCurrencySymbol(_lastTransaction.ClientCurrency)@_lastTransaction.TotalInClientCurrency?.ToString("N2")</strong>
+                                                <button class="btn btn-link text-danger btn-sm" @onclick="ClearCustomer">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </div>
+
+                                            @* Use Loyalty Points *@
+                                            @if (_selectedCustomer.LoyaltyPoints > 0 && _cartItems.Any())
+                                            {
+                                                <div class="mt-2">
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text"><i class="bi bi-gem me-1"></i>Redeem pts</span>
+                                                        <input type="number" class="form-control" placeholder="0" value="@_pointsToRedeem"
+                                                               @oninput="e => { if (int.TryParse(e.Value?.ToString(), out int v)) _pointsToRedeem = Math.Min(Math.Max(0, v), _selectedCustomer.LoyaltyPoints); }"
+                                                               min="0" max="@_selectedCustomer.LoyaltyPoints" step="1" />
+                                                        <span class="input-group-text text-success">-₱@_pointsToRedeem</span>
+                                                    </div>
+                                                    <div class="form-text">1 pt = ₱1 &nbsp;|&nbsp; Max: @_selectedCustomer.LoyaltyPoints pts</div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+
+                                    @* Cart Items *@
+                                    <div class="cart-items">
+                                        @if (!_cartItems.Any())
+                                        {
+                                            <div class="empty-cart">
+                                                <p class="mb-1">No items yet</p>
+                                                <small class="text-muted">Select an appointment or add products</small>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            @* Service items from appointment *@
+                                            @foreach (var item in _cartItems.Where(c => c.Type == "Service"))
+                                            {
+                                                <div class="cart-item cart-item-service">
+                                                    <div class="cart-item-row-top">
+                                                        <span class="cart-item-name" title="@item.Name">
+                                                            <i class="bi bi-gem text-primary" style="font-size:0.7rem"></i> @item.Name
+                                                        </span>
+                                                        <div class="cart-item-qty">
+                                                            <button class="btn btn-sm btn-outline-secondary"
+                                                                    @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
+                                                            <span>@item.Quantity</span>
+                                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
+                                                                class="bi bi-plus"></i></button>
                                                             </div>
-                                                        }
-                                                        @if (_lastPaymentMethod == "Cash" && _lastCashTendered > _lastGrandTotal)
-                                                        {
-                                                            <div class="d-flex justify-content-between mb-2">
-                                                                <span>Change:</span>
-                                                                <strong class="text-success">₱@((_lastCashTendered -
-                                                                                                    _lastGrandTotal).ToString("N0"))</strong>
-                                                                </div>
+                                                        </div>
+                                                        <div class="cart-item-row-bottom">
+                                                            <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
+                                                            @if (_selectedCurrency != "PHP")
+                                                            {
+                                                                <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
                                                             }
-                                                            <div class="d-flex justify-content-between">
-                                                                <span>Receipt #:</span>
-                                                                <strong>@_lastTransaction?.TransactionNumber</strong>
+                                                        </div>
+                                                    </div>
+                                                }
+
+                                                @* Product items *@
+                                                @foreach (var item in _cartItems.Where(c => c.Type == "Product"))
+                                                {
+                                                    <div class="cart-item">
+                                                        <div class="cart-item-row-top">
+                                                            <span class="cart-item-name" title="@item.Name">
+                                                                <i class="bi bi-box text-secondary" style="font-size:0.7rem"></i> @item.Name
+                                                            </span>
+                                                            <div class="cart-item-qty">
+                                                                <button class="btn btn-sm btn-outline-secondary"
+                                                                        @onclick="() => UpdateQuantity(item, -1)"><i class="bi bi-dash"></i></button>
+                                                                <span>@item.Quantity</span>
+                                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateQuantity(item, 1)"><i
+                                                                    class="bi bi-plus"></i></button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="cart-item-row-bottom">
+                                                                <span class="cart-item-price">₱ @item.Total.ToString("N2")</span>
+                                                                @if (_selectedCurrency != "PHP")
+                                                                {
+                                                                    <span class="cart-item-converted">@ConvertDisplay(item.Total)</span>
+                                                                }
                                                             </div>
                                                         </div>
-                                                        <div class="d-flex gap-2 justify-content-center mt-4">
-                                                            <button class="btn btn-outline-primary" @onclick="PrintReceipt">
-                                                                <i class="bi bi-printer me-1"></i> Print Receipt
+                                                    }
+                                                }
+                                            </div>
+
+                                            @* Discount Section *@
+                                            @if (_cartItems.Any())
+                                            {
+                                                <div class="discount-section">
+                                                    <div class="input-group input-group-sm">
+                                                        <span class="input-group-text"><i class="bi bi-percent"></i></span>
+                                                        <input type="number" class="form-control" placeholder="Discount %" @bind="_discountPercent" min="0"
+                                                               max="100" />
+                                                        <button class="btn btn-outline-secondary" type="button" @onclick="ApplyDiscount">Apply</button>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            @* Cart Summary *@
+                                            <div class="cart-summary">
+                                                <div class="summary-row">
+                                                    <span>Subtotal</span>
+                                                    <span>₱ @Subtotal.ToString("N2")</span>
+                                                </div>
+                                                <div class="summary-row">
+                                                    <span>Discount (@_discountPercent%)</span>
+                                                    <span class="text-danger">-₱ @DiscountAmount.ToString("N2")</span>
+                                                </div>
+                                                @if (PointsDiscount > 0)
+                                                {
+                                                    <div class="summary-row">
+                                                        <span><i class="bi bi-gem me-1"></i>Points (@_pointsToRedeem pts)</span>
+                                                        <span class="text-danger">-₱ @PointsDiscount.ToString("N2")</span>
+                                                    </div>
+                                                }
+                                                <div class="summary-row">
+                                                    <span>VAT (12%)</span>
+                                                    <span>₱ @TaxAmount.ToString("N2")</span>
+                                                </div>
+                                                <div class="summary-row total">
+                                                    <span>Total</span>
+                                                    <span>
+                                                        ₱ @GrandTotal.ToString("N2")
+                                                        @if (_selectedCurrency != "PHP" && _exchangeRate > 0)
+                                                        {
+                                                            <small class="d-block text-muted fw-normal"
+                                                                   style="font-size: 0.7em;">@ConvertDisplay(GrandTotal)</small>
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            @* Currency Selector *@
+                                            <div class="currency-section">
+                                                <div class="currency-selector-inline">
+                                                    <i class="bi bi-currency-exchange me-2 text-muted"></i>
+                                                    <label class="form-label mb-0 me-2 small text-muted">Display Currency</label>
+                                                    <select class="form-select form-select-sm currency-select-inline" value="@_selectedCurrency"
+                                                            @onchange="OnCurrencyChanged">
+                                                        <option value="PHP">PHP ₱</option>
+                                                        @foreach (var c in _supportedCurrencies.Where(c => c.Code != "PHP"))
+                                                        {
+                                                            <option value="@c.Code">@c.Code @c.Symbol</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            @* Payment Methods *@
+                                            <div class="payment-section">
+                                                <label class="form-label">Payment Method</label>
+                                                <div class="payment-methods">
+                                                    <button class="payment-method @(_paymentMethod == "Cash" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "Cash"'>
+                                                        <i class="bi bi-cash-coin"></i>
+                                                        <span>Cash</span>
+                                                    </button>
+                                                    <button class="payment-method @(_paymentMethod == "Card" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "Card"'>
+                                                        <i class="bi bi-credit-card"></i>
+                                                        <span>Card</span>
+                                                    </button>
+                                                    <button class="payment-method @(_paymentMethod == "GCash" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "GCash"'>
+                                                        <i class="bi bi-phone"></i>
+                                                        <span>GCash</span>
+                                                    </button>
+                                                    <button class="payment-method @(_paymentMethod == "Bank Transfer" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "Bank Transfer"'>
+                                                        <i class="bi bi-bank"></i>
+                                                        <span>Bank Transfer</span>
+                                                    </button>
+                                                    <button class="payment-method @(_paymentMethod == "Maya" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "Maya"'>
+                                                        <i class="bi bi-phone"></i>
+                                                        <span>Maya</span>
+                                                    </button>
+                                                    <button class="payment-method @(_paymentMethod == "Split" ? "active" : "")"
+                                                            @onclick='() => _paymentMethod = "Split"'>
+                                                        <i class="bi bi-pie-chart"></i>
+                                                        <span>Split</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            @* Cash Tendered (for cash payments) *@
+                                            @if (_paymentMethod == "Cash")
+                                            {
+                                                <div class="cash-section">
+                                                    <label class="form-label">Cash Tendered</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text">₱</span>
+                                                        <input type="number" class="form-control form-control-lg" @bind="_cashTendered" />
+                                                    </div>
+                                                    @if (_cashTendered > 0 && _cashTendered >= GrandTotal)
+                                                    {
+                                                        <div class="change-display">
+                                                            <span>Change:</span>
+                                                            <strong>₱@((_cashTendered - GrandTotal).ToString("N0"))</strong>
+                                                        </div>
+                                                    }
+                                                    <div class="quick-cash">
+                                                        @foreach (var amount in new[] { 100, 500, 1000, 2000, 5000 })
+                                                        {
+                                                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => _cashTendered = amount">
+                                                                ₱@amount
                                                             </button>
-                                                            <button class="btn btn-primary" @onclick="StartNewSale">
-                                                                <i class="bi bi-plus me-1"></i> New Sale
+                                                        }
+                                                        <button class="btn btn-outline-primary btn-sm" @onclick="() => _cashTendered = GrandTotal">
+                                                            Exact
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            @* Error Message *@
+                                            @if (!string.IsNullOrEmpty(_errorMessage))
+                                            {
+                                                <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i> @_errorMessage
+                                                    <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+                                                </div>
+                                            }
+
+                                            @* Checkout Button *@
+                                            <button class="btn btn-success btn-lg w-100 checkout-btn" disabled="@(!CanCheckout)"
+                                                    @onclick="ProcessCheckout">
+                                                @if (_isProcessing)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                                    <span>Processing...</span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-check-circle me-2"></i>
+                                                    <span>Complete Sale - ₱@GrandTotal.ToString("N0")
+                                                        @if (_selectedCurrency != "PHP")
+                                                        {
+                                                            <small class="ms-1">(@ConvertDisplay(GrandTotal))</small>
+                                                        }
+                                                    </span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    @* Success Modal *@
+                                    @if (_showSuccessModal)
+                                    {
+                                        <div class="modal-backdrop fade show"></div>
+                                        <div class="modal fade show d-block" tabindex="-1">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content">
+                                                    <div class="modal-body text-center py-5">
+                                                        <div class="success-icon mb-4">
+                                                            <i class="bi bi-check-circle-fill"></i>
+                                                        </div>
+                                                        <h3 class="text-success mb-2">Payment Successful!</h3>
+                                                        <p class="text-muted mb-4">Transaction completed successfully</p>
+                                                        <div class="receipt-summary">
+                                                            <div class="d-flex justify-content-between mb-2">
+                                                                <span>Total Paid:</span>
+                                                                <strong>₱@(_lastPaymentMethod == "Cash" ? _lastCashTendered.ToString("N0") :
+                                                                                                    _lastGrandTotal.ToString("N0"))</strong>
+                                                                </div>
+                                                                @if (_lastTransaction?.ClientCurrency != null && _lastTransaction.ClientCurrency != "PHP" &&
+                                                                                        _lastTransaction.TotalInClientCurrency.HasValue)
+                                                                {
+                                                                    <div class="d-flex justify-content-between mb-2">
+                                                                        <span>In @_lastTransaction.ClientCurrency:</span>
+                                                                        <strong>@CurrencyDisplay.GetCurrencySymbol(_lastTransaction.ClientCurrency)@_lastTransaction.TotalInClientCurrency?.ToString("N2")</strong>
+                                                                    </div>
+                                                                }
+                                                                @if (_lastPaymentMethod == "Cash" && _lastCashTendered > _lastGrandTotal)
+                                                                {
+                                                                    <div class="d-flex justify-content-between mb-2">
+                                                                        <span>Change:</span>
+                                                                        <strong class="text-success">₱@((_lastCashTendered -
+                                                                                                            _lastGrandTotal).ToString("N0"))</strong>
+                                                                        </div>
+                                                                    }
+                                                                    <div class="d-flex justify-content-between">
+                                                                        <span>Receipt #:</span>
+                                                                        <strong>@_lastTransaction?.TransactionNumber</strong>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="d-flex gap-2 justify-content-center mt-4">
+                                                                    <button class="btn btn-outline-primary" @onclick="PrintReceipt">
+                                                                        <i class="bi bi-printer me-1"></i> Print Receipt
+                                                                    </button>
+                                                                    <button class="btn btn-primary" @onclick="StartNewSale">
+                                                                        <i class="bi bi-plus me-1"></i> New Sale
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </AuthorizedPage>
+
+                                        @* Cash Drawer Modals (outside grid) *@
+                                        @if (_showOpenDrawerModal)
+                                        {
+                                            <div class="modal-backdrop fade show" style="z-index:1050"></div>
+                                            <div class="modal fade show d-block" tabindex="-1" style="z-index:1055">
+                                                <div class="modal-dialog modal-dialog-centered modal-sm">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title"><i class="bi bi-unlock me-2"></i>Open Cash Drawer</h5>
+                                                            <button type="button" class="btn-close" @onclick="() => _showOpenDrawerModal = false"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold">Starting Float (₱)</label>
+                                                                <input type="number" class="form-control" @bind="_drawerFloat" min="0" step="100" />
+                                                                <div class="form-text">Cash amount in the drawer at start of shift</div>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Notes (optional)</label>
+                                                                <input type="text" class="form-control" @bind="_drawerNotes" placeholder="e.g. Morning shift" />
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(_drawerError))
+                                                            {
+                                                                <div class="alert alert-danger py-2">@_drawerError</div>
+                                                            }
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button class="btn btn-secondary" @onclick="() => _showOpenDrawerModal = false">Cancel</button>
+                                                            <button class="btn btn-success" @onclick="OpenDrawer" disabled="@_drawerProcessing">
+                                                                @if (_drawerProcessing)
+                                                                {
+                                                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                                                }
+                                                                Open Drawer
                                                             </button>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    }
-                                </AuthorizedPage>
+                                        }
+
+                                        @if (_showCloseDrawerModal)
+                                        {
+                                            <div class="modal-backdrop fade show" style="z-index:1050"></div>
+                                            <div class="modal fade show d-block" tabindex="-1" style="z-index:1055">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title"><i class="bi bi-lock me-2"></i>Close Cash Drawer</h5>
+                                                            <button type="button" class="btn-close" @onclick="() => _showCloseDrawerModal = false"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            @if (_drawerSession != null)
+                                                            {
+                                                                <div class="row g-2 mb-3">
+                                                                    <div class="col-6"><strong>Starting Float:</strong></div>
+                                                                    <div class="col-6 text-end">₱@_drawerSession.StartingFloat.ToString("N2")</div>
+                                                                    <div class="col-6"><strong>Cash Sales:</strong></div>
+                                                                    <div class="col-6 text-end text-success">+₱@_drawerSession.TotalCashIn.ToString("N2")</div>
+                                                                    <div class="col-6"><strong>Cash Refunds:</strong></div>
+                                                                    <div class="col-6 text-end text-danger">-₱@_drawerSession.TotalCashOut.ToString("N2")</div>
+                                                                    <div class="col-12">
+                                                                        <hr class="my-1" />
+                                                                    </div>
+                                                                    <div class="col-6"><strong>Expected Cash:</strong></div>
+                                                                    <div class="col-6 text-end fw-bold">₱@_drawerSession.ExpectedCash.ToString("N2")</div>
+                                                                </div>
+                                                            }
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold">Actual Cash Count (₱)</label>
+                                                                <input type="number" class="form-control form-control-lg" @bind="_drawerActualCash" min="0"
+                                                                       step="0.01" />
+                                                            </div>
+                                                            @if (_drawerActualCash > 0 && _drawerSession != null)
+                                                            {
+                                                                var disc = _drawerActualCash - _drawerSession.ExpectedCash;
+                                                                <div class="alert @(disc == 0 ? "alert-success" : disc > 0 ? "alert-info" : "alert-warning") py-2">
+                                                                    <strong>Discrepancy:</strong> ₱@disc.ToString("N2")
+                                                                    @if (disc == 0)
+                                                                    {
+                                                                        <span> — Perfect match!</span>
+                                                                    }
+                                                                    else if (disc > 0)
+                                                                    {
+
+                                                                        <span> — Over by ₱@disc.ToString("N2")</span>
+                                                                    }
+                                                                    else
+                                                                    {
+
+                                                                        <span> — Short by ₱@Math.Abs(disc).ToString("N2")</span>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Notes (optional)</label>
+                                                                <input type="text" class="form-control" @bind="_drawerCloseNotes"
+                                                                       placeholder="e.g. End of day close" />
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(_drawerError))
+                                                            {
+                                                                <div class="alert alert-danger py-2">@_drawerError</div>
+                                                            }
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button class="btn btn-secondary" @onclick="() => _showCloseDrawerModal = false">Cancel</button>
+                                                            <button class="btn btn-danger" @onclick="CloseDrawer"
+                                                                    disabled="@(_drawerProcessing || _drawerActualCash <= 0)">
+                                                                @if (_drawerProcessing)
+                                                                {
+                                                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                                                }
+                                                                Close & Settle
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+
+                                        @if (_showDrawerHistoryModal)
+                                        {
+                                            <div class="modal-backdrop fade show" style="z-index:1050"></div>
+                                            <div class="modal fade show d-block" tabindex="-1" style="z-index:1055">
+                                                <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i>Drawer Session History</h5>
+                                                            <button type="button" class="btn-close" @onclick="() => _showDrawerHistoryModal = false"></button>
+                                                        </div>
+                                                        <div class="modal-body" style="max-height:400px;overflow-y:auto;">
+                                                            @if (_drawerHistory.Any())
+                                                            {
+                                                                <table class="table table-sm table-striped">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>Opened</th>
+                                                                            <th>Closed</th>
+                                                                            <th>Opened By</th>
+                                                                            <th class="text-end">Float</th>
+                                                                            <th class="text-end">Expected</th>
+                                                                            <th class="text-end">Actual</th>
+                                                                            <th class="text-end">Discrepancy</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach (var s in _drawerHistory)
+                                                                        {
+                                                                            <tr>
+                                                                                <td>@s.OpenedAt.ToString("MMM dd hh:mm tt")</td>
+                                                                                <td>@(s.ClosedAt?.ToString("hh:mm tt") ?? "—")</td>
+                                                                                <td>@s.OpenedByName</td>
+                                                                                <td class="text-end">₱@s.StartingFloat.ToString("N2")</td>
+                                                                                <td class="text-end">₱@s.ExpectedCash.ToString("N2")</td>
+                                                                                <td class="text-end">@(s.ActualCash.HasValue ? $"₱{s.ActualCash:N2}" : "—")</td>
+                                                                                <td
+                                                                                    class="text-end @(s.Discrepancy == 0 ? "text-success" : s.Discrepancy > 0 ? "text-info" : "text-danger")">
+                                                                                    @(s.Discrepancy.HasValue ? $"₱{s.Discrepancy:N2}" : "—")
+                                                                                </td>
+                                                                            </tr>
+                                                                        }
+                                                                    </tbody>
+                                                                </table>
+                                                            }
+                                                            else
+                                                            {
+                                                                <p class="text-muted text-center py-3">No drawer sessions found</p>
+                                                            }
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button class="btn btn-secondary" @onclick="() => _showDrawerHistoryModal = false">Close</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
 
 @code {
     // Tab & search state
@@ -522,6 +769,7 @@
     private string _searchTerm = "";
     private string _appointmentSearch = "";
     private string? _selectedCategory;
+    private bool _showProductDropdown;
 
     // Customer
     private string _customerSearch = "";
@@ -588,8 +836,9 @@
             var customersTask = CustomerService.GetCustomersAsync(1, 200);
             var currencyTask = LoadCurrencyInfo();
             var servicesTask = ServiceService.GetServicesAsync(1, 100);
+            var drawerTask = LoadDrawerSession();
 
-            await Task.WhenAll(productsTask, customersTask, currencyTask, servicesTask);
+            await Task.WhenAll(productsTask, customersTask, currencyTask, servicesTask, drawerTask);
 
             _products = (await productsTask)?.Items.Where(p => p.IsActive).ToList() ?? new();
             _customers = (await customersTask)?.Items.ToList() ?? new();
@@ -977,6 +1226,8 @@
             if (_lastTransaction != null)
             {
                 _showSuccessModal = true;
+                // Refresh drawer session to update cash totals
+                await LoadDrawerSession();
             }
             else
             {
@@ -1108,5 +1359,88 @@ body {{ font-family: 'Courier New', monospace; width: 300px; margin: 0 auto; pad
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
         public decimal Total => UnitPrice * Quantity;
+    }
+
+    // ========================================================================
+    // Cash Drawer Management
+    // ========================================================================
+
+    private CashDrawerSessionResponse? _drawerSession;
+    private bool _showOpenDrawerModal;
+    private bool _showCloseDrawerModal;
+    private bool _showDrawerHistoryModal;
+    private bool _drawerProcessing;
+    private decimal _drawerFloat = 1000;
+    private string? _drawerNotes;
+    private decimal _drawerActualCash;
+    private string? _drawerCloseNotes;
+    private string? _drawerError;
+    private List<CashDrawerSessionResponse> _drawerHistory = new();
+
+    private async Task LoadDrawerSession()
+    {
+        try
+        {
+            _drawerSession = await CashDrawerService.GetActiveSessionAsync();
+        }
+        catch { /* Drawer service may be unavailable, proceed without it */ }
+    }
+
+    private void ShowOpenDrawerModal()
+    {
+        _drawerFloat = 1000;
+        _drawerNotes = null;
+        _drawerError = null;
+        _showOpenDrawerModal = true;
+    }
+
+    private void ShowCloseDrawerModal()
+    {
+        _drawerActualCash = _drawerSession?.ExpectedCash ?? 0;
+        _drawerCloseNotes = null;
+        _drawerError = null;
+        _showCloseDrawerModal = true;
+    }
+
+    private async Task ShowDrawerHistory()
+    {
+        _drawerHistory = await CashDrawerService.GetSessionHistoryAsync();
+        _showDrawerHistoryModal = true;
+    }
+
+    private async Task OpenDrawer()
+    {
+        _drawerProcessing = true;
+        _drawerError = null;
+        try
+        {
+            var (result, error) = await CashDrawerService.OpenDrawerAsync(new OpenDrawerRequest
+            {
+                StartingFloat = _drawerFloat,
+                Notes = _drawerNotes
+            });
+            if (error != null) { _drawerError = error; }
+            else { _drawerSession = result; _showOpenDrawerModal = false; }
+        }
+        catch (Exception ex) { _drawerError = ex.Message; }
+        _drawerProcessing = false;
+    }
+
+    private async Task CloseDrawer()
+    {
+        _drawerProcessing = true;
+        _drawerError = null;
+        try
+        {
+            var (result, error) = await CashDrawerService.CloseDrawerAsync(new CloseDrawerRequest
+            {
+                ActualCash = _drawerActualCash,
+                Notes = _drawerCloseNotes
+            });
+            if (error != null) { _drawerError = error; }
+            else { _drawerSession = null; _showCloseDrawerModal = false; }
+        }
+        catch (Exception ex) { _drawerError = ex.Message; }
+        _drawerProcessing = false;
     }
 }

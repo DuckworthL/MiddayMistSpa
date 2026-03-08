@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using MiddayMistSpa.Core;
 using MiddayMistSpa.Core.Entities.Accounting;
 using MiddayMistSpa.Core.Entities.Appointment;
 using MiddayMistSpa.Core.Entities.Configuration;
@@ -50,11 +51,13 @@ public class DatabaseSeeder : IDatabaseSeeder
 
             // Sample business data
             await SeedServiceCategoriesAndServicesAsync();
+            await SeedSuppliersAsync();
             await SeedProductCategoriesAndProductsAsync();
             await SeedSampleCustomersAsync();
             await SeedSampleEmployeesAsync();
             await LinkUsersToEmployeesAsync();
             await SeedEmployeeShiftsAsync();
+            await SeedEmployeeLeaveBalancesAsync();
             await SeedAttendanceRecordsAsync();
             await SeedRoomsAsync();
 
@@ -259,6 +262,24 @@ public class DatabaseSeeder : IDatabaseSeeder
                 RoleId = salesLedgerRole?.RoleId ?? adminRole.RoleId,
                 FirstName = "Roberto",
                 LastName = "Mendoza",
+                IsActive = true,
+                LockoutEnabled = true,
+                PasswordExpiryDate = DateTime.UtcNow.AddDays(90),
+                MustChangePassword = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            // Ana Gonzales - Therapist account (linked to EMP-004)
+            new()
+            {
+                Username = "anagonzales",
+                Email = "ana.g@middaymistspa.com",
+                EmailConfirmed = true,
+                PasswordHash = HashPassword("AnaGonzales@2026!"),
+                SecurityStamp = Guid.NewGuid().ToString(),
+                RoleId = therapistRole?.RoleId ?? adminRole.RoleId,
+                FirstName = "Ana",
+                LastName = "Gonzales",
                 IsActive = true,
                 LockoutEnabled = true,
                 PasswordExpiryDate = DateTime.UtcNow.AddDays(90),
@@ -689,6 +710,28 @@ public class DatabaseSeeder : IDatabaseSeeder
         await _context.Services.AddRangeAsync(services);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Seeded {CategoryCount} service categories and {ServiceCount} services", categories.Count, services.Count);
+    }
+
+    private async Task SeedSuppliersAsync()
+    {
+        if (await _context.Suppliers.AnyAsync())
+        {
+            _logger.LogInformation("Suppliers already seeded, skipping...");
+            return;
+        }
+
+        var suppliers = new List<Supplier>
+        {
+            new() { SupplierCode = "SUP-001", SupplierName = "Aromatherapy Philippines", ContactPerson = "Maria Santos", Email = "maria@aromatherapyph.com", PhoneNumber = "09171234567", Address = "123 Makati Ave", City = "Makati", Province = "Metro Manila", PaymentTerms = "Net 30", IsActive = true },
+            new() { SupplierCode = "SUP-002", SupplierName = "BeautyPro Supplies", ContactPerson = "Carlo Reyes", Email = "carlo@beautypro.ph", PhoneNumber = "09189876543", Address = "456 BGC Taguig", City = "Taguig", Province = "Metro Manila", PaymentTerms = "Net 15", IsActive = true },
+            new() { SupplierCode = "SUP-003", SupplierName = "Derma Essentials Co.", ContactPerson = "Ana Cruz", Email = "ana@dermaessentials.com", PhoneNumber = "09201112233", Address = "789 Ortigas Center", City = "Pasig", Province = "Metro Manila", PaymentTerms = "COD", IsActive = true },
+            new() { SupplierCode = "SUP-004", SupplierName = "NailArt Trading", ContactPerson = "Jen Lim", Email = "jen@nailart.ph", PhoneNumber = "09223344556", Address = "12 Session Rd", City = "Baguio", Province = "Benguet", PaymentTerms = "Net 30", IsActive = true },
+            new() { SupplierCode = "SUP-005", SupplierName = "MediSpa Distributors", ContactPerson = "Rico Tan", Email = "rico@medispa.com.ph", PhoneNumber = "09175556677", Address = "88 Cebu Business Park", City = "Cebu City", Province = "Cebu", PaymentTerms = "Net 60", IsActive = true }
+        };
+
+        await _context.Suppliers.AddRangeAsync(suppliers);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Seeded {Count} suppliers", suppliers.Count);
     }
 
     private async Task SeedProductCategoriesAndProductsAsync()
@@ -1129,20 +1172,20 @@ public class DatabaseSeeder : IDatabaseSeeder
         var employees = new List<Employee>
         {
             // Therapists
-            new() { EmployeeCode = "EMP-001", FirstName = "Rosa", LastName = "Mercado", DateOfBirth = new DateTime(1990, 5, 15), Gender = "Female", PhoneNumber = "+63 917 111 2222", Email = "rosa.m@middaymistspa.com", Position = "Senior Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2020, 3, 15), DailyRate = 962, MonthlyBasicSalary = 25000, SSSNumber = "34-1234567-8", PhilHealthNumber = "12-345678901-2", PagIBIGNumber = "1234-5678-9012", TINNumber = "123-456-789-000", IsTherapist = true, Specialization = "Swedish Massage, Deep Tissue", IsActive = true },
-            new() { EmployeeCode = "EMP-002", FirstName = "Jenny", LastName = "Aquino", DateOfBirth = new DateTime(1992, 8, 20), Gender = "Female", PhoneNumber = "+63 918 222 3333", Email = "jenny.a@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2021, 6, 1), DailyRate = 769, MonthlyBasicSalary = 20000, SSSNumber = "34-2345678-9", PhilHealthNumber = "12-456789012-3", PagIBIGNumber = "2345-6789-0123", TINNumber = "234-567-890-000", IsTherapist = true, Specialization = "Aromatherapy, Hot Stone", IsActive = true },
-            new() { EmployeeCode = "EMP-003", FirstName = "Mark", LastName = "Villanueva", DateOfBirth = new DateTime(1988, 3, 10), Gender = "Male", PhoneNumber = "+63 919 333 4444", Email = "mark.v@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2022, 1, 10), DailyRate = 692, MonthlyBasicSalary = 18000, SSSNumber = "34-3456789-0", PhilHealthNumber = "12-567890123-4", PagIBIGNumber = "3456-7890-1234", TINNumber = "345-678-901-000", IsTherapist = true, Specialization = "Sports Massage, Thai Massage", IsActive = true },
-            new() { EmployeeCode = "EMP-004", FirstName = "Ana", LastName = "Gonzales", DateOfBirth = new DateTime(1995, 11, 25), Gender = "Female", PhoneNumber = "+63 920 444 5555", Email = "ana.g@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Part-Time", HireDate = new DateTime(2023, 4, 1), DailyRate = 462, MonthlyBasicSalary = 12000, SSSNumber = "34-4567890-1", PhilHealthNumber = "12-678901234-5", PagIBIGNumber = "4567-8901-2345", TINNumber = "456-789-012-000", IsTherapist = true, Specialization = "Foot Reflexology", IsActive = true },
-            new() { EmployeeCode = "EMP-005", FirstName = "Paolo", LastName = "Ramos", DateOfBirth = new DateTime(1985, 7, 8), Gender = "Male", PhoneNumber = "+63 921 555 6666", Email = "paolo.r@middaymistspa.com", Position = "Senior Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2019, 8, 20), DailyRate = 1077, MonthlyBasicSalary = 28000, SSSNumber = "34-5678901-2", PhilHealthNumber = "12-789012345-6", PagIBIGNumber = "5678-9012-3456", TINNumber = "567-890-123-000", IsTherapist = true, Specialization = "Deep Tissue, Sports Massage", IsActive = true },
+            new() { EmployeeCode = "EMP-001", FirstName = "Rosa", LastName = "Mercado", DateOfBirth = new DateTime(1990, 5, 15), Gender = "Female", PhoneNumber = "+63 917 111 2222", Email = "rosa.m@middaymistspa.com", Position = "Senior Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2020, 3, 15), DailyRate = 962, MonthlyBasicSalary = 25000, SSSNumber = "34-1234567-8", PhilHealthNumber = "12-345678901-2", PagIBIGNumber = "1234-5678-9012", TINNumber = "123-456-789-000", IsTherapist = true, Specialization = "Swedish Massage, Deep Tissue", IsActive = true, BankName = "BDO Unibank", BankAccountNumber = "0012-3456-7801" },
+            new() { EmployeeCode = "EMP-002", FirstName = "Jenny", LastName = "Aquino", DateOfBirth = new DateTime(1992, 8, 20), Gender = "Female", PhoneNumber = "+63 918 222 3333", Email = "jenny.a@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2021, 6, 1), DailyRate = 769, MonthlyBasicSalary = 20000, SSSNumber = "34-2345678-9", PhilHealthNumber = "12-456789012-3", PagIBIGNumber = "2345-6789-0123", TINNumber = "234-567-890-000", IsTherapist = true, Specialization = "Aromatherapy, Hot Stone", IsActive = true, BankName = "BPI", BankAccountNumber = "3456-7890-1202" },
+            new() { EmployeeCode = "EMP-003", FirstName = "Mark", LastName = "Villanueva", DateOfBirth = new DateTime(1988, 3, 10), Gender = "Male", PhoneNumber = "+63 919 333 4444", Email = "mark.v@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2022, 1, 10), DailyRate = 692, MonthlyBasicSalary = 18000, SSSNumber = "34-3456789-0", PhilHealthNumber = "12-567890123-4", PagIBIGNumber = "3456-7890-1234", TINNumber = "345-678-901-000", IsTherapist = true, Specialization = "Sports Massage, Thai Massage", IsActive = true, BankName = "Metrobank", BankAccountNumber = "2234-5678-9003" },
+            new() { EmployeeCode = "EMP-004", FirstName = "Ana", LastName = "Gonzales", DateOfBirth = new DateTime(1995, 11, 25), Gender = "Female", PhoneNumber = "+63 920 444 5555", Email = "ana.g@middaymistspa.com", Position = "Therapist", Department = "Operations", EmploymentType = "Part-Time", HireDate = new DateTime(2023, 4, 1), DailyRate = 462, MonthlyBasicSalary = 12000, SSSNumber = "34-4567890-1", PhilHealthNumber = "12-678901234-5", PagIBIGNumber = "4567-8901-2345", TINNumber = "456-789-012-000", IsTherapist = true, Specialization = "Foot Reflexology", IsActive = true, BankName = "BDO Unibank", BankAccountNumber = "0098-7654-3204" },
+            new() { EmployeeCode = "EMP-005", FirstName = "Paolo", LastName = "Ramos", DateOfBirth = new DateTime(1985, 7, 8), Gender = "Male", PhoneNumber = "+63 921 555 6666", Email = "paolo.r@middaymistspa.com", Position = "Senior Therapist", Department = "Operations", EmploymentType = "Regular", HireDate = new DateTime(2019, 8, 20), DailyRate = 1077, MonthlyBasicSalary = 28000, SSSNumber = "34-5678901-2", PhilHealthNumber = "12-789012345-6", PagIBIGNumber = "5678-9012-3456", TINNumber = "567-890-123-000", IsTherapist = true, Specialization = "Deep Tissue, Sports Massage", IsActive = true, BankName = "BPI", BankAccountNumber = "3456-1234-5605" },
 
             // Front Desk
-            new() { EmployeeCode = "EMP-006", FirstName = "Carla", LastName = "Mendoza", DateOfBirth = new DateTime(1993, 2, 14), Gender = "Female", PhoneNumber = "+63 922 666 7777", Email = "carla.m@middaymistspa.com", Position = "Receptionist", Department = "Front Desk", EmploymentType = "Regular", HireDate = new DateTime(2021, 2, 1), DailyRate = 692, MonthlyBasicSalary = 18000, SSSNumber = "34-6789012-3", PhilHealthNumber = "12-890123456-7", PagIBIGNumber = "6789-0123-4567", TINNumber = "678-901-234-000", IsTherapist = false, IsActive = true },
-            new() { EmployeeCode = "EMP-007", FirstName = "Michelle", LastName = "Santos", DateOfBirth = new DateTime(1991, 9, 30), Gender = "Female", PhoneNumber = "+63 923 777 8888", Email = "michelle.s@middaymistspa.com", Position = "Senior Receptionist", Department = "Front Desk", EmploymentType = "Regular", HireDate = new DateTime(2019, 11, 15), DailyRate = 846, MonthlyBasicSalary = 22000, SSSNumber = "34-7890123-4", PhilHealthNumber = "12-901234567-8", PagIBIGNumber = "7890-1234-5678", TINNumber = "789-012-345-000", IsTherapist = false, IsActive = true },
+            new() { EmployeeCode = "EMP-006", FirstName = "Carla", LastName = "Mendoza", DateOfBirth = new DateTime(1993, 2, 14), Gender = "Female", PhoneNumber = "+63 922 666 7777", Email = "carla.m@middaymistspa.com", Position = "Receptionist", Department = "Front Desk", EmploymentType = "Regular", HireDate = new DateTime(2021, 2, 1), DailyRate = 692, MonthlyBasicSalary = 18000, SSSNumber = "34-6789012-3", PhilHealthNumber = "12-890123456-7", PagIBIGNumber = "6789-0123-4567", TINNumber = "678-901-234-000", IsTherapist = false, IsActive = true, BankName = "Landbank", BankAccountNumber = "1987-6543-2106" },
+            new() { EmployeeCode = "EMP-007", FirstName = "Michelle", LastName = "Santos", DateOfBirth = new DateTime(1991, 9, 30), Gender = "Female", PhoneNumber = "+63 923 777 8888", Email = "michelle.s@middaymistspa.com", Position = "Senior Receptionist", Department = "Front Desk", EmploymentType = "Regular", HireDate = new DateTime(2019, 11, 15), DailyRate = 846, MonthlyBasicSalary = 22000, SSSNumber = "34-7890123-4", PhilHealthNumber = "12-901234567-8", PagIBIGNumber = "7890-1234-5678", TINNumber = "789-012-345-000", IsTherapist = false, IsActive = true, BankName = "Metrobank", BankAccountNumber = "2345-6789-0107" },
 
             // Management
-            new() { EmployeeCode = "EMP-008", FirstName = "Ricardo", LastName = "Lim", DateOfBirth = new DateTime(1980, 4, 5), Gender = "Male", PhoneNumber = "+63 924 888 9999", Email = "ricardo.l@middaymistspa.com", Position = "Operations Manager", Department = "Management", EmploymentType = "Regular", HireDate = new DateTime(2018, 5, 1), DailyRate = 1731, MonthlyBasicSalary = 45000, SSSNumber = "34-8901234-5", PhilHealthNumber = "12-012345678-9", PagIBIGNumber = "8901-2345-6789", TINNumber = "890-123-456-000", IsTherapist = false, IsActive = true },
-            new() { EmployeeCode = "EMP-009", FirstName = "Teresa", LastName = "Reyes", DateOfBirth = new DateTime(1978, 6, 20), Gender = "Female", PhoneNumber = "+63 925 999 0000", Email = "teresa.r@middaymistspa.com", Position = "HR Manager", Department = "Human Resources", EmploymentType = "Regular", HireDate = new DateTime(2017, 9, 1), DailyRate = 1538, MonthlyBasicSalary = 40000, SSSNumber = "34-9012345-6", PhilHealthNumber = "12-123456789-0", PagIBIGNumber = "9012-3456-7890", TINNumber = "901-234-567-000", IsTherapist = false, IsActive = true },
-            new() { EmployeeCode = "EMP-010", FirstName = "Antonio", LastName = "Cruz", DateOfBirth = new DateTime(1982, 12, 12), Gender = "Male", PhoneNumber = "+63 926 000 1111", Email = "antonio.c@middaymistspa.com", Position = "Accountant", Department = "Finance", EmploymentType = "Regular", HireDate = new DateTime(2020, 1, 15), DailyRate = 1346, MonthlyBasicSalary = 35000, SSSNumber = "34-0123456-7", PhilHealthNumber = "12-234567890-1", PagIBIGNumber = "0123-4567-8901", TINNumber = "012-345-678-000", IsTherapist = false, IsActive = true }
+            new() { EmployeeCode = "EMP-008", FirstName = "Ricardo", LastName = "Lim", DateOfBirth = new DateTime(1980, 4, 5), Gender = "Male", PhoneNumber = "+63 924 888 9999", Email = "ricardo.l@middaymistspa.com", Position = "Operations Manager", Department = "Management", EmploymentType = "Regular", HireDate = new DateTime(2018, 5, 1), DailyRate = 1731, MonthlyBasicSalary = 45000, SSSNumber = "34-8901234-5", PhilHealthNumber = "12-012345678-9", PagIBIGNumber = "8901-2345-6789", TINNumber = "890-123-456-000", IsTherapist = false, IsActive = true, BankName = "BDO Unibank", BankAccountNumber = "0011-2233-4408" },
+            new() { EmployeeCode = "EMP-009", FirstName = "Teresa", LastName = "Reyes", DateOfBirth = new DateTime(1978, 6, 20), Gender = "Female", PhoneNumber = "+63 925 999 0000", Email = "teresa.r@middaymistspa.com", Position = "HR Manager", Department = "Human Resources", EmploymentType = "Regular", HireDate = new DateTime(2017, 9, 1), DailyRate = 1538, MonthlyBasicSalary = 40000, SSSNumber = "34-9012345-6", PhilHealthNumber = "12-123456789-0", PagIBIGNumber = "9012-3456-7890", TINNumber = "901-234-567-000", IsTherapist = false, IsActive = true, BankName = "BPI", BankAccountNumber = "3456-7890-4509" },
+            new() { EmployeeCode = "EMP-010", FirstName = "Antonio", LastName = "Cruz", DateOfBirth = new DateTime(1982, 12, 12), Gender = "Male", PhoneNumber = "+63 926 000 1111", Email = "antonio.c@middaymistspa.com", Position = "Accountant", Department = "Finance", EmploymentType = "Regular", HireDate = new DateTime(2020, 1, 15), DailyRate = 1346, MonthlyBasicSalary = 35000, SSSNumber = "34-0123456-7", PhilHealthNumber = "12-234567890-1", PagIBIGNumber = "0123-4567-8901", TINNumber = "012-345-678-000", IsTherapist = false, IsActive = true, BankName = "Landbank", BankAccountNumber = "1234-5678-9010" }
         };
 
         await _context.Employees.AddRangeAsync(employees);
@@ -1185,6 +1228,20 @@ public class DatabaseSeeder : IDatabaseSeeder
         {
             if (linkedUserIds.Contains(user.UserId))
                 continue;
+
+            // Try to match an existing unlinked employee by name
+            var existingEmployee = await _context.Employees
+                .FirstOrDefaultAsync(e => e.UserId == null
+                    && e.FirstName == user.FirstName
+                    && e.LastName == user.LastName);
+
+            if (existingEmployee != null)
+            {
+                existingEmployee.UserId = user.UserId;
+                existingEmployee.UpdatedAt = DateTime.UtcNow;
+                created++;
+                continue;
+            }
 
             // Determine position and department based on role
             var (position, department, isTherapist) = user.Role!.RoleName switch
@@ -1244,11 +1301,56 @@ public class DatabaseSeeder : IDatabaseSeeder
     {
         if (await _context.EmployeeShifts.AnyAsync())
         {
-            _logger.LogInformation("Employee shifts already seeded, skipping...");
+            _logger.LogInformation("Employee shifts already seeded, checking for missing shifts...");
+
+            // Ensure ALL active employees have shifts for ALL 7 days
+            var allEmployees = await _context.Employees
+                .Where(e => e.IsActive)
+                .ToListAsync();
+
+            var shiftStart = new TimeSpan(9, 0, 0);
+            var shiftEnd = new TimeSpan(18, 0, 0);
+            var effectiveFrom = new DateTime(2026, 1, 1);
+            var newShifts = new List<EmployeeShift>();
+
+            foreach (var emp in allEmployees)
+            {
+                var existingDays = await _context.EmployeeShifts
+                    .Where(s => s.EmployeeId == emp.EmployeeId && s.IsActive)
+                    .Select(s => s.DayOfWeek)
+                    .ToListAsync();
+
+                for (int day = 0; day <= 6; day++)
+                {
+                    if (!existingDays.Contains(day))
+                    {
+                        newShifts.Add(new EmployeeShift
+                        {
+                            EmployeeId = emp.EmployeeId,
+                            DayOfWeek = day,
+                            StartTime = shiftStart,
+                            EndTime = shiftEnd,
+                            IsRecurring = true,
+                            EffectiveFrom = effectiveFrom,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            if (newShifts.Any())
+            {
+                await _context.EmployeeShifts.AddRangeAsync(newShifts);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Added {Count} missing employee shifts", newShifts.Count);
+            }
             return;
         }
 
         var employeeMap = await _context.Employees
+            .Where(e => e.IsActive)
             .ToDictionaryAsync(e => e.EmployeeCode, e => e.EmployeeId);
 
         if (!employeeMap.Any())
@@ -1257,37 +1359,62 @@ public class DatabaseSeeder : IDatabaseSeeder
             return;
         }
 
-        var shiftStart = new TimeSpan(9, 0, 0);  // 9:00 AM
-        var shiftEnd = new TimeSpan(18, 0, 0);   // 6:00 PM
-        var effectiveFrom = new DateTime(2026, 1, 1);
+        var defaultShiftStart = new TimeSpan(9, 0, 0);  // 9:00 AM
+        var defaultShiftEnd = new TimeSpan(18, 0, 0);   // 6:00 PM
+        var defaultEffectiveFrom = new DateTime(2026, 1, 1);
 
-        // Regular employees: Mon–Sat (DayOfWeek 1–6)
-        var regularCodes = new[] { "EMP-001", "EMP-002", "EMP-003", "EMP-005", "EMP-006", "EMP-007", "EMP-008", "EMP-009", "EMP-010" };
-        var regularDays = new[] { 1, 2, 3, 4, 5, 6 };
-
-        // Part-time: Tue, Thu, Sat (DayOfWeek 2, 4, 6)
-        var partTimeCodes = new[] { "EMP-004" };
-        var partTimeDays = new[] { 2, 4, 6 };
-
+        // All active employees get shifts for all 7 days (Sun-Sat)
+        var allDays = new[] { 0, 1, 2, 3, 4, 5, 6 };
         var shifts = new List<EmployeeShift>();
 
-        foreach (var code in regularCodes)
+        foreach (var (code, empId) in employeeMap)
         {
-            if (!employeeMap.TryGetValue(code, out var empId)) continue;
-            foreach (var day in regularDays)
-                shifts.Add(new EmployeeShift { EmployeeId = empId, DayOfWeek = day, StartTime = shiftStart, EndTime = shiftEnd, IsRecurring = true, EffectiveFrom = effectiveFrom, EffectiveTo = null, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
-        }
-
-        foreach (var code in partTimeCodes)
-        {
-            if (!employeeMap.TryGetValue(code, out var empId)) continue;
-            foreach (var day in partTimeDays)
-                shifts.Add(new EmployeeShift { EmployeeId = empId, DayOfWeek = day, StartTime = shiftStart, EndTime = shiftEnd, IsRecurring = true, EffectiveFrom = effectiveFrom, EffectiveTo = null, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
+            foreach (var day in allDays)
+                shifts.Add(new EmployeeShift { EmployeeId = empId, DayOfWeek = day, StartTime = defaultShiftStart, EndTime = defaultShiftEnd, IsRecurring = true, EffectiveFrom = defaultEffectiveFrom, EffectiveTo = null, IsActive = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow });
         }
 
         await _context.EmployeeShifts.AddRangeAsync(shifts);
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Seeded {Count} employee shifts", shifts.Count);
+        _logger.LogInformation("Seeded {Count} employee shifts for {EmpCount} employees", shifts.Count, employeeMap.Count);
+    }
+
+    private async Task SeedEmployeeLeaveBalancesAsync()
+    {
+        var currentYear = PhilippineTime.Today.Year;
+        var allEmployees = await _context.Employees
+            .Where(e => e.IsActive)
+            .ToListAsync();
+
+        var existingBalances = await _context.EmployeeLeaveBalances
+            .Where(lb => lb.Year == currentYear)
+            .Select(lb => lb.EmployeeId)
+            .ToListAsync();
+
+        var newBalances = allEmployees
+            .Where(e => !existingBalances.Contains(e.EmployeeId))
+            .Select(e => new MiddayMistSpa.Core.Entities.Employee.EmployeeLeaveBalance
+            {
+                EmployeeId = e.EmployeeId,
+                Year = currentYear,
+                SILDays = 5.0m,
+                SILUsed = 0,
+                SickLeaveDays = 5.0m,
+                SickLeaveUsed = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (newBalances.Any())
+        {
+            await _context.EmployeeLeaveBalances.AddRangeAsync(newBalances);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Seeded leave balances for {Count} employees (year {Year})", newBalances.Count, currentYear);
+        }
+        else
+        {
+            _logger.LogInformation("All employees already have leave balances for {Year}", currentYear);
+        }
     }
 
     private async Task SeedAttendanceRecordsAsync()

@@ -219,6 +219,7 @@ builder.Services.AddScoped<ICurrencyApiService, CurrencyApiService>();
 builder.Services.AddScoped<ITwoFactorApiService, TwoFactorApiService>();
 builder.Services.AddScoped<ICaptchaApiService, CaptchaApiService>();
 builder.Services.AddScoped<ISettingsApiService, SettingsApiService>();
+builder.Services.AddScoped<ICashDrawerApiService, CashDrawerApiService>();
 
 // Customer Segmentation: use direct service calls in production (bypass HTTP loopback)
 if (!builder.Environment.IsDevelopment())

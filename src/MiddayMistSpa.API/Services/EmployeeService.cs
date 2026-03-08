@@ -63,6 +63,8 @@ public class EmployeeService : IEmployeeService
             Specialization = request.Specialization,
             LicenseNumber = request.LicenseNumber,
             LicenseExpiryDate = request.LicenseExpiryDate,
+            BankName = request.BankName,
+            BankAccountNumber = request.BankAccountNumber,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -279,6 +281,8 @@ public class EmployeeService : IEmployeeService
         employee.Specialization = request.Specialization;
         employee.LicenseNumber = request.LicenseNumber;
         employee.LicenseExpiryDate = request.LicenseExpiryDate;
+        employee.BankName = request.BankName;
+        employee.BankAccountNumber = request.BankAccountNumber;
         employee.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -890,6 +894,8 @@ public class EmployeeService : IEmployeeService
         Specialization = employee.Specialization,
         LicenseNumber = employee.LicenseNumber,
         LicenseExpiryDate = employee.LicenseExpiryDate,
+        BankName = employee.BankName,
+        BankAccountNumber = employee.BankAccountNumber,
         IsActive = employee.IsActive,
         UserId = employee.UserId,
         CreatedAt = employee.CreatedAt,

@@ -420,6 +420,15 @@ public class TimeAttendanceService : ITimeAttendanceService
         return requests.Select(MapToTimeOffResponse).ToList();
     }
 
+    public async Task<int?> GetEmployeeIdByUserIdAsync(int userId)
+    {
+        var employee = await _context.Employees
+            .Where(e => e.UserId == userId && e.IsActive)
+            .Select(e => (int?)e.EmployeeId)
+            .FirstOrDefaultAsync();
+        return employee;
+    }
+
     // ============================================================================
     // Leave Balance Management
     // ============================================================================
@@ -1058,6 +1067,17 @@ public class TimeAttendanceService : ITimeAttendanceService
         if (!hasShift)
             throw new InvalidOperationException(
                 $"{employee.FullName} does not have a scheduled shift for today ({today.DayOfWeek}). Please create a shift in Shift Management before clocking in.");
+
+        // Leave enforcement: employee must not have an approved leave covering today
+        var hasApprovedLeave = await _context.TimeOffRequests
+            .AnyAsync(t => t.EmployeeId == employeeId
+                && t.Status == "Approved"
+                && t.StartDate <= today
+                && t.EndDate >= today);
+
+        if (hasApprovedLeave)
+            throw new InvalidOperationException(
+                $"{employee.FullName} is on approved leave today and cannot clock in.");
 
         // Duplicate prevention: check if already clocked in today (has open record)
         var existing = await _context.AttendanceRecords

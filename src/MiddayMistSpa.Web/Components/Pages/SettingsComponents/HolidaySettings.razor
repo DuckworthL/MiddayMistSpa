@@ -1,0 +1,286 @@
+@* Holiday Settings Component *@
+@inject ISettingsApiService SettingsApi
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-calendar-event me-2"></i>Philippine Holidays</h5>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width: auto;" @bind="_selectedYear"
+                    @bind:after="LoadHolidays">
+                @for (int y = DateTime.Now.Year - 1; y <= DateTime.Now.Year + 2; y++)
+                {
+                    <option value="@y">@y</option>
+                }
+            </select>
+            <button class="btn btn-primary btn-sm" @onclick="ShowAddModal">
+                <i class="bi bi-plus-lg me-1"></i> Add Holiday
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (_isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading holidays...</p>
+            </div>
+        }
+        else if (!_holidays.Any())
+        {
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-calendar-x" style="font-size: 2rem;"></i>
+                <p class="mt-2">No holidays found for @_selectedYear.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Holiday Name</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Recurring</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var holiday in _holidays)
+                        {
+                            <tr>
+                                <td><strong>@holiday.HolidayName</strong></td>
+                                <td>@holiday.HolidayDate.ToString("MMMM dd, yyyy")</td>
+                                <td>
+                                    <span
+                                        class="badge @(holiday.HolidayType == "Regular" ? "bg-danger" : "bg-warning text-dark")">
+                                        @holiday.HolidayType
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (holiday.IsRecurring)
+                                    {
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-x-circle text-muted"></i>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => ShowEditModal(holiday)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            @onclick="() => DeleteHoliday(holiday.HolidayId)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_statusMessage))
+        {
+            <div class="alert @_statusAlertClass mt-3 alert-dismissible fade show" role="alert">
+                @_statusMessage
+                <button type="button" class="btn-close" @onclick="() => _statusMessage = string.Empty"></button>
+            </div>
+        }
+    </div>
+</div>
+
+@* Add/Edit Holiday Modal *@
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isEditing ? "Edit Holiday" : "Add Holiday")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Holiday Name</label>
+                        <input type="text" class="form-control" @bind="_formName" placeholder="e.g., New Year's Day" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" @bind="_formDate" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" @bind="_formType">
+                            <option value="Regular">Regular Holiday</option>
+                            <option value="Special">Special Non-Working</option>
+                        </select>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="isRecurring" @bind="_formIsRecurring">
+                            <label class="form-check-label" for="isRecurring">Recurring every year</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                        <button class="btn btn-primary" @onclick="SaveHoliday" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            @(_isEditing ? "Update" : "Create")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+@code {
+    private List<HolidayResponse> _holidays = new();
+    private int _selectedYear = DateTime.Now.Year;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string _statusMessage = string.Empty;
+    private string _statusAlertClass = "alert-success";
+
+    // Modal state
+    private bool _showModal;
+    private bool _isEditing;
+    private int _editingHolidayId;
+    private string _formName = "";
+    private DateTime _formDate = DateTime.Today;
+    private string _formType = "Regular";
+    private bool _formIsRecurring = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHolidays();
+    }
+
+    private async Task LoadHolidays()
+    {
+        _isLoading = true;
+        try
+        {
+            _holidays = await SettingsApi.GetHolidaysAsync(_selectedYear);
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error loading holidays: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowAddModal()
+    {
+        _isEditing = false;
+        _editingHolidayId = 0;
+        _formName = "";
+        _formDate = new DateTime(_selectedYear, 1, 1);
+        _formType = "Regular";
+        _formIsRecurring = true;
+        _showModal = true;
+    }
+
+    private void ShowEditModal(HolidayResponse holiday)
+    {
+        _isEditing = true;
+        _editingHolidayId = holiday.HolidayId;
+        _formName = holiday.HolidayName;
+        _formDate = holiday.HolidayDate;
+        _formType = holiday.HolidayType;
+        _formIsRecurring = holiday.IsRecurring;
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task SaveHoliday()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            _statusMessage = "Holiday name is required.";
+            _statusAlertClass = "alert-warning";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            if (_isEditing)
+            {
+                var request = new UpdateHolidayRequest
+                {
+                    HolidayName = _formName.Trim(),
+                    HolidayDate = _formDate,
+                    HolidayType = _formType,
+                    IsRecurring = _formIsRecurring
+                };
+                var result = await SettingsApi.UpdateHolidayAsync(_editingHolidayId, request);
+                if (result != null)
+                {
+                    _statusMessage = "Holiday updated successfully.";
+                    _statusAlertClass = "alert-success";
+                }
+            }
+            else
+            {
+                var request = new CreateHolidayRequest
+                {
+                    HolidayName = _formName.Trim(),
+                    HolidayDate = _formDate,
+                    HolidayType = _formType,
+                    IsRecurring = _formIsRecurring
+                };
+                var result = await SettingsApi.CreateHolidayAsync(request);
+                if (result != null)
+                {
+                    _statusMessage = "Holiday created successfully.";
+                    _statusAlertClass = "alert-success";
+                }
+            }
+
+            _showModal = false;
+            await LoadHolidays();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error saving holiday: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task DeleteHoliday(int holidayId)
+    {
+        try
+        {
+            var success = await SettingsApi.DeleteHolidayAsync(holidayId);
+            if (success)
+            {
+                _statusMessage = "Holiday deleted successfully.";
+                _statusAlertClass = "alert-success";
+                await LoadHolidays();
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Error deleting holiday: {ex.Message}";
+            _statusAlertClass = "alert-danger";
+        }
+    }
+}

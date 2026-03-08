@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 using MiddayMistSpa.API.DTOs.Employee;
 using MiddayMistSpa.API.DTOs.Payroll;
 using MiddayMistSpa.Core;
@@ -205,6 +206,17 @@ public class PayrollService : IPayrollService
         period.FinalizedBy = finalizedByUserId;
         period.FinalizedAt = PhilippineTime.Now;
         period.UpdatedAt = PhilippineTime.Now;
+
+        // Mark all records as Paid when finalizing
+        foreach (var record in period.PayrollRecords)
+        {
+            if (record.PaymentStatus is "Preview" or "Pending")
+            {
+                record.PaymentStatus = "Paid";
+                record.PaymentDate ??= PhilippineTime.Now;
+                record.UpdatedAt = PhilippineTime.Now;
+            }
+        }
 
         await _context.SaveChangesAsync();
 
@@ -1316,5 +1328,36 @@ public class PayrollService : IPayrollService
         }
 
         return results;
+    }
+
+    // =========================================================================
+    // Bank File Export
+    // =========================================================================
+
+    public async Task<byte[]> GenerateBankFileAsync(int payrollPeriodId)
+    {
+        var period = await _context.PayrollPeriods.FindAsync(payrollPeriodId)
+            ?? throw new ArgumentException("Payroll period not found");
+
+        var records = await _context.PayrollRecords
+            .Include(r => r.Employee)
+            .Where(r => r.PayrollPeriodId == payrollPeriodId && r.PaymentStatus != "Pending")
+            .OrderBy(r => r.Employee.LastName)
+            .ThenBy(r => r.Employee.FirstName)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Employee Code,Employee Name,Bank Name,Account Number,Net Pay,Payment Method");
+        foreach (var record in records)
+        {
+            var emp = record.Employee;
+            var bankName = emp.BankName ?? "";
+            var accountNumber = emp.BankAccountNumber ?? "";
+            // CSV-safe escaping
+            var empName = $"{emp.LastName}, {emp.FirstName}";
+            sb.AppendLine($"{emp.EmployeeCode},\"{empName}\",\"{bankName}\",\"{accountNumber}\",{record.NetPay:F2},{record.PaymentMethod ?? "Cash"}");
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
     }
 }

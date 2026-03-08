@@ -166,6 +166,14 @@
                                                             <i class="bi bi-eye"></i>
                                                         </button>
                                                     }
+                                                    @if (appt.Status is "Completed" or "Cancelled" or "No Show" or "Checked In" or
+                                                                                            "Scheduled" or "Confirmed")
+                                                    {
+                                                        <button class="btn btn-outline-secondary" @onclick="() => OpenDetailModal(appt)"
+                                                                title="View Details">
+                                                            <i class="bi bi-eye"></i>
+                                                        </button>
+                                                    }
                                                     @if (_canEdit && appt.Status is "Scheduled" or "Confirmed")
                                                     {
                                                         <button class="btn btn-outline-primary" @onclick="() => EditAppointment(appt)"
@@ -695,6 +703,180 @@
                     </FooterContent>
                 </Modal>
 
+                @* Appointment Detail Modal (for viewing completed/cancelled/scheduled appointments) *@
+                <Modal @bind-IsVisible="_showDetailModal" Title="Appointment Details" Size="Modal.ModalSize.Large">
+                    <ChildContent>
+                        @if (_detailAppointment != null)
+                        {
+                            <div class="row g-4">
+                                @* Header with status badge *@
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">
+                                            <i class="bi bi-clipboard2-pulse me-2"></i>@_detailAppointment.AppointmentNumber
+                                        </h5>
+                                        <StatusBadge Status="@_detailAppointment.Status" />
+                                    </div>
+                                </div>
+
+                                @* Left Column - Customer & Service Info *@
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header bg-info text-white">
+                                            <i class="bi bi-clipboard-check me-2"></i>Service Details
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-2">
+                                                <i class="bi bi-person-fill text-muted me-2"></i>
+                                                <strong>Customer:</strong> @_detailAppointment.CustomerName
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(_detailAppointment.CustomerPhone))
+                                            {
+                                                <div class="mb-2">
+                                                    <i class="bi bi-telephone text-muted me-2"></i>
+                                                    <strong>Phone:</strong> @_detailAppointment.CustomerPhone
+                                                </div>
+                                            }
+                                            <div class="mb-2">
+                                                <i class="bi bi-star text-muted me-2"></i>
+                                                <strong>Membership:</strong>
+                                                <span class="badge bg-warning text-dark">@_detailAppointment.MembershipType</span>
+                                            </div>
+                                            <div class="mb-2">
+                                                <i class="bi bi-person-badge text-muted me-2"></i>
+                                                <strong>Therapist:</strong> @(_detailAppointment.TherapistName ?? "Not Assigned")
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(_detailAppointment.RoomName))
+                                            {
+                                                <div class="mb-2">
+                                                    <i class="bi bi-door-open text-muted me-2"></i>
+                                                    <strong>Room:</strong> @_detailAppointment.RoomName
+                                                </div>
+                                            }
+                                            <hr />
+                                            <h6 class="mb-2"><i class="bi bi-gem me-1"></i>Services</h6>
+                                            @if (_detailAppointment.ServiceItems.Any())
+                                            {
+                                                @foreach (var si in _detailAppointment.ServiceItems)
+                                                {
+                                                    <div class="d-flex justify-content-between mb-1">
+                                                        <span>@si.ServiceName (@si.DurationMinutes min)</span>
+                                                        <span>₱@si.UnitPrice.ToString("N0")</span>
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex justify-content-between mb-1">
+                                                    <span>@_detailAppointment.ServiceName (@_detailAppointment.DurationMinutes min)</span>
+                                                    <span>₱@_detailAppointment.ServicePrice.ToString("N0")</span>
+                                                </div>
+                                            }
+                                            <hr class="my-2" />
+                                            <div class="d-flex justify-content-between fw-bold">
+                                                <span>Total:</span>
+                                                <span class="text-primary">₱@_detailAppointment.TotalPrice.ToString("N0")</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @* Right Column - Schedule & Timeline *@
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div
+                                            class="card-header @(_detailAppointment.Status == "Completed" ? "bg-success" : _detailAppointment.Status == "Cancelled" ? "bg-danger" : "bg-primary") text-white">
+                                            <i class="bi bi-calendar-event me-2"></i>Schedule & Timeline
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-2">
+                                                <i class="bi bi-calendar text-muted me-2"></i>
+                                                <strong>Date:</strong> @_detailAppointment.AppointmentDate.ToString("MMMM dd, yyyy (dddd)")
+                                            </div>
+                                            <div class="mb-2">
+                                                <i class="bi bi-clock text-muted me-2"></i>
+                                                <strong>Time:</strong>
+                                                @(DateTime.Today.Add(_detailAppointment.StartTime).ToString("h:mm tt")) -
+                                                @(DateTime.Today.Add(_detailAppointment.EndTime).ToString("h:mm tt"))
+                                            </div>
+                                            <div class="mb-3">
+                                                <i class="bi bi-hourglass-split text-muted me-2"></i>
+                                                <strong>Duration:</strong> @_detailAppointment.TotalDurationMinutes minutes
+                                            </div>
+
+                                            <hr />
+                                            <h6 class="mb-2"><i class="bi bi-clock-history me-1"></i>Timeline</h6>
+                                            <div class="small">
+                                                <div class="mb-1">
+                                                    <i class="bi bi-plus-circle text-muted me-1"></i>
+                                                    <strong>Created:</strong> @_detailAppointment.CreatedAt.ToString("MMM dd, yyyy h:mm tt")
+                                                </div>
+                                                @if (_detailAppointment.CheckedInAt.HasValue)
+                                                {
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-box-arrow-in-right text-info me-1"></i>
+                                                        <strong>Checked In:</strong>
+                                                        @PhilippineTime.FromUtc(_detailAppointment.CheckedInAt.Value).ToString("h:mm tt")
+                                                    </div>
+                                                }
+                                                @if (_detailAppointment.ServiceStartedAt.HasValue)
+                                                {
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-play-circle text-primary me-1"></i>
+                                                        <strong>Service Started:</strong>
+                                                        @PhilippineTime.FromUtc(_detailAppointment.ServiceStartedAt.Value).ToString("h:mm tt")
+                                                    </div>
+                                                }
+                                                @if (_detailAppointment.ServiceCompletedAt.HasValue)
+                                                {
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-check-circle text-success me-1"></i>
+                                                        <strong>Completed:</strong>
+                                                        @PhilippineTime.FromUtc(_detailAppointment.ServiceCompletedAt.Value).ToString("h:mm tt")
+                                                    </div>
+                                                }
+                                                @if (_detailAppointment.CancelledAt.HasValue)
+                                                {
+                                                    <div class="mb-1">
+                                                        <i class="bi bi-x-circle text-danger me-1"></i>
+                                                        <strong>Cancelled:</strong>
+                                                        @PhilippineTime.FromUtc(_detailAppointment.CancelledAt.Value).ToString("h:mm tt")
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(_detailAppointment.CancellationReason))
+                                                    {
+                                                        <div class="text-danger ms-3">
+                                                            <em>Reason: @_detailAppointment.CancellationReason</em>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(_detailAppointment.Notes))
+                                            {
+                                                <hr />
+                                                <h6 class="mb-2"><i class="bi bi-sticky me-1"></i>Notes</h6>
+                                                <p class="text-muted mb-0 small">@_detailAppointment.Notes</p>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </ChildContent>
+                    <FooterContent>
+                        <button type="button" class="btn btn-secondary" @onclick="CloseDetailModal">
+                            <i class="bi bi-x-lg me-1"></i>Close
+                        </button>
+                        @if (_detailAppointment != null && _detailAppointment.CanBeRescheduled)
+                        {
+                            <button type="button" class="btn btn-primary"
+                                    @onclick="async () => { CloseDetailModal(); await EditAppointment(_detailAppointment); }">
+                                <i class="bi bi-pencil me-1"></i>Edit
+                            </button>
+                        }
+                    </FooterContent>
+                </Modal>
+
                 @* Payment Success Modal *@
                 <Modal @bind-IsVisible="_showPaymentSuccessModal" Title="Payment Complete">
                     <ChildContent>
@@ -798,6 +980,14 @@
     private int _addServiceId;
     private bool _isAddingService;
 
+    // Detail Modal State (for viewing completed/cancelled appointments)
+    private bool _showDetailModal;
+    private AppointmentResponse? _detailAppointment;
+
+    // Query parameter support
+    [SupplyParameterFromQuery(Name = "action")]
+    public string? ActionParam { get; set; }
+
     // Payment Success
     private bool _showPaymentSuccessModal;
     private string _lastTransactionNumber = string.Empty;
@@ -853,7 +1043,17 @@
             var target = _appointments.Items.FirstOrDefault(a => a.AppointmentId == AppointmentId)
             ?? (AppointmentResponse?)await AppointmentService.GetAppointmentByIdAsync(AppointmentId);
             if (target != null)
-                await OpenProgressModal(target);
+            {
+                if (target.Status is "InProgress")
+                    await OpenProgressModal(target);
+                else
+                    OpenDetailModal(target);
+            }
+        }
+        // If ?action=new was requested (e.g., from dashboard), open the new appointment modal
+        else if (string.Equals(ActionParam, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            await ShowNewAppointmentModal();
         }
     }
 
@@ -1389,6 +1589,18 @@
         StartTimer();
 
         _showProgressModal = true;
+    }
+
+    private void OpenDetailModal(AppointmentResponse appt)
+    {
+        _detailAppointment = appt;
+        _showDetailModal = true;
+    }
+
+    private void CloseDetailModal()
+    {
+        _showDetailModal = false;
+        _detailAppointment = null;
     }
 
     private void StartTimer()

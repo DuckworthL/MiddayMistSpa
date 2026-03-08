@@ -348,6 +348,71 @@
                 </div>
             </div>
 
+            @* Commission Summary *@
+            <div class="row g-4 mt-0">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-cash-coin me-2"></i>Commission Summary</h6>
+                            @if (_commissionData != null)
+                            {
+                                <span class="badge bg-success fs-6">Total: @_commissionData.GrandTotal.ToString("C")</span>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (_commissionData == null || !_commissionData.Employees.Any())
+                            {
+                                <p class="text-muted text-center mb-0">No commission data for this period.</p>
+                            }
+                            else
+                            {
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="d-flex justify-content-between border-bottom pb-2">
+                                            <span class="text-muted">Service Commissions</span>
+                                            <strong class="text-primary">@_commissionData.TotalServiceCommissions.ToString("C")</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="d-flex justify-content-between border-bottom pb-2">
+                                            <span class="text-muted">Product Commissions</span>
+                                            <strong class="text-info">@_commissionData.TotalProductCommissions.ToString("C")</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Employee</th>
+                                                <th>Position</th>
+                                                <th class="text-end">Services</th>
+                                                <th class="text-end">Products</th>
+                                                <th class="text-end">Total</th>
+                                                <th class="text-center">Transactions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var emp in _commissionData.Employees)
+                                            {
+                                                <tr>
+                                                    <td><strong>@emp.EmployeeName</strong></td>
+                                                    <td class="text-muted">@emp.JobTitle</td>
+                                                    <td class="text-end">@emp.ServiceCommissions.ToString("C")</td>
+                                                    <td class="text-end">@emp.ProductCommissions.ToString("C")</td>
+                                                    <td class="text-end fw-bold text-success">@emp.TotalCommissions.ToString("C")</td>
+                                                    <td class="text-center">@emp.TransactionCount</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             @* Report Quick Links *@
             <div class="row g-3 mt-4">
                 <div class="col-12">
@@ -472,6 +537,9 @@
 
     // Available reports
     private List<ReportItem> _availableReports = new();
+
+    // Commission data
+    private CommissionSummaryResponse? _commissionData;
 
     // Custom report modal
     private bool _showCustomReportModal;
@@ -761,6 +829,13 @@ new() { Id = "services", Name = "Service Analysis", Description = "Service perfo
 new() { Id = "marketing", Name = "Marketing Report", Description = "Campaign effectiveness", Icon = "bi-megaphone" },
 new() { Id = "custom", Name = "Custom Report", Description = "Build your own report", Icon = "bi-sliders" },
 };
+
+            // Load commission summary
+            try
+            {
+                _commissionData = await ReportsService.GetCommissionSummaryAsync(startDate, endDate);
+            }
+            catch { _commissionData = null; }
         }
         catch (Exception ex)
         {

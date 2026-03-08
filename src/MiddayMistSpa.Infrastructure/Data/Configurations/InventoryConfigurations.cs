@@ -27,10 +27,10 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.ProductCode).HasMaxLength(50).IsRequired();
         builder.Property(p => p.ProductName).HasMaxLength(200).IsRequired();
+        builder.Property(p => p.Brand).HasMaxLength(200);
         builder.Property(p => p.Description).HasMaxLength(1000);
         builder.Property(p => p.ProductType).HasMaxLength(50).IsRequired();
         builder.Property(p => p.UnitOfMeasure).HasMaxLength(20).IsRequired();
-        builder.Property(p => p.Supplier).HasMaxLength(200);
         builder.Property(p => p.RetailCommissionRate).HasPrecision(5, 4);
         builder.Property(p => p.CurrentStock).HasPrecision(18, 3);
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
@@ -42,6 +42,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .WithMany(c => c.Products)
             .HasForeignKey(p => p.ProductCategoryId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(p => p.Supplier)
+            .WithMany(s => s.Products)
+            .HasForeignKey(p => p.SupplierId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Ignore(p => p.IsLowStock);
         builder.Ignore(p => p.IsExpiringSoon);

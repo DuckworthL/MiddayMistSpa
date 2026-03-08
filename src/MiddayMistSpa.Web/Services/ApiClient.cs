@@ -125,14 +125,23 @@ public class ApiClient : IApiClient
             var errorContent = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"API POST Error [{response.StatusCode}] {endpoint}: {errorContent}");
 
+            // Try to deserialize error response body as TResponse (for fields like RemainingAttempts, LockoutEnd)
+            TResponse? errorResult = default;
+            try
+            {
+                errorResult = System.Text.Json.JsonSerializer.Deserialize<TResponse>(errorContent, _jsonOptions);
+            }
+            catch { /* non-deserializable, ignore */ }
+
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 OnUnauthorized?.Invoke();
-                return (default, "Unauthorized");
+                var unauthMsg = TryExtractErrorMessage(errorContent) ?? "Unauthorized";
+                return (errorResult, unauthMsg);
             }
 
             var errorMessage = TryExtractErrorMessage(errorContent) ?? $"Request failed ({(int)response.StatusCode})";
-            return (default, errorMessage);
+            return (errorResult, errorMessage);
         }
         catch (Exception ex)
         {

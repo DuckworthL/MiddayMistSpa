@@ -53,6 +53,10 @@ public record CreateEmployeeRequest
     public string? LicenseNumber { get; init; }
     public DateTime? LicenseExpiryDate { get; init; }
 
+    // Bank Account
+    public string? BankName { get; init; }
+    public string? BankAccountNumber { get; init; }
+
     // User Account (optional - creates login access)
     public bool CreateUserAccount { get; init; }
     public int? RoleId { get; init; }
@@ -95,6 +99,10 @@ public record UpdateEmployeeRequest
     public string? Specialization { get; init; }
     public string? LicenseNumber { get; init; }
     public DateTime? LicenseExpiryDate { get; init; }
+
+    // Bank Account
+    public string? BankName { get; init; }
+    public string? BankAccountNumber { get; init; }
 }
 
 public record EmployeeResponse
@@ -138,6 +146,10 @@ public record EmployeeResponse
     public string? Specialization { get; init; }
     public string? LicenseNumber { get; init; }
     public DateTime? LicenseExpiryDate { get; init; }
+
+    // Bank Account
+    public string? BankName { get; init; }
+    public string? BankAccountNumber { get; init; }
 
     public bool IsActive { get; init; }
     public int? UserId { get; init; }

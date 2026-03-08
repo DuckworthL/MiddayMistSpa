@@ -28,7 +28,7 @@ public class ReportingService : IReportingService
 
         // Calculate previous period for comparison
         var periodLength = (endDate - startDate).Days;
-        var previousStart = startDate.AddDays(-periodLength - 1);
+        var previousStart = startDate.AddDays(-periodLength);
         var previousEnd = startDate.AddDays(-1);
 
         var response = new DashboardResponse
@@ -619,10 +619,15 @@ public class ReportingService : IReportingService
     public async Task<EmployeePerformanceResponse> GetEmployeePerformanceReportAsync(EmployeePerformanceRequest request)
     {
         var endOfDay = request.EndDate.Date.AddDays(1).AddTicks(-1);
-        var employees = await _context.Employees
+        var employeesQuery = _context.Employees
             .Include(e => e.User)
-            .Where(e => e.IsActive)
-            .ToListAsync();
+            .Where(e => e.IsActive);
+
+        // Filter by specific employee if requested
+        if (request.EmployeeId.HasValue)
+            employeesQuery = employeesQuery.Where(e => e.EmployeeId == request.EmployeeId.Value);
+
+        var employees = await employeesQuery.ToListAsync();
 
         if (!string.IsNullOrEmpty(request.JobTitle))
             employees = employees.Where(e => e.Position == request.JobTitle).ToList();
@@ -632,15 +637,30 @@ public class ReportingService : IReportingService
             .Where(a => a.AppointmentDate >= request.StartDate.Date && a.AppointmentDate <= endOfDay)
             .ToListAsync();
 
+        // Load shifts to compute scheduled days and absences
+        var shifts = await _context.EmployeeShifts
+            .Where(s => s.IsActive && s.EffectiveFrom <= request.EndDate.Date)
+            .ToListAsync();
+
+        // Load attendance records to compute actual days worked
+        var attendanceRecords = await _context.AttendanceRecords
+            .Where(a => a.Date >= request.StartDate.Date && a.Date <= request.EndDate.Date)
+            .ToListAsync();
+
         // Load schedules to compute utilization
         var schedules = await _context.EmployeeSchedules
             .Where(s => !s.IsRestDay)
             .ToListAsync();
 
-        var performanceItems = new List<EmployeePerformanceItem>();
+        // Load commission data from transactions
+        var transactions = await _context.Transactions
+            .AsNoTracking()
+            .Include(t => t.ServiceItems)
+            .Include(t => t.ProductItems)
+            .Where(t => t.TransactionDate >= request.StartDate.Date && t.TransactionDate < endOfDay && t.PaymentStatus == "Paid")
+            .ToListAsync();
 
-        // Calculate total working days in period
-        var periodDays = (int)(request.EndDate.Date - request.StartDate.Date).TotalDays + 1;
+        var performanceItems = new List<EmployeePerformanceItem>();
 
         foreach (var employee in employees)
         {
@@ -651,19 +671,41 @@ public class ReportingService : IReportingService
                 .Where(a => a.Status == "Completed")
                 .Sum(a => a.Service?.RegularPrice ?? 0);
 
-            var commissions = totalRevenue * (empAppointments.FirstOrDefault()?.Service?.TherapistCommissionRate ?? 0);
-            var daysWorked = empAppointments
-                .Where(a => a.Status == "Completed")
-                .Select(a => a.AppointmentDate.Date)
-                .Distinct()
-                .Count();
+            // Calculate scheduled days based on shifts
+            var empShifts = shifts.Where(s => s.EmployeeId == employee.EmployeeId).ToList();
+            int scheduledDays = 0;
+            for (var day = request.StartDate.Date; day <= request.EndDate.Date; day = day.AddDays(1))
+            {
+                var dow = (int)day.DayOfWeek;
+                if (empShifts.Any(s => s.DayOfWeek == dow && s.EffectiveFrom <= day && (!s.EffectiveTo.HasValue || s.EffectiveTo.Value >= day)))
+                    scheduledDays++;
+            }
+
+            // Actual days worked from attendance records
+            var empAttendance = attendanceRecords.Where(a => a.EmployeeId == employee.EmployeeId).ToList();
+            var daysWorked = empAttendance.Select(a => a.Date.Date).Distinct().Count();
+            var absences = Math.Max(0, scheduledDays - daysWorked);
+            var attendanceRate = scheduledDays > 0 ? Math.Min(100, (decimal)daysWorked / scheduledDays * 100) : 0;
+
+            // Service commissions from transactions
+            var serviceCommissions = transactions
+                .SelectMany(t => t.ServiceItems)
+                .Where(si => si.TherapistId == employee.EmployeeId)
+                .Sum(si => si.CommissionAmount);
+
+            // Product commissions from transactions
+            var productCommissions = transactions
+                .SelectMany(t => t.ProductItems)
+                .Where(pi => pi.SoldBy == employee.EmployeeId)
+                .Sum(pi => pi.CommissionAmount);
+
+            var totalCommissions = serviceCommissions + productCommissions;
 
             // Calculate utilization: booked service hours vs available schedule hours
             var empSchedules = schedules.Where(s => s.EmployeeId == employee.EmployeeId).ToList();
             decimal utilizationRate = 0;
             if (empSchedules.Any())
             {
-                // Count scheduled work hours in the period
                 decimal totalAvailableHours = 0;
                 for (var day = request.StartDate.Date; day <= request.EndDate.Date; day = day.AddDays(1))
                 {
@@ -677,7 +719,6 @@ public class ReportingService : IReportingService
                     }
                 }
 
-                // Booked hours from completed appointments
                 var bookedHours = empAppointments
                     .Where(a => a.Status == "Completed")
                     .Sum(a => (decimal)(a.EndTime - a.StartTime).TotalHours);
@@ -696,11 +737,16 @@ public class ReportingService : IReportingService
                 CancelledByTherapist = cancelled,
                 CompletionRate = empAppointments.Count > 0 ? (decimal)completed / empAppointments.Count * 100 : 0,
                 RevenueGenerated = totalRevenue,
-                CommissionsEarned = commissions,
+                CommissionsEarned = totalCommissions,
                 AverageServiceValue = completed > 0 ? totalRevenue / completed : 0,
                 DaysWorked = daysWorked,
+                ScheduledDays = scheduledDays,
+                Absences = absences,
+                AttendanceRate = Math.Round(attendanceRate, 1),
+                ServiceCommissions = serviceCommissions,
+                ProductCommissions = productCommissions,
                 UtilizationRate = Math.Round(utilizationRate, 1),
-                AverageRating = 0, // No review/rating system implemented yet
+                AverageRating = 0,
                 ReviewCount = 0
             });
         }
@@ -709,7 +755,7 @@ public class ReportingService : IReportingService
         performanceItems = request.SortBy?.ToLower() switch
         {
             "appointments" => performanceItems.OrderByDescending(e => e.AppointmentsCompleted).ToList(),
-            "rating" => performanceItems.OrderByDescending(e => e.AverageRating).ToList(),
+            "attendance" => performanceItems.OrderByDescending(e => e.AttendanceRate).ToList(),
             _ => performanceItems.OrderByDescending(e => e.RevenueGenerated).ToList()
         };
 
@@ -848,6 +894,7 @@ public class ReportingService : IReportingService
     {
         var products = await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Supplier)
             .ToListAsync();
 
         if (request.CategoryId.HasValue)
@@ -878,7 +925,7 @@ public class ReportingService : IReportingService
             Sku = p.ProductCode,
             ProductName = p.ProductName,
             Category = p.Category?.CategoryName ?? "Uncategorized",
-            Supplier = p.Supplier,
+            Supplier = p.Supplier?.SupplierName,
             CurrentStock = (int)p.CurrentStock,
             ReorderLevel = (int)p.ReorderLevel,
             UnitCost = p.CostPrice,
@@ -1392,5 +1439,75 @@ public class ReportingService : IReportingService
             EndDate = request.EndDate
         });
         return await _exportService.ExportFinancialSummaryAsync(data, request.StartDate, request.EndDate, request.Format, FormatGeneratedBy(request));
+    }
+
+    // =========================================================================
+    // Commission Summary
+    // =========================================================================
+
+    public async Task<CommissionSummaryResponse> GetCommissionSummaryAsync(CommissionSummaryRequest request)
+    {
+        var startDate = request.StartDate.Date;
+        var endDate = request.EndDate.Date.AddDays(1);
+
+        var transactions = await _context.Transactions
+            .AsNoTracking()
+            .Include(t => t.ServiceItems).ThenInclude(si => si.Therapist)
+            .Include(t => t.ProductItems)
+            .Where(t => t.TransactionDate >= startDate && t.TransactionDate < endDate && t.PaymentStatus == "Paid")
+            .ToListAsync();
+
+        var employeeMap = new Dictionary<int, EmployeeCommissionSummary>();
+
+        foreach (var tx in transactions)
+        {
+            foreach (var si in tx.ServiceItems.Where(s => s.TherapistId.HasValue))
+            {
+                var empId = si.TherapistId!.Value;
+                if (!employeeMap.ContainsKey(empId))
+                {
+                    employeeMap[empId] = new EmployeeCommissionSummary
+                    {
+                        EmployeeId = empId,
+                        EmployeeName = si.Therapist != null ? $"{si.Therapist.FirstName} {si.Therapist.LastName}" : "Unknown",
+                        JobTitle = si.Therapist?.Position ?? ""
+                    };
+                }
+                employeeMap[empId].ServiceCommissions += si.CommissionAmount;
+                employeeMap[empId].TransactionCount++;
+            }
+
+            foreach (var pi in tx.ProductItems.Where(p => p.SoldBy.HasValue))
+            {
+                var empId = pi.SoldBy!.Value;
+                if (!employeeMap.ContainsKey(empId))
+                {
+                    var emp = await _context.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.EmployeeId == empId);
+                    employeeMap[empId] = new EmployeeCommissionSummary
+                    {
+                        EmployeeId = empId,
+                        EmployeeName = emp != null ? $"{emp.FirstName} {emp.LastName}" : "Unknown",
+                        JobTitle = emp?.Position ?? ""
+                    };
+                }
+                employeeMap[empId].ProductCommissions += pi.CommissionAmount;
+                employeeMap[empId].TransactionCount++;
+            }
+        }
+
+        foreach (var emp in employeeMap.Values)
+            emp.TotalCommissions = emp.ServiceCommissions + emp.ProductCommissions;
+
+        var employees = employeeMap.Values.OrderByDescending(e => e.TotalCommissions).ToList();
+
+        return new CommissionSummaryResponse
+        {
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            TotalServiceCommissions = employees.Sum(e => e.ServiceCommissions),
+            TotalProductCommissions = employees.Sum(e => e.ProductCommissions),
+            GrandTotal = employees.Sum(e => e.TotalCommissions),
+            Employees = employees
+        };
     }
 }

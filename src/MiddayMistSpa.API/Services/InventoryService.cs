@@ -134,6 +134,7 @@ public class InventoryService : IInventoryService
             ProductCode = productCode,
             ProductCategoryId = request.ProductCategoryId,
             ProductName = request.ProductName,
+            Brand = request.Brand,
             Description = request.Description,
             ProductType = request.ProductType,
             CurrentStock = 0,
@@ -143,7 +144,7 @@ public class InventoryService : IInventoryService
             SellingPrice = request.SellingPrice,
             RetailCommissionRate = request.RetailCommissionRate,
             ExpiryDate = request.ExpiryDate,
-            Supplier = request.Supplier,
+            SupplierId = request.SupplierId,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -162,6 +163,7 @@ public class InventoryService : IInventoryService
         var product = await _context.Products
             .AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.ProductId == productId);
 
         return product == null ? null : MapToProductResponse(product, product.Category.CategoryName);
@@ -172,6 +174,7 @@ public class InventoryService : IInventoryService
         var product = await _context.Products
             .AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.ProductCode == productCode);
 
         return product == null ? null : MapToProductResponse(product, product.Category.CategoryName);
@@ -182,6 +185,7 @@ public class InventoryService : IInventoryService
         var query = _context.Products
             .AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.Supplier)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
@@ -307,6 +311,7 @@ public class InventoryService : IInventoryService
     {
         var product = await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Supplier)
             .FirstOrDefaultAsync(p => p.ProductId == productId)
             ?? throw new InvalidOperationException($"Product with ID {productId} not found");
 
@@ -315,6 +320,7 @@ public class InventoryService : IInventoryService
 
         product.ProductCategoryId = request.ProductCategoryId;
         product.ProductName = request.ProductName;
+        product.Brand = request.Brand;
         product.Description = request.Description;
         product.ProductType = request.ProductType;
         product.ReorderLevel = request.ReorderLevel;
@@ -323,7 +329,7 @@ public class InventoryService : IInventoryService
         product.SellingPrice = request.SellingPrice;
         product.RetailCommissionRate = request.RetailCommissionRate;
         product.ExpiryDate = request.ExpiryDate;
-        product.Supplier = request.Supplier;
+        product.SupplierId = request.SupplierId;
         product.IsActive = request.IsActive;
         product.UpdatedAt = DateTime.UtcNow;
 
@@ -1080,6 +1086,7 @@ public class InventoryService : IInventoryService
         ProductId = product.ProductId,
         ProductCode = product.ProductCode,
         ProductName = product.ProductName,
+        Brand = product.Brand,
         Description = product.Description,
         ProductCategoryId = product.ProductCategoryId,
         CategoryName = categoryName,
@@ -1091,7 +1098,8 @@ public class InventoryService : IInventoryService
         SellingPrice = product.SellingPrice,
         RetailCommissionRate = product.RetailCommissionRate,
         ExpiryDate = product.ExpiryDate,
-        Supplier = product.Supplier,
+        SupplierId = product.SupplierId,
+        SupplierName = product.Supplier?.SupplierName,
         IsActive = product.IsActive,
         IsLowStock = product.IsLowStock,
         IsExpiringSoon = product.IsExpiringSoon,
@@ -1105,6 +1113,7 @@ public class InventoryService : IInventoryService
         ProductId = product.ProductId,
         ProductCode = product.ProductCode,
         ProductName = product.ProductName,
+        Brand = product.Brand,
         ProductCategoryId = product.ProductCategoryId,
         CategoryName = product.Category?.CategoryName ?? "Unknown",
         ProductType = product.ProductType,
@@ -1113,6 +1122,8 @@ public class InventoryService : IInventoryService
         UnitOfMeasure = product.UnitOfMeasure,
         CostPrice = product.CostPrice,
         SellingPrice = product.SellingPrice,
+        SupplierId = product.SupplierId,
+        SupplierName = product.Supplier?.SupplierName,
         IsLowStock = product.IsLowStock,
         IsExpiringSoon = product.IsExpiringSoon,
         IsActive = product.IsActive

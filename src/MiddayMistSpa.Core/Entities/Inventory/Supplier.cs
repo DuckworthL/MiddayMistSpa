@@ -22,4 +22,5 @@ public class Supplier
 
     // Navigation properties
     public virtual ICollection<PurchaseOrder> PurchaseOrders { get; set; } = new List<PurchaseOrder>();
+    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 }

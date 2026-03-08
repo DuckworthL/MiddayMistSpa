@@ -242,4 +242,24 @@ public class ReportsController : ControllerBase
             return StatusCode(500, new { error = "An error occurred while exporting the report" });
         }
     }
+
+    // ============================================================================
+    // Commission Summary
+    // ============================================================================
+
+    [HttpGet("commission-summary")]
+    [Authorize(Policy = "Permission:reports.view")]
+    public async Task<ActionResult<CommissionSummaryResponse>> GetCommissionSummary([FromQuery] CommissionSummaryRequest request)
+    {
+        try
+        {
+            var result = await _reportingService.GetCommissionSummaryAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting commission summary");
+            return StatusCode(500, new { error = "An error occurred while getting the commission summary" });
+        }
+    }
 }

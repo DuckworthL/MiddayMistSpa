@@ -13,8 +13,8 @@ public class PagedResponse<T>
     public List<T> Items { get; set; } = new();
     public int TotalCount { get; set; }
     public int Page { get; set; }
-    public int PageSize { get; set; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+    public int PageSize { get; set; } = 1;
+    public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
     public bool HasPreviousPage => Page > 1;
     public bool HasNextPage => Page < TotalPages;
 }
@@ -445,6 +445,8 @@ public class ProductResponse
     public string? UnitOfMeasure { get; set; }
     public string Unit => UnitOfMeasure ?? "pcs"; // Alias
     public DateTime? ExpiryDate { get; set; }
+    public int? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
     public bool IsActive { get; set; }
     public bool IsLowStock { get; set; }
     public bool IsExpiringSoon { get; set; }
@@ -459,6 +461,22 @@ public class ProductCategoryResponse
     public string? Description { get; set; }
     public int ProductCount { get; set; }
     public bool IsActive { get; set; }
+}
+
+public class SupplierResponse
+{
+    public int SupplierId { get; set; }
+    public string SupplierCode { get; set; } = string.Empty;
+    public string SupplierName { get; set; } = string.Empty;
+    public string? ContactPerson { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class CreateSupplierRequest
+{
+    public string SupplierName { get; set; } = string.Empty;
 }
 
 public class CreateProductRequest
@@ -493,7 +511,7 @@ public class CreateProductRequest
     public decimal ReorderLevel { get; set; }
 
     public DateTime? ExpiryDate { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
     public bool IsActive { get; set; } = true;
 }
 
@@ -847,7 +865,7 @@ public class UpdateProductRequest
     public decimal RetailPrice { get; set; }
     public decimal? SellingPrice => RetailPrice > 0 ? RetailPrice : null;
     public decimal ReorderLevel { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -1071,27 +1089,41 @@ public class AttendanceSummaryResponse
 
 public class TimeOffResponse
 {
-    public int TimeOffId { get; set; }
+    public int TimeOffRequestId { get; set; }
     public int EmployeeId { get; set; }
     public string EmployeeName { get; set; } = string.Empty;
     public string LeaveType { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public int TotalDays { get; set; }
+    public decimal TotalDays { get; set; }
     public string Reason { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
-    public int? ApprovedById { get; set; }
     public string? ApprovedByName { get; set; }
     public DateTime? ApprovedAt { get; set; }
+    public string? RejectionReason { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class CreateTimeOffRequest
 {
     public int EmployeeId { get; set; }
-    public string LeaveType { get; set; } = "Vacation";
+    public string LeaveType { get; set; } = "SIL";
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string Reason { get; set; } = string.Empty;
+}
+
+public class UpdateTimeOffRequest
+{
+    public string? LeaveType { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string? Reason { get; set; }
+}
+
+public class RejectTimeOffRequestModel
+{
+    public string RejectionReason { get; set; } = string.Empty;
 }
 
 public class LiveAttendanceStatus
@@ -1248,6 +1280,11 @@ public class EmployeePerformanceItem
     public decimal CommissionsEarned { get; set; }
     public decimal AverageServiceValue { get; set; }
     public int DaysWorked { get; set; }
+    public int ScheduledDays { get; set; }
+    public int Absences { get; set; }
+    public decimal AttendanceRate { get; set; }
+    public decimal ServiceCommissions { get; set; }
+    public decimal ProductCommissions { get; set; }
     public decimal UtilizationRate { get; set; }
     public decimal AverageRating { get; set; }
     public int ReviewCount { get; set; }
@@ -1263,6 +1300,31 @@ public class CustomerReportResponse
     public decimal RetentionRate { get; set; }
     public decimal AverageSpend { get; set; }
     public List<CustomerSegment> Segments { get; set; } = new();
+}
+
+// =========================================================================
+// Commission Summary
+// =========================================================================
+
+public class CommissionSummaryResponse
+{
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public decimal TotalServiceCommissions { get; set; }
+    public decimal TotalProductCommissions { get; set; }
+    public decimal GrandTotal { get; set; }
+    public List<EmployeeCommissionSummary> Employees { get; set; } = new();
+}
+
+public class EmployeeCommissionSummary
+{
+    public int EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public string JobTitle { get; set; } = string.Empty;
+    public decimal ServiceCommissions { get; set; }
+    public decimal ProductCommissions { get; set; }
+    public decimal TotalCommissions { get; set; }
+    public int TransactionCount { get; set; }
 }
 
 public class CustomerSegment
@@ -1690,6 +1752,23 @@ public class JournalSummaryResponse
     public decimal TotalCredits { get; set; }
 }
 
+public class FiscalYearCloseRequest
+{
+    public int FiscalYear { get; set; }
+}
+
+public class FiscalYearCloseResponse
+{
+    public int FiscalYear { get; set; }
+    public int JournalEntryId { get; set; }
+    public string EntryNumber { get; set; } = string.Empty;
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal NetIncome { get; set; }
+    public int AccountsClosed { get; set; }
+    public DateTime ClosedAt { get; set; }
+}
+
 public class CustomerStatsResponse
 {
     public int TotalCustomers { get; set; }
@@ -1704,6 +1783,41 @@ public class TransactionStatsResponse
     public int TodayCount { get; set; }
     public decimal AverageTransaction { get; set; }
     public decimal PendingPayments { get; set; }
+}
+
+// =============================================================================
+// Cash Drawer Models
+// =============================================================================
+
+public class CashDrawerSessionResponse
+{
+    public int SessionId { get; set; }
+    public int OpenedByUserId { get; set; }
+    public string OpenedByName { get; set; } = string.Empty;
+    public int? ClosedByUserId { get; set; }
+    public string? ClosedByName { get; set; }
+    public DateTime OpenedAt { get; set; }
+    public DateTime? ClosedAt { get; set; }
+    public decimal StartingFloat { get; set; }
+    public decimal TotalCashIn { get; set; }
+    public decimal TotalCashOut { get; set; }
+    public decimal ExpectedCash { get; set; }
+    public decimal? ActualCash { get; set; }
+    public decimal? Discrepancy { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+public class OpenDrawerRequest
+{
+    public decimal StartingFloat { get; set; }
+    public string? Notes { get; set; }
+}
+
+public class CloseDrawerRequest
+{
+    public decimal ActualCash { get; set; }
+    public string? Notes { get; set; }
 }
 
 // =============================================================================
@@ -2243,4 +2357,34 @@ public class CreateRoleRequest
 public class UpdateRolePermissionsRequest
 {
     public HashSet<string> Permissions { get; set; } = new();
+}
+
+// =========================================================================
+// Holiday Models
+// =========================================================================
+
+public class HolidayResponse
+{
+    public int HolidayId { get; set; }
+    public string HolidayName { get; set; } = "";
+    public DateTime HolidayDate { get; set; }
+    public string HolidayType { get; set; } = "";
+    public int Year { get; set; }
+    public bool IsRecurring { get; set; }
+}
+
+public class CreateHolidayRequest
+{
+    public string HolidayName { get; set; } = "";
+    public DateTime HolidayDate { get; set; }
+    public string HolidayType { get; set; } = "Regular";
+    public bool IsRecurring { get; set; } = true;
+}
+
+public class UpdateHolidayRequest
+{
+    public string HolidayName { get; set; } = "";
+    public DateTime HolidayDate { get; set; }
+    public string HolidayType { get; set; } = "Regular";
+    public bool IsRecurring { get; set; } = true;
 }

@@ -538,45 +538,54 @@ public class ExportService : IExportService
                         row.ConstantItem(8).Text("");
                         row.RelativeItem().Element(c => KpiCard(c, "Total Revenue", $"₱{data.Summary.TotalRevenue:N2}"));
                         row.ConstantItem(8).Text("");
-                        row.RelativeItem().Element(c => KpiCard(c, "Total Appointments", data.Summary.TotalAppointments.ToString()));
+                        row.RelativeItem().Element(c => KpiCard(c, "Total Commissions", $"₱{data.Summary.TotalCommissions:N2}"));
                         row.ConstantItem(8).Text("");
-                        row.RelativeItem().Element(c => KpiCard(c, "Avg Rating", $"{data.Summary.AverageRating:N1}/5.0"));
+                        row.RelativeItem().Element(c => KpiCard(c, "Total Appointments", data.Summary.TotalAppointments.ToString()));
                     });
 
                     // Employee Details
                     if (data.Employees?.Any() == true)
                     {
-                        col.Item().Element(c => SectionTitle(c, "Employee Details"));
+                        col.Item().Element(c => SectionTitle(c, "Employee Performance Details"));
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(cols =>
                             {
-                                cols.RelativeColumn(3);
-                                cols.RelativeColumn(2);
-                                cols.RelativeColumn(2);
-                                cols.RelativeColumn(2);
-                                cols.RelativeColumn(2);
-                                cols.RelativeColumn(2);
+                                cols.RelativeColumn(3);  // Employee
+                                cols.RelativeColumn(2);  // Position
+                                cols.RelativeColumn(1.5f); // Scheduled
+                                cols.RelativeColumn(1.5f); // Worked
+                                cols.RelativeColumn(1.5f); // Absences
+                                cols.RelativeColumn(1.5f); // Attendance
+                                cols.RelativeColumn(1.5f); // Services
+                                cols.RelativeColumn(2);  // Revenue
+                                cols.RelativeColumn(2);  // Total Comm
                             });
 
                             table.Header(header =>
                             {
-                                header.Cell().Background(HeaderBgColor).Padding(5).Text("Employee").FontSize(9).FontColor(Colors.White).Bold();
-                                header.Cell().Background(HeaderBgColor).Padding(5).Text("Position").FontSize(9).FontColor(Colors.White).Bold();
-                                header.Cell().Background(HeaderBgColor).Padding(5).AlignRight().Text("Appointments").FontSize(9).FontColor(Colors.White).Bold();
-                                header.Cell().Background(HeaderBgColor).Padding(5).AlignRight().Text("Revenue").FontSize(9).FontColor(Colors.White).Bold();
-                                header.Cell().Background(HeaderBgColor).Padding(5).AlignRight().Text("Rating").FontSize(9).FontColor(Colors.White).Bold();
-                                header.Cell().Background(HeaderBgColor).Padding(5).AlignRight().Text("Utilization").FontSize(9).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).Text("Employee").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).Text("Position").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignCenter().Text("Scheduled").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignCenter().Text("Worked").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignCenter().Text("Absences").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignCenter().Text("Attendance").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignCenter().Text("Services").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignRight().Text("Revenue").FontSize(8).FontColor(Colors.White).Bold();
+                                header.Cell().Background(HeaderBgColor).Padding(4).AlignRight().Text("Total Comm").FontSize(8).FontColor(Colors.White).Bold();
                             });
 
                             foreach (var emp in data.Employees)
                             {
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(emp.EmployeeName).FontSize(9);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(emp.JobTitle).FontSize(9);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).AlignRight().Text(emp.AppointmentsCompleted.ToString()).FontSize(9);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).AlignRight().Text($"₱{emp.RevenueGenerated:N2}").FontSize(9);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).AlignRight().Text($"{emp.AverageRating:N1}").FontSize(9);
-                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).AlignRight().Text($"{emp.UtilizationRate:N1}%").FontSize(9);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(emp.EmployeeName).FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(emp.JobTitle).FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text($"{emp.ScheduledDays}").FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text($"{emp.DaysWorked}").FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text($"{emp.Absences}").FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text($"{emp.AttendanceRate:N0}%").FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignCenter().Text(emp.AppointmentsCompleted.ToString()).FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text($"₱{emp.RevenueGenerated:N2}").FontSize(8);
+                                table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(4).AlignRight().Text($"₱{emp.CommissionsEarned:N2}").FontSize(8);
                             }
                         });
 
@@ -604,9 +613,18 @@ public class ExportService : IExportService
         WriteExcelHeader(ws, "Employee Performance Report", startDate, endDate);
 
         var row = 5;
-        ws.Cell(row, 1).Value = "Employee"; ws.Cell(row, 2).Value = "Position"; ws.Cell(row, 3).Value = "Appointments";
-        ws.Cell(row, 4).Value = "Revenue"; ws.Cell(row, 5).Value = "Rating"; ws.Cell(row, 6).Value = "Utilization %";
-        StyleExcelHeaderRow(ws, row, 6);
+        ws.Cell(row, 1).Value = "Employee";
+        ws.Cell(row, 2).Value = "Position";
+        ws.Cell(row, 3).Value = "Scheduled Days";
+        ws.Cell(row, 4).Value = "Days Worked";
+        ws.Cell(row, 5).Value = "Absences";
+        ws.Cell(row, 6).Value = "Attendance %";
+        ws.Cell(row, 7).Value = "Services Completed";
+        ws.Cell(row, 8).Value = "Revenue";
+        ws.Cell(row, 9).Value = "Service Comm";
+        ws.Cell(row, 10).Value = "Product Comm";
+        ws.Cell(row, 11).Value = "Total Comm";
+        StyleExcelHeaderRow(ws, row, 11);
 
         if (data.Employees != null)
         {
@@ -615,10 +633,15 @@ public class ExportService : IExportService
                 row++;
                 ws.Cell(row, 1).Value = emp.EmployeeName;
                 ws.Cell(row, 2).Value = emp.JobTitle;
-                ws.Cell(row, 3).Value = emp.AppointmentsCompleted;
-                ws.Cell(row, 4).Value = emp.RevenueGenerated; ws.Cell(row, 4).Style.NumberFormat.Format = "₱#,##0.00";
-                ws.Cell(row, 5).Value = emp.AverageRating; ws.Cell(row, 5).Style.NumberFormat.Format = "0.0";
-                ws.Cell(row, 6).Value = emp.UtilizationRate / 100; ws.Cell(row, 6).Style.NumberFormat.Format = "0.0%";
+                ws.Cell(row, 3).Value = emp.ScheduledDays;
+                ws.Cell(row, 4).Value = emp.DaysWorked;
+                ws.Cell(row, 5).Value = emp.Absences;
+                ws.Cell(row, 6).Value = emp.AttendanceRate / 100; ws.Cell(row, 6).Style.NumberFormat.Format = "0.0%";
+                ws.Cell(row, 7).Value = emp.AppointmentsCompleted;
+                ws.Cell(row, 8).Value = emp.RevenueGenerated; ws.Cell(row, 8).Style.NumberFormat.Format = "₱#,##0.00";
+                ws.Cell(row, 9).Value = emp.ServiceCommissions; ws.Cell(row, 9).Style.NumberFormat.Format = "₱#,##0.00";
+                ws.Cell(row, 10).Value = emp.ProductCommissions; ws.Cell(row, 10).Style.NumberFormat.Format = "₱#,##0.00";
+                ws.Cell(row, 11).Value = emp.CommissionsEarned; ws.Cell(row, 11).Style.NumberFormat.Format = "₱#,##0.00";
             }
         }
 
@@ -632,10 +655,10 @@ public class ExportService : IExportService
         sb.AppendLine($"Employee Performance Report — {CompanyName}");
         sb.AppendLine($"Period: {startDate:MMM dd yyyy} to {endDate:MMM dd yyyy}");
         sb.AppendLine();
-        sb.AppendLine("Employee,Position,Appointments,Revenue,Rating,Utilization %");
+        sb.AppendLine("Employee,Position,Scheduled Days,Days Worked,Absences,Attendance %,Services Completed,Revenue,Service Comm,Product Comm,Total Comm");
         if (data.Employees != null)
             foreach (var emp in data.Employees)
-                sb.AppendLine($"\"{emp.EmployeeName}\",\"{emp.JobTitle}\",{emp.AppointmentsCompleted},{emp.RevenueGenerated:N2},{emp.AverageRating:N1},{emp.UtilizationRate:N1}%");
+                sb.AppendLine($"\"{emp.EmployeeName}\",\"{emp.JobTitle}\",{emp.ScheduledDays},{emp.DaysWorked},{emp.Absences},{emp.AttendanceRate:N1}%,{emp.AppointmentsCompleted},{emp.RevenueGenerated:N2},{emp.ServiceCommissions:N2},{emp.ProductCommissions:N2},{emp.CommissionsEarned:N2}");
 
         return CsvToResponse(sb, $"Employee_Performance_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}");
     }

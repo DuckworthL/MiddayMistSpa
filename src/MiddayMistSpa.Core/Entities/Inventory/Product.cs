@@ -9,6 +9,7 @@ public class Product
     public int ProductCategoryId { get; set; }
     public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
+    public string? Brand { get; set; }
     public string? Description { get; set; }
     public string ProductType { get; set; } = string.Empty; // Retail, Supply, Consumable
 
@@ -24,7 +25,7 @@ public class Product
 
     // Tracking
     public DateTime? ExpiryDate { get; set; }
-    public string? Supplier { get; set; }
+    public int? SupplierId { get; set; }
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -37,6 +38,7 @@ public class Product
 
     // Navigation properties
     public virtual ProductCategory Category { get; set; } = null!;
+    public virtual Supplier? Supplier { get; set; }
     public virtual ICollection<StockAdjustment> StockAdjustments { get; set; } = new List<StockAdjustment>();
     public virtual ICollection<Service.ServiceProductRequirement> ServiceRequirements { get; set; } = new List<Service.ServiceProductRequirement>();
     public virtual ICollection<ProductBatch> Batches { get; set; } = new List<ProductBatch>();

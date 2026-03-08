@@ -70,13 +70,16 @@
                     </div>
                     @if (_isAdminUser)
                     {
-                        <div class="col-md-2">
-                            <select class="form-select" @onchange="OnEmployeeFilterChange">
-                                <option value="">All Employees</option>
-                                @foreach (var emp in _employeeLookup)
-                                {
-                                    <option value="@emp.Id">@emp.Name</option>
-                                }
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Search employee..." @bind="_searchTerm" @bind:event="oninput" />
+                        </div>
+                        <div class="col-auto">
+                            <select class="form-select" @bind="_statusFilter">
+                                <option value="">All Status</option>
+                                <option value="ClockedIn">Clocked In</option>
+                                <option value="OnBreak">On Break</option>
+                                <option value="ClockedOut">Clocked Out</option>
+                                <option value="NotYetIn">Not Yet In</option>
                             </select>
                         </div>
                     }
@@ -97,7 +100,7 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
-                        @foreach (var status in _liveStatus)
+                        @foreach (var status in FilteredLiveStatus)
                         {
                             var bgClass = status.Status switch
                             {
@@ -243,90 +246,370 @@
                 </div>
             </div>
 
-            @* Time Entries Table *@
-            <div class="card border-0 shadow-sm mt-4">
-                <div class="card-header bg-transparent">
-                    <h6 class="mb-0">Time Entries</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Employee</th>
-                                    <th class="text-center">Clock In</th>
-                                    <th class="text-center">Clock Out</th>
-                                    <th class="text-center">Break</th>
-                                    <th class="text-center">Total Hours</th>
-                                    <th class="text-center">Status</th>
-                                    @if (_isAdminUser && _canManage)
-                                    {
-                                        <th class="text-end">Actions</th>
-                                    }
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e =>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            e.ClockIn))
+            @* Time Entries & Leave Requests Tabs *@
+            <div class="card border-0 shadow-sm mt-4 mb-4">
+                <div class="card-header bg-transparent p-0">
+                    <ul class="nav nav-tabs" style="border-bottom: none;">
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "entries" ? "active" : "")" @onclick='() => _activeTab = "entries"'>
+                                <i class="bi bi-clock-history me-1"></i> Time Entries
+                                @{ var pendingEntries = _timeEntries.Count(e => !e.IsApproved); }
+                                @if (pendingEntries > 0)
                                 {
+                                    <span class="badge bg-warning ms-1">@pendingEntries</span>
+                                }
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(_activeTab == "leave" ? "active" : "")" @onclick='() => _activeTab = "leave"'>
+                                <i class="bi bi-calendar-event me-1"></i> Leave Requests
+                                @if (_pendingLeaveRequests.Any())
+                                {
+                                    <span class="badge bg-warning ms-1">@_pendingLeaveRequests.Count</span>
+                                }
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                @if (_activeTab == "entries")
+                {
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
                                     <tr>
-                                        <td>@entry.Date.ToString("ddd, MMM dd")</td>
-                                        <td>@entry.EmployeeName</td>
-                                        <td class="text-center">
-                                            <span class="badge bg-success">@entry.ClockIn.ToString("hh\\:mm")</span>
-                                        </td>
-                                        <td class="text-center">
-                                            @if (entry.ClockOut.HasValue)
-                                            {
-                                                <span class="badge bg-secondary">@entry.ClockOut.Value.ToString("hh\\:mm")</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-warning">Still In</span>
-                                            }
-                                        </td>
-                                        <td class="text-center">@entry.BreakMinutes min</td>
-                                        <td class="text-center fw-medium">@entry.TotalHours.ToString("N2")h</td>
-                                        <td class="text-center">
-                                            @if (entry.IsApproved)
-                                            {
-                                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Approved</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-warning">Pending</span>
-                                            }
-                                        </td>
+                                        <th>Date</th>
+                                        <th>Employee</th>
+                                        <th class="text-center">Clock In</th>
+                                        <th class="text-center">Clock Out</th>
+                                        <th class="text-center">Break</th>
+                                        <th class="text-center">Total Hours</th>
+                                        <th class="text-center">Status</th>
                                         @if (_isAdminUser && _canManage)
                                         {
-                                            <td class="text-end">
-                                                <div class="btn-group btn-group-sm">
-                                                    <button class="btn btn-outline-primary" @onclick="() => EditTimeEntry(entry)"
-                                                            title="Edit">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </button>
-                                                    @if (!entry.IsApproved)
-                                                    {
-                                                        <button class="btn btn-outline-success" @onclick="() => ApproveEntry(entry)"
-                                                                title="Approve">
-                                                            <i class="bi bi-check-lg"></i>
-                                                        </button>
-                                                    }
-                                                </div>
-                                            </td>
+                                            <th class="text-end">Actions</th>
                                         }
                                     </tr>
-                                }
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    @if (!_timeEntries.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="8" class="text-center py-4 text-muted">
+                                                <i class="bi bi-clock fs-4"></i>
+                                                <p class="mb-0 mt-1">No time entries for this week.</p>
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var entry in _timeEntries.OrderByDescending(e => e.Date).ThenByDescending(e => e.ClockIn))
+                                        {
+                                            <tr>
+                                                <td>@entry.Date.ToString("ddd, MMM dd")</td>
+                                                <td>@entry.EmployeeName</td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-success">@entry.ClockIn.ToString("hh\\:mm")</span>
+                                                </td>
+                                                <td class="text-center">
+                                                    @if (entry.ClockOut.HasValue)
+                                                    {
+                                                        <span class="badge bg-secondary">@entry.ClockOut.Value.ToString("hh\\:mm")</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-warning">Still In</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">@entry.BreakMinutes min</td>
+                                                <td class="text-center fw-medium">@entry.TotalHours.ToString("N2")h</td>
+                                                <td class="text-center">
+                                                    @if (entry.IsApproved)
+                                                    {
+                                                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Approved</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-warning">Pending</span>
+                                                    }
+                                                </td>
+                                                @if (_isAdminUser && _canManage)
+                                                {
+                                                    <td class="text-end">
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary" @onclick="() => EditTimeEntry(entry)"
+                                                                    title="Edit">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            @if (!entry.IsApproved)
+                                                            {
+                                                                <button class="btn btn-outline-success" @onclick="() => ApproveEntry(entry)"
+                                                                        title="Approve">
+                                                                    <i class="bi bi-check-lg"></i>
+                                                                </button>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                }
+                else
+                {
+                    <div class="card-body p-0">
+                        <div class="d-flex justify-content-end p-2 border-bottom">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="ShowLeaveRequestModal">
+                                <i class="bi bi-plus-lg me-1"></i> Request Leave
+                            </button>
+                        </div>
+                        @if (_leaveRequests.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Type</th>
+                                            <th>Period</th>
+                                            <th class="text-center">Days</th>
+                                            <th>Reason</th>
+                                            <th class="text-center">Status</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var leave in _leaveRequests)
+                                        {
+                                            var statusBadge = leave.Status switch
+                                            {
+                                                "Approved" => "bg-success",
+                                                "Rejected" => "bg-danger",
+                                                _ => "bg-warning"
+                                            };
+                                            <tr>
+                                                <td class="fw-medium">@leave.EmployeeName</td>
+                                                <td><span class="badge bg-light text-dark">@leave.LeaveType</span></td>
+                                                <td>@leave.StartDate.ToString("MMM dd") - @leave.EndDate.ToString("MMM dd, yyyy")</td>
+                                                <td class="text-center">@leave.TotalDays</td>
+                                                <td><small class="text-muted">@(leave.Reason?.Length > 40 ? leave.Reason[..40] + "..." : leave.Reason)</small></td>
+                                                <td class="text-center">
+                                                    <span class="badge @statusBadge">@leave.Status</span>
+                                                    @if (leave.Status != "Pending" && !string.IsNullOrEmpty(leave.ApprovedByName))
+                                                    {
+                                                        <br /><small class="text-muted">by @leave.ApprovedByName</small>
+                                                    }
+                                                    @if (leave.Status == "Rejected" && !string.IsNullOrEmpty(leave.RejectionReason))
+                                                    {
+                                                        <br /><small class="text-danger">@leave.RejectionReason</small>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm">
+                                                        @if (_isAdminUser && _canManage && leave.Status == "Pending")
+                                                        {
+                                                            <button class="btn btn-outline-success" @onclick="() => ApproveLeaveRequest(leave.TimeOffRequestId)" title="Approve">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-danger" @onclick="() => ShowRejectModal(leave)" title="Reject">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        }
+                                                        @if (leave.Status == "Pending")
+                                                        {
+                                                            <button class="btn btn-outline-primary" @onclick="() => ShowEditLeaveModal(leave)" title="Edit">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                        }
+                                                        <button class="btn btn-outline-secondary" @onclick="() => ArchiveLeaveRequest(leave)" title="Archive">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-calendar-x fs-4"></i>
+                                <p class="mb-0 mt-1">No leave requests found.</p>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         }
     </div>
 
-    @* Clock In/Out Modal *@
+    @* Leave Request Modal *@
+    <Modal @bind-IsVisible="_showLeaveModal" Title="Request Leave">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Employee *</label>
+                @if (_isAdminUser)
+                {
+                    <select class="form-select" @bind="_leaveForm.EmployeeId">
+                        <option value="0">Select Employee...</option>
+                        @foreach (var emp in _employeeLookup)
+                        {
+                            <option value="@emp.Id">@emp.Name</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <div class="form-control bg-light">
+                        <i class="bi bi-person-fill me-2"></i>@_currentEmployeeName
+                    </div>
+                }
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Leave Type *</label>
+                <select class="form-select" @bind="_leaveForm.LeaveType">
+                    <option value="SIL">Service Incentive Leave</option>
+                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="Maternity Leave">Maternity Leave</option>
+                    <option value="Paternity Leave">Paternity Leave</option>
+                    <option value="Solo Parent Leave">Solo Parent Leave</option>
+                    <option value="Emergency Leave">Emergency Leave</option>
+                </select>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Date *</label>
+                    <input type="date" class="form-control" @bind="_leaveForm.StartDate" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">End Date *</label>
+                    <input type="date" class="form-control" @bind="_leaveForm.EndDate" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" rows="2" @bind="_leaveForm.Reason" placeholder="Reason for leave request..."></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showLeaveModal = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SubmitLeaveRequest" disabled="@_isSavingLeave">
+                @if (_isSavingLeave)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Submit Request
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Reject Leave Modal *@
+    <Modal @bind-IsVisible="_showRejectModal" Title="Reject Leave Request">
+        <ChildContent>
+            @if (_rejectingLeave != null)
+            {
+                <div class="alert alert-info">
+                    <strong>@_rejectingLeave.EmployeeName</strong> —
+                    @_rejectingLeave.LeaveType (@_rejectingLeave.StartDate.ToString("MMM dd") - @_rejectingLeave.EndDate.ToString("MMM dd"))
+                </div>
+            }
+            <div class="mb-3">
+                <label class="form-label">Rejection Reason *</label>
+                <textarea class="form-control" rows="3" @bind="_rejectReason" placeholder="Explain reason for rejection..."></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showRejectModal = false">Cancel</button>
+            <button type="button" class="btn btn-danger" @onclick="ConfirmRejectLeave" disabled="@(string.IsNullOrWhiteSpace(_rejectReason))">
+                Reject Leave
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Edit Leave Modal *@
+    <Modal @bind-IsVisible="_showEditLeaveModal" Title="Edit Leave Request">
+        <ChildContent>
+            <div class="mb-3">
+                <label class="form-label">Employee</label>
+                <div class="form-control bg-light">
+                    <i class="bi bi-person-fill me-2"></i>@_editLeaveEmployeeName
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Leave Type *</label>
+                <select class="form-select" @bind="_editLeaveForm.LeaveType">
+                    <option value="SIL">Service Incentive Leave</option>
+                    <option value="Sick Leave">Sick Leave</option>
+                    <option value="Maternity Leave">Maternity Leave</option>
+                    <option value="Paternity Leave">Paternity Leave</option>
+                    <option value="Solo Parent Leave">Solo Parent Leave</option>
+                    <option value="Emergency Leave">Emergency Leave</option>
+                </select>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Date *</label>
+                    <input type="date" class="form-control" @bind="_editLeaveForm.StartDate" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">End Date *</label>
+                    <input type="date" class="form-control" @bind="_editLeaveForm.EndDate" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" rows="2" @bind="_editLeaveForm.Reason" placeholder="Reason for leave..."></textarea>
+            </div>
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showEditLeaveModal = false">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="SubmitEditLeave" disabled="@_isSavingEditLeave">
+                @if (_isSavingEditLeave)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Save Changes
+            </button>
+        </FooterContent>
+    </Modal>
+
+    @* Archive Confirm Modal *@
+    <Modal @bind-IsVisible="_showArchiveConfirmModal" Title="Archive Leave Request">
+        <ChildContent>
+            @if (_archivingLeave != null)
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Are you sure you want to archive this leave request?
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <p class="mb-1"><strong>@_archivingLeave.EmployeeName</strong></p>
+                        <p class="mb-1">@_archivingLeave.LeaveType — @_archivingLeave.StartDate.ToString("MMM dd") to @_archivingLeave.EndDate.ToString("MMM dd, yyyy")</p>
+                        <p class="mb-0 text-muted">Status: @_archivingLeave.Status</p>
+                    </div>
+                </div>
+            }
+        </ChildContent>
+        <FooterContent>
+            <button type="button" class="btn btn-secondary" @onclick="() => _showArchiveConfirmModal = false">Cancel</button>
+            <button type="button" class="btn btn-danger" @onclick="ConfirmArchiveLeave" disabled="@_isArchiving">
+                @if (_isArchiving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Archive
+            </button>
+        </FooterContent>
+    </Modal>
+
     <Modal @bind-IsVisible="_showClockModal" Title="Clock In/Out">
         <ChildContent>
             <div class="mb-3">
@@ -472,6 +755,8 @@
     private DateTime _weekStart;
     private DateTime _weekEnd;
     private int? _employeeFilter;
+    private string _searchTerm = string.Empty;
+    private string _statusFilter = string.Empty;
 
     // Stats
     private int _clockedInCount;
@@ -480,11 +765,27 @@
     private int _notYetInCount;
     private decimal _todayHours;
 
+    // Tab state
+    private string _activeTab = "entries";
+
     // Data
     private List<LookupItem> _employeeLookup = new();
     private List<LiveStatusViewModel> _liveStatus = new();
     private List<TimesheetViewModel> _timesheets = new();
     private List<TimeEntryViewModel> _timeEntries = new();
+
+    private IEnumerable<LiveStatusViewModel> FilteredLiveStatus
+    {
+        get
+        {
+            IEnumerable<LiveStatusViewModel> result = _liveStatus;
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+                result = result.Where(s => s.EmployeeName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(_statusFilter))
+                result = result.Where(s => s.Status == _statusFilter);
+            return result;
+        }
+    }
 
     // Clock modal
     private bool _showClockModal;
@@ -497,6 +798,28 @@
     private bool _showManualEntryModal;
     private bool _isSaving;
     private ManualEntryFormModel _manualEntry = new();
+
+    // Leave
+    private bool _showLeaveModal;
+    private bool _isSavingLeave;
+    private LeaveFormModel _leaveForm = new();
+    private List<TimeOffResponse> _leaveRequests = new();
+    private List<TimeOffResponse> _pendingLeaveRequests = new();
+    private bool _showRejectModal;
+    private TimeOffResponse? _rejectingLeave;
+    private string _rejectReason = string.Empty;
+
+    // Edit leave
+    private bool _showEditLeaveModal;
+    private bool _isSavingEditLeave;
+    private int _editLeaveId;
+    private string _editLeaveEmployeeName = string.Empty;
+    private LeaveFormModel _editLeaveForm = new();
+
+    // Archive leave
+    private bool _showArchiveConfirmModal;
+    private bool _isArchiving;
+    private TimeOffResponse? _archivingLeave;
 
     // Permission flags
     private bool _canManage;
@@ -555,6 +878,8 @@ RolePermissionService.HasPermission("timeattendance.manage");
                     _currentEmployeeName = AuthService.CurrentUser?.Username ?? "You";
             }
         }
+
+        await LoadLeaveRequests();
     }
 
     private void SetCurrentWeek()
@@ -566,24 +891,24 @@ RolePermissionService.HasPermission("timeattendance.manage");
         _weekEnd = _weekStart.AddDays(6);
     }
 
-    private void PreviousWeek()
+    private async Task PreviousWeek()
     {
         _weekStart = _weekStart.AddDays(-7);
         _weekEnd = _weekStart.AddDays(6);
-        _ = LoadTimeData();
+        await LoadTimeData();
     }
 
-    private void NextWeek()
+    private async Task NextWeek()
     {
         _weekStart = _weekStart.AddDays(7);
         _weekEnd = _weekStart.AddDays(6);
-        _ = LoadTimeData();
+        await LoadTimeData();
     }
 
-    private void GoToCurrentWeek()
+    private async Task GoToCurrentWeek()
     {
         SetCurrentWeek();
-        _ = LoadTimeData();
+        await LoadTimeData();
     }
 
     private async Task OnEmployeeFilterChange(ChangeEventArgs e)
@@ -1016,6 +1341,233 @@ base64);
         _alertType = type;
     }
 
+    // Leave Request Methods
+    private async Task LoadLeaveRequests()
+    {
+        try
+        {
+            if (_canManage)
+            {
+                // Admins see all requests
+                var result = await TimeAttendanceService.GetTimeOffRequestsAsync(pageSize: 50);
+                _leaveRequests = result.Items.OrderByDescending(r => r.CreatedAt).ToList();
+                _pendingLeaveRequests = await TimeAttendanceService.GetPendingTimeOffRequestsAsync();
+            }
+            else
+            {
+                // Regular employees see only their own requests
+                _leaveRequests = await TimeAttendanceService.GetMyTimeOffRequestsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading leave requests: {ex.Message}");
+            _leaveRequests = new List<TimeOffResponse>();
+        }
+    }
+
+    private void ShowLeaveRequestModal()
+    {
+        var currentEmployeeId = AuthService.CurrentUser?.EmployeeId ?? 0;
+        _leaveForm = new LeaveFormModel
+        {
+            EmployeeId = _isAdminUser ? 0 : currentEmployeeId,
+            StartDate = PhilippineTime.Today.AddDays(1),
+            EndDate = PhilippineTime.Today.AddDays(1)
+        };
+        _showLeaveModal = true;
+    }
+
+    private async Task SubmitLeaveRequest()
+    {
+        if (_leaveForm.EmployeeId == 0)
+        {
+            ShowAlert("Please select an employee.", Alert.AlertType.Warning);
+            return;
+        }
+        if (_leaveForm.StartDate > _leaveForm.EndDate)
+        {
+            ShowAlert("End date must be on or after start date.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSavingLeave = true;
+        try
+        {
+            var request = new CreateTimeOffRequest
+            {
+                EmployeeId = _leaveForm.EmployeeId,
+                LeaveType = _leaveForm.LeaveType,
+                StartDate = _leaveForm.StartDate,
+                EndDate = _leaveForm.EndDate,
+                Reason = _leaveForm.Reason
+            };
+
+            var result = await TimeAttendanceService.CreateTimeOffRequestAsync(request);
+            if (result != null)
+            {
+                ShowAlert("Leave request submitted successfully!", Alert.AlertType.Success);
+                _showLeaveModal = false;
+                await LoadLeaveRequests();
+            }
+            else
+            {
+                ShowAlert("Failed to submit leave request. Check leave balance.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isSavingLeave = false;
+        }
+    }
+
+    private async Task ApproveLeaveRequest(int timeOffRequestId)
+    {
+        try
+        {
+            var result = await TimeAttendanceService.ApproveTimeOffAsync(timeOffRequestId);
+            if (result != null)
+            {
+                ShowAlert("Leave request approved.", Alert.AlertType.Success);
+                await LoadLeaveRequests();
+            }
+            else
+            {
+                ShowAlert("Failed to approve leave request.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private void ShowRejectModal(TimeOffResponse leave)
+    {
+        _rejectingLeave = leave;
+        _rejectReason = string.Empty;
+        _showRejectModal = true;
+    }
+
+    private async Task ConfirmRejectLeave()
+    {
+        if (_rejectingLeave == null || string.IsNullOrWhiteSpace(_rejectReason)) return;
+
+        try
+        {
+            var result = await TimeAttendanceService.RejectTimeOffAsync(_rejectingLeave.TimeOffRequestId, _rejectReason);
+            if (result != null)
+            {
+                ShowAlert("Leave request rejected.", Alert.AlertType.Info);
+                _showRejectModal = false;
+                await LoadLeaveRequests();
+            }
+            else
+            {
+                ShowAlert("Failed to reject leave request.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+    }
+
+    private void ShowEditLeaveModal(TimeOffResponse leave)
+    {
+        _editLeaveId = leave.TimeOffRequestId;
+        _editLeaveEmployeeName = leave.EmployeeName;
+        _editLeaveForm = new LeaveFormModel
+        {
+            EmployeeId = leave.EmployeeId,
+            LeaveType = leave.LeaveType,
+            StartDate = leave.StartDate,
+            EndDate = leave.EndDate,
+            Reason = leave.Reason
+        };
+        _showEditLeaveModal = true;
+    }
+
+    private async Task SubmitEditLeave()
+    {
+        if (_editLeaveForm.StartDate > _editLeaveForm.EndDate)
+        {
+            ShowAlert("End date must be on or after start date.", Alert.AlertType.Warning);
+            return;
+        }
+
+        _isSavingEditLeave = true;
+        try
+        {
+            var request = new UpdateTimeOffRequest
+            {
+                LeaveType = _editLeaveForm.LeaveType,
+                StartDate = _editLeaveForm.StartDate,
+                EndDate = _editLeaveForm.EndDate,
+                Reason = _editLeaveForm.Reason
+            };
+
+            var result = await TimeAttendanceService.UpdateTimeOffAsync(_editLeaveId, request);
+            if (result != null)
+            {
+                ShowAlert("Leave request updated successfully!", Alert.AlertType.Success);
+                _showEditLeaveModal = false;
+                await LoadLeaveRequests();
+            }
+            else
+            {
+                ShowAlert("Failed to update leave request.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isSavingEditLeave = false;
+        }
+    }
+
+    private void ArchiveLeaveRequest(TimeOffResponse leave)
+    {
+        _archivingLeave = leave;
+        _showArchiveConfirmModal = true;
+    }
+
+    private async Task ConfirmArchiveLeave()
+    {
+        if (_archivingLeave == null) return;
+
+        _isArchiving = true;
+        try
+        {
+            var success = await TimeAttendanceService.CancelTimeOffAsync(_archivingLeave.TimeOffRequestId);
+            if (success)
+            {
+                ShowAlert("Leave request archived.", Alert.AlertType.Success);
+                _showArchiveConfirmModal = false;
+                await LoadLeaveRequests();
+            }
+            else
+            {
+                ShowAlert("Failed to archive leave request.", Alert.AlertType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowAlert($"Error: {ex.Message}", Alert.AlertType.Error);
+        }
+        finally
+        {
+            _isArchiving = false;
+        }
+    }
+
     // View Models
     private class LiveStatusViewModel
     {
@@ -1052,9 +1604,9 @@ base64);
         public TimeSpan? ClockOut { get; set; }
         public int BreakMinutes { get; set; }
         public bool IsApproved { get; set; }
-        public decimal TotalHours => ClockOut.HasValue
+        public decimal TotalHours => Math.Max(0, ClockOut.HasValue
         ? (decimal)(ClockOut.Value - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours
-        : (decimal)(PhilippineTime.Now.TimeOfDay - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours;
+        : (decimal)(PhilippineTime.Now.TimeOfDay - ClockIn - TimeSpan.FromMinutes(BreakMinutes)).TotalHours);
     }
 
     private class ClockFormModel
@@ -1070,5 +1622,14 @@ base64);
         public TimeOnly? ClockOut { get; set; }
         public int BreakMinutes { get; set; }
         public string Notes { get; set; } = string.Empty;
+    }
+
+    private class LeaveFormModel
+    {
+        public int EmployeeId { get; set; }
+        public string LeaveType { get; set; } = "SIL";
+        public DateTime StartDate { get; set; } = DateTime.Today.AddDays(1);
+        public DateTime EndDate { get; set; } = DateTime.Today.AddDays(1);
+        public string Reason { get; set; } = string.Empty;
     }
 }

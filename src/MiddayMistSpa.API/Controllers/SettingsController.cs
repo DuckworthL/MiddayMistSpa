@@ -311,4 +311,76 @@ public class SettingsController : ControllerBase
             return StatusCode(500, new { message = "Failed to delete role" });
         }
     }
+
+    // =========================================================================
+    // Philippine Holidays
+    // =========================================================================
+
+    [HttpGet("holidays")]
+    public async Task<ActionResult<List<HolidayResponse>>> GetHolidays([FromQuery] int? year)
+    {
+        try
+        {
+            var holidays = await _settingsService.GetHolidaysAsync(year);
+            return Ok(holidays);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting holidays");
+            return StatusCode(500, new { message = "Failed to retrieve holidays" });
+        }
+    }
+
+    [HttpPost("holidays")]
+    public async Task<ActionResult<HolidayResponse>> CreateHoliday([FromBody] CreateHolidayRequest request)
+    {
+        try
+        {
+            var holiday = await _settingsService.CreateHolidayAsync(request);
+            return Ok(holiday);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating holiday");
+            return StatusCode(500, new { message = "Failed to create holiday" });
+        }
+    }
+
+    [HttpPut("holidays/{holidayId}")]
+    public async Task<ActionResult<HolidayResponse>> UpdateHoliday(int holidayId, [FromBody] UpdateHolidayRequest request)
+    {
+        try
+        {
+            var holiday = await _settingsService.UpdateHolidayAsync(holidayId, request);
+            return Ok(holiday);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating holiday {HolidayId}", holidayId);
+            return StatusCode(500, new { message = "Failed to update holiday" });
+        }
+    }
+
+    [HttpDelete("holidays/{holidayId}")]
+    public async Task<ActionResult> DeleteHoliday(int holidayId)
+    {
+        try
+        {
+            await _settingsService.DeleteHolidayAsync(holidayId);
+            return Ok(new { message = "Holiday deleted successfully" });
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting holiday {HolidayId}", holidayId);
+            return StatusCode(500, new { message = "Failed to delete holiday" });
+        }
+    }
 }

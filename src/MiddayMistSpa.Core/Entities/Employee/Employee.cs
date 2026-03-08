@@ -49,6 +49,10 @@ public class Employee
     public string? LicenseNumber { get; set; }
     public DateTime? LicenseExpiryDate { get; set; }
 
+    // Bank Account (for payroll disbursement)
+    public string? BankName { get; set; }
+    public string? BankAccountNumber { get; set; }
+
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

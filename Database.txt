@@ -897,6 +897,25 @@ CREATE TABLE Refunds (
     CONSTRAINT FK_Refunds_ProcessedBy FOREIGN KEY (ProcessedBy) REFERENCES Users(UserId)
 );
 
+-- Cash Drawer Sessions Table
+CREATE TABLE CashDrawerSessions (
+    SessionId INT IDENTITY(1,1) PRIMARY KEY,
+    OpenedByUserId INT NOT NULL,
+    ClosedByUserId INT NULL,
+    OpenedAt DATETIME2 NOT NULL,
+    ClosedAt DATETIME2 NULL,
+    StartingFloat DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalCashIn DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalCashOut DECIMAL(18,2) NOT NULL DEFAULT 0,
+    ExpectedCash DECIMAL(18,2) NOT NULL DEFAULT 0,
+    ActualCash DECIMAL(18,2) NULL,
+    Discrepancy DECIMAL(18,2) NULL,
+    Status NVARCHAR(20) NOT NULL DEFAULT 'Open', -- Open, Closed
+    Notes NVARCHAR(500) NULL,
+    CONSTRAINT FK_CashDrawer_OpenedBy FOREIGN KEY (OpenedByUserId) REFERENCES Users(UserId),
+    CONSTRAINT FK_CashDrawer_ClosedBy FOREIGN KEY (ClosedByUserId) REFERENCES Users(UserId)
+);
+
 -- ================================================================
 -- SECTION 8: ACCOUNTING TABLES
 -- ================================================================
@@ -1096,7 +1115,7 @@ PRINT 'Section 3 - Payroll: PhilippineHolidays, SSSContributionRates, PhilHealth
 PRINT 'Section 4 - Customer Management: Customers, CustomerSegments, LoyaltyPointTransactions';
 PRINT 'Section 5 - Services & Inventory: ServiceCategories, Services, ProductCategories, Products, ProductBatches, ServiceProductRequirements, Suppliers, PurchaseOrders, PurchaseOrderItems, StockAdjustments';
 PRINT 'Section 6 - Appointments & Bookings: Rooms, Appointments, AppointmentServiceItems, Waitlists';
-PRINT 'Section 7 - POS & Transactions: Transactions, TransactionServiceItems, TransactionProductItems, Refunds';
+PRINT 'Section 7 - POS & Transactions: Transactions, TransactionServiceItems, TransactionProductItems, Refunds, CashDrawerSessions';
 PRINT 'Section 8 - Accounting: ChartOfAccounts, JournalEntries, JournalEntryLines, Invoices, InvoiceLines';
 PRINT 'Section 9 - System Configuration: SystemSettings, CurrencyRates';
 GO

@@ -417,3 +417,25 @@ public class JournalSummaryResponse
     public decimal TotalDebits { get; set; }
     public decimal TotalCredits { get; set; }
 }
+
+// ============================================================================
+// Fiscal Year Close DTOs
+// ============================================================================
+
+public class FiscalYearCloseRequest
+{
+    [Required]
+    public int FiscalYear { get; set; }
+}
+
+public class FiscalYearCloseResponse
+{
+    public int FiscalYear { get; set; }
+    public int JournalEntryId { get; set; }
+    public string EntryNumber { get; set; } = string.Empty;
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal NetIncome { get; set; }
+    public int AccountsClosed { get; set; }
+    public DateTime ClosedAt { get; set; }
+}

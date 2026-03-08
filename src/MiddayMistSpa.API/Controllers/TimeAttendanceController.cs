@@ -157,6 +157,24 @@ public class TimeAttendanceController : ControllerBase
     // Time Off Request Endpoints
     // ============================================================================
 
+    [HttpGet("time-off/my-requests")]
+    public async Task<ActionResult<List<TimeOffResponse>>> GetMyTimeOffRequests()
+    {
+        var userId = GetCurrentUserId();
+        var employeeId = await _timeAttendanceService.GetEmployeeIdByUserIdAsync(userId);
+        if (employeeId == null)
+            return Ok(new List<TimeOffResponse>());
+
+        var request = new TimeOffSearchRequest
+        {
+            EmployeeId = employeeId,
+            PageSize = 50,
+            SortDescending = true
+        };
+        var result = await _timeAttendanceService.SearchTimeOffRequestsAsync(request);
+        return Ok(result.Items);
+    }
+
     [HttpPost("time-off")]
     public async Task<ActionResult<TimeOffResponse>> CreateTimeOffRequest([FromBody] CreateTimeOffRequest request)
     {

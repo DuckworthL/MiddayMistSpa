@@ -28,4 +28,10 @@ public interface ISettingsService
     Task<RoleListResponse> CreateRoleAsync(CreateRoleRequest request);
     Task<RoleListResponse> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequest request);
     Task<bool> DeleteRoleAsync(int roleId);
+
+    // Holiday Management
+    Task<List<HolidayResponse>> GetHolidaysAsync(int? year = null);
+    Task<HolidayResponse> CreateHolidayAsync(CreateHolidayRequest request);
+    Task<HolidayResponse> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request);
+    Task<bool> DeleteHolidayAsync(int holidayId);
 }

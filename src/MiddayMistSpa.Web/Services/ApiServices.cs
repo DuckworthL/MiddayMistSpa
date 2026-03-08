@@ -480,6 +480,8 @@ public interface IInventoryApiService
     Task<(bool Success, string? ErrorMessage)> AdjustStockWithErrorAsync(StockAdjustmentRequest request);
     Task<List<ProductResponse>> GetLowStockProductsAsync();
     Task<List<LookupItem>> GetProductLookupAsync();
+    Task<List<SupplierResponse>> GetSuppliersAsync();
+    Task<SupplierResponse?> CreateSupplierAsync(CreateSupplierRequest request);
 }
 
 public class InventoryApiService : IInventoryApiService
@@ -545,6 +547,17 @@ public class InventoryApiService : IInventoryApiService
     {
         var result = await _apiClient.GetAsync<List<ProductCategoryResponse>>("api/inventory/categories");
         return result ?? new List<ProductCategoryResponse>();
+    }
+
+    public async Task<List<SupplierResponse>> GetSuppliersAsync()
+    {
+        var result = await _apiClient.GetAsync<List<SupplierResponse>>("api/inventory/suppliers");
+        return result ?? new List<SupplierResponse>();
+    }
+
+    public async Task<SupplierResponse?> CreateSupplierAsync(CreateSupplierRequest request)
+    {
+        return await _apiClient.PostAsync<CreateSupplierRequest, SupplierResponse>("api/inventory/suppliers", request);
     }
 
     public async Task<bool> SaveCategoryAsync(CreateCategoryRequest request, int? id = null)
@@ -692,7 +705,7 @@ public class TransactionApiService : ITransactionApiService
     public async Task<decimal> GetTodayRevenueAsync()
     {
         // Use transactions list and sum completed transactions for today
-        var result = await _apiClient.GetAsync<PagedResponse<TransactionResponse>>($"api/transactions?startDate={PhilippineTime.Today:yyyy-MM-dd}&endDate={PhilippineTime.Today:yyyy-MM-dd}&pageSize=1000");
+        var result = await _apiClient.GetAsync<PagedResponse<TransactionResponse>>($"api/transactions?dateFrom={PhilippineTime.Today:yyyy-MM-dd}&dateTo={PhilippineTime.Today:yyyy-MM-dd}&pageSize=1000");
         return result?.Items?.Where(t => t.PaymentStatus == "Completed").Sum(t => t.TotalAmount) ?? 0;
     }
 
@@ -737,6 +750,9 @@ public interface IPayrollApiService
 
     // Payroll Preview
     Task<List<PayrollRecordResponse>> PreviewPayrollAsync(DateTime startDate, DateTime endDate);
+
+    // Bank File
+    Task<(byte[]? FileContent, string? FileName, string? ContentType, string? ErrorMessage)> DownloadBankFileAsync(int periodId);
 }
 
 public class PayrollApiService : IPayrollApiService
@@ -851,6 +867,11 @@ public class PayrollApiService : IPayrollApiService
         var result = await _apiClient.GetAsync<List<PayrollRecordResponse>>(url);
         return result ?? new List<PayrollRecordResponse>();
     }
+
+    public async Task<(byte[]? FileContent, string? FileName, string? ContentType, string? ErrorMessage)> DownloadBankFileAsync(int periodId)
+    {
+        return await _apiClient.PostForFileAsync($"api/payroll/bank-file/{periodId}", new { });
+    }
 }
 
 // =============================================================================
@@ -877,9 +898,13 @@ public interface ITimeAttendanceApiService
 
     // Time Off / Leave
     Task<PagedResponse<TimeOffResponse>> GetTimeOffRequestsAsync(int? employeeId = null, string? status = null, int page = 1, int pageSize = 20);
+    Task<List<TimeOffResponse>> GetPendingTimeOffRequestsAsync();
+    Task<List<TimeOffResponse>> GetMyTimeOffRequestsAsync();
     Task<TimeOffResponse?> CreateTimeOffRequestAsync(CreateTimeOffRequest request);
     Task<TimeOffResponse?> ApproveTimeOffAsync(int id);
     Task<TimeOffResponse?> RejectTimeOffAsync(int id, string reason);
+    Task<TimeOffResponse?> UpdateTimeOffAsync(int id, UpdateTimeOffRequest request);
+    Task<bool> CancelTimeOffAsync(int id);
 
     // Live Status
     Task<List<LiveAttendanceStatus>> GetLiveStatusAsync();
@@ -990,7 +1015,29 @@ public class TimeAttendanceApiService : ITimeAttendanceApiService
 
     public async Task<TimeOffResponse?> RejectTimeOffAsync(int id, string reason)
     {
-        return await _apiClient.PostAsync<object, TimeOffResponse>($"api/time-attendance/time-off/{id}/reject", new { reason });
+        return await _apiClient.PostAsync<RejectTimeOffRequestModel, TimeOffResponse>($"api/time-attendance/time-off/{id}/reject", new RejectTimeOffRequestModel { RejectionReason = reason });
+    }
+
+    public async Task<TimeOffResponse?> UpdateTimeOffAsync(int id, UpdateTimeOffRequest request)
+    {
+        return await _apiClient.PutAsync<UpdateTimeOffRequest, TimeOffResponse>($"api/time-attendance/time-off/{id}", request);
+    }
+
+    public async Task<bool> CancelTimeOffAsync(int id)
+    {
+        return await _apiClient.DeleteAsync($"api/time-attendance/time-off/{id}");
+    }
+
+    public async Task<List<TimeOffResponse>> GetPendingTimeOffRequestsAsync()
+    {
+        var result = await _apiClient.GetAsync<List<TimeOffResponse>>("api/time-attendance/time-off/pending");
+        return result ?? new List<TimeOffResponse>();
+    }
+
+    public async Task<List<TimeOffResponse>> GetMyTimeOffRequestsAsync()
+    {
+        var result = await _apiClient.GetAsync<List<TimeOffResponse>>("api/time-attendance/time-off/my-requests");
+        return result ?? new List<TimeOffResponse>();
     }
 
     public async Task<List<LiveAttendanceStatus>> GetLiveStatusAsync()
@@ -1015,10 +1062,11 @@ public interface IReportsApiService
     Task<QuickStatsResponse?> GetQuickStatsAsync();
     Task<SalesReportResponse?> GetSalesReportAsync(DateTime startDate, DateTime endDate, string? groupBy = null);
     Task<ServicePerformanceResponse?> GetServicePerformanceAsync(DateTime startDate, DateTime endDate);
-    Task<EmployeePerformanceResponse?> GetEmployeePerformanceAsync(DateTime startDate, DateTime endDate);
+    Task<EmployeePerformanceResponse?> GetEmployeePerformanceAsync(DateTime startDate, DateTime endDate, int? employeeId = null);
     Task<CustomerReportResponse?> GetCustomerReportAsync(DateTime startDate, DateTime endDate);
     Task<InventoryReportResponse?> GetInventoryReportAsync();
     Task<(byte[]? FileContent, string? FileName, string? ContentType, string? ErrorMessage)> ExportReportAsync(string reportType, string format, DateTime startDate, DateTime endDate);
+    Task<CommissionSummaryResponse?> GetCommissionSummaryAsync(DateTime startDate, DateTime endDate);
 }
 
 public class ReportsApiService : IReportsApiService
@@ -1058,9 +1106,11 @@ public class ReportsApiService : IReportsApiService
         return await _apiClient.GetAsync<ServicePerformanceResponse>($"api/reports/services/performance?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
     }
 
-    public async Task<EmployeePerformanceResponse?> GetEmployeePerformanceAsync(DateTime startDate, DateTime endDate)
+    public async Task<EmployeePerformanceResponse?> GetEmployeePerformanceAsync(DateTime startDate, DateTime endDate, int? employeeId = null)
     {
-        return await _apiClient.GetAsync<EmployeePerformanceResponse>($"api/reports/employees/performance?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
+        var url = $"api/reports/employees/performance?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}";
+        if (employeeId.HasValue) url += $"&employeeId={employeeId.Value}";
+        return await _apiClient.GetAsync<EmployeePerformanceResponse>(url);
     }
 
     public async Task<CustomerReportResponse?> GetCustomerReportAsync(DateTime startDate, DateTime endDate)
@@ -1077,6 +1127,11 @@ public class ReportsApiService : IReportsApiService
     {
         var request = new { ReportType = reportType, Format = format, StartDate = startDate, EndDate = endDate };
         return await _apiClient.PostForFileAsync("api/reports/export", request);
+    }
+
+    public async Task<CommissionSummaryResponse?> GetCommissionSummaryAsync(DateTime startDate, DateTime endDate)
+    {
+        return await _apiClient.GetAsync<CommissionSummaryResponse>($"api/reports/commission-summary?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}");
     }
 }
 
@@ -1191,6 +1246,9 @@ public interface IAccountingApiService
     Task<ExpenseSummaryResponse?> GetExpenseSummaryAsync();
     Task<IncomeSummaryResponse?> GetIncomeSummaryAsync();
     Task<JournalSummaryResponse?> GetJournalSummaryAsync();
+
+    // Fiscal Year Close
+    Task<(FiscalYearCloseResponse? Result, string? Error)> PerformFiscalYearCloseAsync(int fiscalYear);
 }
 
 public class AccountingApiService : IAccountingApiService
@@ -1383,6 +1441,60 @@ public class AccountingApiService : IAccountingApiService
     public async Task<JournalSummaryResponse?> GetJournalSummaryAsync()
     {
         return await _apiClient.GetAsync<JournalSummaryResponse>("api/accounting/journal-entries/summary");
+    }
+
+    public async Task<(FiscalYearCloseResponse? Result, string? Error)> PerformFiscalYearCloseAsync(int fiscalYear)
+    {
+        var (result, error) = await _apiClient.PostWithErrorAsync<FiscalYearCloseRequest, FiscalYearCloseResponse>(
+            "api/accounting/fiscal-year-close", new FiscalYearCloseRequest { FiscalYear = fiscalYear });
+        return (result, error);
+    }
+}
+
+// =============================================================================
+// Cash Drawer API Service
+// =============================================================================
+
+public interface ICashDrawerApiService
+{
+    Task<CashDrawerSessionResponse?> GetActiveSessionAsync();
+    Task<(CashDrawerSessionResponse? Result, string? Error)> OpenDrawerAsync(OpenDrawerRequest request);
+    Task<(CashDrawerSessionResponse? Result, string? Error)> CloseDrawerAsync(CloseDrawerRequest request);
+    Task<List<CashDrawerSessionResponse>> GetSessionHistoryAsync(DateTime? startDate = null, DateTime? endDate = null);
+}
+
+public class CashDrawerApiService : ICashDrawerApiService
+{
+    private readonly IApiClient _apiClient;
+
+    public CashDrawerApiService(IApiClient apiClient)
+    {
+        _apiClient = apiClient;
+    }
+
+    public async Task<CashDrawerSessionResponse?> GetActiveSessionAsync()
+    {
+        return await _apiClient.GetAsync<CashDrawerSessionResponse>("api/cash-drawer/active");
+    }
+
+    public async Task<(CashDrawerSessionResponse? Result, string? Error)> OpenDrawerAsync(OpenDrawerRequest request)
+    {
+        return await _apiClient.PostWithErrorAsync<OpenDrawerRequest, CashDrawerSessionResponse>("api/cash-drawer/open", request);
+    }
+
+    public async Task<(CashDrawerSessionResponse? Result, string? Error)> CloseDrawerAsync(CloseDrawerRequest request)
+    {
+        return await _apiClient.PostWithErrorAsync<CloseDrawerRequest, CashDrawerSessionResponse>("api/cash-drawer/close", request);
+    }
+
+    public async Task<List<CashDrawerSessionResponse>> GetSessionHistoryAsync(DateTime? startDate = null, DateTime? endDate = null)
+    {
+        var url = "api/cash-drawer/history";
+        var queryParams = new List<string>();
+        if (startDate.HasValue) queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
+        if (endDate.HasValue) queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+        if (queryParams.Any()) url += "?" + string.Join("&", queryParams);
+        return await _apiClient.GetAsync<List<CashDrawerSessionResponse>>(url) ?? new();
     }
 }
 
@@ -1769,6 +1881,12 @@ public interface ISettingsApiService
     Task<(SettingsRoleListResponse? Result, string? Error)> CreateRoleAsync(CreateRoleRequest request);
     Task<SettingsRoleListResponse?> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequest request);
     Task<(bool Success, string? Error)> DeleteRoleAsync(int roleId);
+
+    // Holiday Management
+    Task<List<HolidayResponse>> GetHolidaysAsync(int? year = null);
+    Task<HolidayResponse?> CreateHolidayAsync(CreateHolidayRequest request);
+    Task<HolidayResponse?> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request);
+    Task<bool> DeleteHolidayAsync(int holidayId);
 }
 
 public class SettingsApiService : ISettingsApiService
@@ -1832,4 +1950,23 @@ public class SettingsApiService : ISettingsApiService
 
     public async Task<(bool Success, string? Error)> DeleteRoleAsync(int roleId)
         => await _apiClient.DeleteWithErrorAsync($"api/settings/roles/{roleId}");
+
+    // Holiday Management
+    public async Task<List<HolidayResponse>> GetHolidaysAsync(int? year = null)
+    {
+        var url = year.HasValue ? $"api/settings/holidays?year={year}" : "api/settings/holidays";
+        return await _apiClient.GetAsync<List<HolidayResponse>>(url) ?? new();
+    }
+
+    public async Task<HolidayResponse?> CreateHolidayAsync(CreateHolidayRequest request)
+        => await _apiClient.PostAsync<CreateHolidayRequest, HolidayResponse>("api/settings/holidays", request);
+
+    public async Task<HolidayResponse?> UpdateHolidayAsync(int holidayId, UpdateHolidayRequest request)
+        => await _apiClient.PutAsync<UpdateHolidayRequest, HolidayResponse>($"api/settings/holidays/{holidayId}", request);
+
+    public async Task<bool> DeleteHolidayAsync(int holidayId)
+    {
+        var (success, _) = await _apiClient.DeleteWithErrorAsync($"api/settings/holidays/{holidayId}");
+        return success;
+    }
 }

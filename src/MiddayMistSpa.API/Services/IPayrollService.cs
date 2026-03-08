@@ -71,4 +71,10 @@ public interface IPayrollService
 
     Task<ThirteenthMonthPayResponse> CalculateThirteenthMonthPayAsync(int employeeId, int year);
     Task<List<ThirteenthMonthPayResponse>> CalculateThirteenthMonthPayAllAsync(int year);
+
+    // ============================================================================
+    // Bank File Export
+    // ============================================================================
+
+    Task<byte[]> GenerateBankFileAsync(int payrollPeriodId);
 }

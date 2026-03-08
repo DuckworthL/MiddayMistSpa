@@ -54,4 +54,9 @@ public interface IReportingService
     // Export
     // ============================================================================
     Task<ExportResponse> ExportReportAsync(ExportRequest request);
+
+    // ============================================================================
+    // Commission Summary
+    // ============================================================================
+    Task<CommissionSummaryResponse> GetCommissionSummaryAsync(CommissionSummaryRequest request);
 }

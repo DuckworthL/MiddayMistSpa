@@ -1631,4 +1631,148 @@ public class AccountingService : IAccountingService
             TotalCredits = await allEntries.SumAsync(j => (decimal?)j.TotalCredit) ?? 0
         };
     }
+
+    // ============================================================================
+    // Fiscal Year Close
+    // ============================================================================
+
+    public async Task<FiscalYearCloseResponse> PerformFiscalYearCloseAsync(int fiscalYear, int userId)
+    {
+        // Validate year
+        if (fiscalYear < 2020 || fiscalYear > PhilippineTime.Today.Year)
+            throw new InvalidOperationException($"Invalid fiscal year: {fiscalYear}");
+
+        // Check if already closed
+        var existingClose = await _context.JournalEntries
+            .AnyAsync(j => j.ReferenceType == "FiscalYearClose" && j.ReferenceId == fiscalYear.ToString() && j.Status != "Voided");
+        if (existingClose)
+            throw new InvalidOperationException($"Fiscal year {fiscalYear} has already been closed");
+
+        var yearStart = new DateTime(fiscalYear, 1, 1);
+        var yearEnd = new DateTime(fiscalYear, 12, 31);
+
+        // Load all revenue and expense accounts with their journal lines
+        var temporaryAccounts = await _context.ChartOfAccounts
+            .Where(a => a.IsActive && (a.AccountType == DomainConstants.AccountTypes.Revenue || a.AccountType == DomainConstants.AccountTypes.Expense))
+            .Include(a => a.JournalEntryLines)
+            .ThenInclude(l => l.JournalEntry)
+            .ToListAsync();
+
+        // Find retained earnings account (code 3200)
+        var retainedEarnings = await _context.ChartOfAccounts
+            .FirstOrDefaultAsync(a => a.AccountCode == "3200" && a.AccountType == DomainConstants.AccountTypes.Equity);
+        if (retainedEarnings == null)
+            throw new InvalidOperationException("Retained Earnings account (3200) not found. Cannot perform fiscal year close.");
+
+        // Calculate balances for the fiscal year
+        var closingLines = new List<JournalEntryLine>();
+        decimal totalRevenue = 0;
+        decimal totalExpenses = 0;
+        int accountsClosed = 0;
+
+        foreach (var account in temporaryAccounts)
+        {
+            var balance = CalculateAccountBalance(account, yearStart, yearEnd);
+            if (balance == 0) continue;
+
+            accountsClosed++;
+
+            if (account.AccountType == DomainConstants.AccountTypes.Revenue)
+            {
+                totalRevenue += balance;
+                // Revenue accounts are credit-normal; to zero them, debit them
+                closingLines.Add(new JournalEntryLine
+                {
+                    AccountId = account.AccountId,
+                    DebitAmount = balance,
+                    CreditAmount = 0,
+                    Description = $"Close {account.AccountName} for FY {fiscalYear}",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            else // Expense
+            {
+                totalExpenses += balance;
+                // Expense accounts are debit-normal; to zero them, credit them
+                closingLines.Add(new JournalEntryLine
+                {
+                    AccountId = account.AccountId,
+                    DebitAmount = 0,
+                    CreditAmount = balance,
+                    Description = $"Close {account.AccountName} for FY {fiscalYear}",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        if (!closingLines.Any())
+            throw new InvalidOperationException($"No revenue or expense balances to close for fiscal year {fiscalYear}");
+
+        // Net income = Revenue - Expenses
+        var netIncome = totalRevenue - totalExpenses;
+
+        // Add retained earnings line to balance the entry
+        if (netIncome > 0)
+        {
+            // Net profit: credit retained earnings
+            closingLines.Add(new JournalEntryLine
+            {
+                AccountId = retainedEarnings.AccountId,
+                DebitAmount = 0,
+                CreditAmount = netIncome,
+                Description = $"Net income transferred to Retained Earnings for FY {fiscalYear}",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        else if (netIncome < 0)
+        {
+            // Net loss: debit retained earnings
+            closingLines.Add(new JournalEntryLine
+            {
+                AccountId = retainedEarnings.AccountId,
+                DebitAmount = Math.Abs(netIncome),
+                CreditAmount = 0,
+                Description = $"Net loss transferred to Retained Earnings for FY {fiscalYear}",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        var entryNumber = await GenerateEntryNumberAsync();
+        var totalDebits = closingLines.Sum(l => l.DebitAmount);
+        var totalCredits = closingLines.Sum(l => l.CreditAmount);
+
+        var journalEntry = new JournalEntry
+        {
+            EntryNumber = entryNumber,
+            EntryDate = yearEnd,
+            Description = $"Fiscal Year {fiscalYear} Closing Entry — Transfer net income to Retained Earnings",
+            ReferenceType = "FiscalYearClose",
+            ReferenceId = fiscalYear.ToString(),
+            TotalDebit = totalDebits,
+            TotalCredit = totalCredits,
+            Status = "Posted",
+            CreatedBy = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        foreach (var line in closingLines)
+            journalEntry.Lines.Add(line);
+
+        _context.JournalEntries.Add(journalEntry);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Fiscal year {Year} closed. Net income: {NetIncome:C}. Entry: {EntryNumber}", fiscalYear, netIncome, entryNumber);
+
+        return new FiscalYearCloseResponse
+        {
+            FiscalYear = fiscalYear,
+            JournalEntryId = journalEntry.JournalEntryId,
+            EntryNumber = entryNumber,
+            TotalRevenue = totalRevenue,
+            TotalExpenses = totalExpenses,
+            NetIncome = netIncome,
+            AccountsClosed = accountsClosed,
+            ClosedAt = DateTime.UtcNow
+        };
+    }
 }

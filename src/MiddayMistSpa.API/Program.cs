@@ -62,6 +62,7 @@ builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
 builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<ICashDrawerService, CashDrawerService>();
 builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
 builder.Services.AddMemoryCache();
@@ -254,8 +255,9 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, cancellationToken) =>
     {
         context.HttpContext.Response.ContentType = "application/json";
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
         await context.HttpContext.Response.WriteAsync(
-            """{"error":"Too many requests. Please try again later."}""",
+            """{"error":"Too many requests. Please wait 1 minute before trying again."}""",
             cancellationToken);
     };
 });

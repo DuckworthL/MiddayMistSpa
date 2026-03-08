@@ -437,4 +437,24 @@ public class AccountingController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    // ============================================================================
+    // Fiscal Year Close
+    // ============================================================================
+
+    [HttpPost("fiscal-year-close")]
+    [Authorize(Policy = "Permission:accounting.manage")]
+    public async Task<ActionResult<FiscalYearCloseResponse>> PerformFiscalYearClose([FromBody] FiscalYearCloseRequest request)
+    {
+        try
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
+            var result = await _accountingService.PerformFiscalYearCloseAsync(request.FiscalYear, userId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

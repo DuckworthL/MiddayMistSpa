@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MiddayMistSpa.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using MiddayMistSpa.Infrastructure.Data;
 namespace MiddayMistSpa.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(SpaDbContext))]
-    partial class SpaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260308073545_SchemaUpdates_SupplierFK_CashDrawer_BankFields")]
+    partial class SchemaUpdates_SupplierFK_CashDrawer_BankFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1703,10 +1706,6 @@ namespace MiddayMistSpa.Infrastructure.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProductId"));
-
-                    b.Property<string>("Brand")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
 
                     b.Property<decimal>("CostPrice")
                         .HasPrecision(18, 2)
